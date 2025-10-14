@@ -4,30 +4,27 @@
   <meta charset="utf-8" />
   <title>Ingreso | KP Invest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0b4ea2">
+  <meta name="theme-color" content="#00a81c">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
     :root{
-      /* Colores del logo */
-      --brand:#0b4ea2;        /* azul KP */
-      --brand-700:#093f82;    /* hover */
-      --accent:#00a81c;       /* verde KP */
-      --accent-700:#008517;
-
+      /* KP: verde como primario */
+      --brand:#00a81c;        /* verde */
+      --brand-700:#008517;    /* hover */
       --bg:#f6f8fb;
       --surface:#ffffff;
       --ink:#1f2328;
       --muted:#6d7b8a;
       --border:#e9edf3;
-      --ring:0 0 0 4px rgba(11,78,162,.18);
+      --ring:0 0 0 4px rgba(0,168,28,.18);
     }
 
     html,body{height:100%}
     body{
       background:
-        radial-gradient(900px 500px at -10% -10%, rgba(11,78,162,.06), transparent 60%),
+        radial-gradient(900px 500px at -10% -10%, rgba(0,168,28,.07), transparent 60%),
         radial-gradient(700px 400px at 120% 0%, rgba(0,168,28,.05), transparent 60%),
         linear-gradient(#fbfcff,#f6f8fb);
       color:var(--ink);
@@ -50,7 +47,7 @@
     .side{
       background:
         linear-gradient(180deg,#fff, #fff),
-        radial-gradient(60% 60% at 40% 30%, rgba(11,78,162,.09), transparent 72%);
+        radial-gradient(60% 60% at 40% 30%, rgba(0,168,28,.10), transparent 72%);
       padding:clamp(18px, 3vw, 34px);
       min-height: 280px;
     }
@@ -113,7 +110,7 @@
     <div class="side col-12 col-lg-6 d-flex flex-column">
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
-          <!-- coloca tu archivo real del logo -->
+          <!-- ÚNICO logo -->
           <img src="/assets/img/logo.png" alt="KP Invest" loading="lazy" decoding="async">
         </a>
       </div>
