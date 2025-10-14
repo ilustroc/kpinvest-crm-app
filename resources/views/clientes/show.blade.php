@@ -5,6 +5,17 @@
 
 @push('head')
 <style>
+  /* ====== Marca KP: verde primario + azul acento (fallback si el layout está cacheado) ====== */
+  :root{
+    --brand:#00a81c;        /* verde KP */
+    --brand-ink:#008517;    /* hover/ink */
+    --accent:#0b4ea2;       /* azul KP */
+    --accent-ink:#093f82;
+
+    --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
+    --ink:#151a23; --muted:#6d7b8a;
+  }
+
   /* ====== Densidad / helpers ====== */
   .tbl-compact.table> :not(caption)>*>*{ padding:.5rem .65rem }
   .max-h-320{ max-height:320px; overflow:auto }
@@ -27,33 +38,30 @@
   .tbl-compact thead th{
     position: sticky; top: 0; z-index: 1;
     background: color-mix(in oklab, var(--surface-2) 55%, transparent);
+    color: var(--ink);
     text-transform: uppercase; font-size:.8rem; letter-spacing:.3px;
     border-bottom:1px solid var(--border);
     box-shadow:0 3px 8px rgba(15,23,42,.06);
-  }
-  [data-theme="dark"] .tbl-compact thead th{
-    background: color-mix(in oklab, var(--surface-2) 42%, transparent);
-    box-shadow:0 3px 10px rgba(0,0,0,.25);
   }
   .tbl-compact tbody tr:nth-child(even){
     background: color-mix(in oklab, var(--surface-2) 14%, transparent);
   }
   .tbl-compact tbody tr:hover{
-    background: color-mix(in oklab, var(--brand) 10%, transparent);
+    background: color-mix(in oklab, var(--accent) 10%, var(--brand) 6%);
   }
   .tbl-compact tfoot td{
     background: color-mix(in oklab, var(--surface-2) 35%, transparent);
     font-weight:700; border-top:1px solid var(--border);
   }
 
-  /* ====== Promesas: look de fila destacada por estado ====== */
+  /* ====== Promesas: look de fila destacada por estado (azul preaprobada, verde aprobada) ====== */
   .promesas .table>tbody>tr{ transition:box-shadow .2s ease, transform .05s ease }
   .promesas .table>tbody>tr:hover{ box-shadow:0 1px 0 rgba(15,23,42,.06) inset, 0 2px 10px rgba(15,23,42,.06) }
 
-  .promesas .pp-state-preaprobada  { box-shadow: 4px 0 0 0 #7aa7f7 inset; background: color-mix(in oklab,#e9f1ff 25%, transparent) }
-  .promesas .pp-state-aprobada     { box-shadow: 4px 0 0 0 #57b485 inset; background: color-mix(in oklab,#e7fbf1 22%, transparent) }
-  .promesas .pp-state-rechazada    { box-shadow: 4px 0 0 0 #e38074 inset; background: color-mix(in oklab,#feecec 20%, transparent) }
-  .promesas .pp-state-pendiente    { box-shadow: 4px 0 0 0 #cfd7e1 inset; background: color-mix(in oklab,#f3f6fa 18%, transparent) }
+  .promesas .pp-state-preaprobada  { box-shadow: 4px 0 0 0 var(--accent) inset; background: color-mix(in oklab, var(--accent) 18%, transparent) }
+  .promesas .pp-state-aprobada     { box-shadow: 4px 0 0 0 var(--brand) inset;  background: color-mix(in oklab, var(--brand) 18%, transparent) }
+  .promesas .pp-state-rechazada    { box-shadow: 4px 0 0 0 #e38074 inset;       background: color-mix(in oklab,#e38074 16%, transparent) }
+  .promesas .pp-state-pendiente    { box-shadow: 4px 0 0 0 #cfd7e1 inset;       background: color-mix(in oklab,#cfd7e1 16%, transparent) }
 
   .promesas .card-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.5rem }
   .promesas .hint{ color:var(--muted); font-size:.85rem }
@@ -77,7 +85,7 @@
   }
 
   .table-responsive::-webkit-scrollbar{ height:10px }
-  .table-responsive::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--brand) 22%, transparent); border-radius:10px }
+  .table-responsive::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--accent) 22%, transparent); border-radius:10px }
 
   /* ====== DECISIONES ====== */
   .decision-cell{ min-width:260px }
@@ -91,10 +99,17 @@
     padding:.45rem .6rem;
     background:var(--surface);
   }
-  .decision-box.is-preaprobada{ border-left-color:#7aa7f7; background:color-mix(in oklab,#dfeffd 35%, transparent) }
-  .decision-box.is-aprobada{ border-left-color:#57b485; background:color-mix(in oklab,#dff7ea 35%, transparent) }
-  .decision-box.is-rechazada{ border-left-color:#e38074; background:color-mix(in oklab,#fde0de 35%, transparent) }
-  .decision-box.is-pendiente{ border-left-color:#cfd7e1; background:color-mix(in oklab,#e9edf3 35%, transparent) }
+  .decision-box.is-preaprobada{ border-left-color:var(--accent); background:color-mix(in oklab, var(--accent) 20%, transparent) }
+  .decision-box.is-aprobada{ border-left-color:var(--brand); background:color-mix(in oklab, var(--brand) 20%, transparent) }
+  .decision-box.is-rechazada{ border-left-color:#e38074; background:color-mix(in oklab,#e38074 20%, transparent) }
+  .decision-box.is-pendiente{ border-left-color:#cfd7e1; background:color-mix(in oklab,#cfd7e1 20%, transparent) }
+
+  /* ====== Botones coherentes (primario verde, outline primario azul acento en esta vista) ====== */
+  .btn-primary{ background:var(--brand); border-color:var(--brand) }
+  .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
+
+  .btn-outline-primary{ color:var(--accent); border-color:var(--accent) }
+  .btn-outline-primary:hover{ color:#fff; background:var(--accent-ink); border-color:var(--accent-ink) }
 </style>
 @endpush
 
@@ -195,10 +210,9 @@
             // CCDs precargados
             $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
 
-            // CNAs por operación (MAPA que envía el controller del show)
+            // CNAs por operación
             $cnas = collect($cnasByOperacion[$c->operacion] ?? []);
 
-            // helpers
             $badgeFor = function($estado) {
               $e = strtolower((string)$estado);
               return match (true) {
@@ -283,7 +297,7 @@
             </td>
             {{-- === /CELDA CNA === --}}
 
-            {{-- === CELDA CCD (sin cambios) === --}}
+            {{-- === CELDA CCD === --}}
             <td class="text-nowrap">
               @if($docsCcd->count() === 1)
                 @php
@@ -392,18 +406,16 @@
           <tbody>
             @forelse($pagos as $p)
               @php
-                // Tolerante a objeto o array
                 $oper = $p->oper ?? $p['oper'] ?? '-';
                 $fec  = $p->fecha ?? $p['fecha'] ?? null;
                 $mon  = $p->monto ?? $p['monto'] ?? 0;
                 $gest = $p->gestor ?? $p['gestor'] ?? '-';
                 $st   = strtoupper($p->estado ?? $p['estado'] ?? '-');
 
-                // Badge por estado
                 $cls = 'bg-secondary-subtle text-secondary border';
                 if (str_contains($st,'CANCEL')) $cls = 'bg-success-subtle text-success border';
                 elseif (str_contains($st,'PEND')) $cls = 'bg-warning-subtle text-warning border';
-                elseif (preg_match('/CUOTA|ABONO|PARCIAL/', $st)) $cls = 'bg-danger-subtle text-danger border'; // <-- salmon
+                elseif (preg_match('/CUOTA|ABONO|PARCIAL/', $st)) $cls = 'bg-danger-subtle text-danger border';
                 elseif (preg_match('/RECHAZ|ANUL/', $st)) $cls = 'bg-danger-subtle text-danger border';
               @endphp
               <tr>
@@ -454,26 +466,22 @@
                 $notaDec  = $pp->decision_nota;
                 $autorDec = $pp->decision_user_name;
                 $fechaFmt = $pp->decision_at?->format('d/m/Y H:i');
-                $state    = $pp->workflow_estado ?? 'pendiente'; // preaprobada|aprobada|rechazada|pendiente
+                $state    = $pp->workflow_estado ?? 'pendiente';
                 $rowClass = 'pp-state-'.str_replace(['pre-aprobada',' '], ['preaprobada',''], strtolower($state));
               @endphp
               <tr class="{{ $rowClass }}">
-                {{-- Fecha --}}
                 <td class="text-nowrap">{{ optional($pp->fecha_promesa)->format('d/m/Y') ?? '—' }}</td>
 
-                {{-- Tipo --}}
                 <td>
                   <span class="badge badge-pill {{ $pp->tipo_badge_class }}">
                     {{ $pp->tipo_label }}
                   </span>
                 </td>
 
-                {{-- Monto principal (si monto = 0, cae a monto_convenio) --}}
                 <td class="text-end text-nowrap">
                   S/ {{ number_format((float)(($pp->monto ?? 0) > 0 ? $pp->monto : ($pp->monto_convenio ?? 0)), 2) }}
                 </td>
 
-                {{-- Operaciones --}}
                 <td class="text-nowrap">
                   @php
                     $ops = $pp->relationLoaded('operaciones') ? $pp->operaciones->pluck('operacion')->all() : [];
@@ -488,7 +496,6 @@
                   @endif
                 </td>
 
-                {{-- Plan (convenio) --}}
                 <td class="small">
                   @if($pp->tipo === 'convenio')
                     {{ (int)($pp->nro_cuotas ?? 0) }} cuota(s)
@@ -500,7 +507,6 @@
                   @endif
                 </td>
 
-                {{-- Compromiso --}}
                 <td class="small">
                   @if($pp->fecha_pago)
                     <div>{{ optional($pp->fecha_pago)->format('d/m/Y') }}</div>
@@ -513,7 +519,6 @@
                   @endif
                 </td>
 
-                {{-- Decisión / Nota --}}
                 <td class="decision-cell">
                   <div class="d-flex flex-column gap-2">
                     <span class="badge badge-pill {{ $pp->workflow_badge_class }}">
@@ -558,7 +563,6 @@
                   </div>
                 </td>
 
-                {{-- Acciones --}}
                 <td class="text-end">
                   @php $estado = strtolower($pp->workflow_estado ?? ''); @endphp
 
@@ -592,7 +596,6 @@
           <h5 class="modal-title"><i class="bi bi-journal-text me-1"></i> Nota</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <!-- usa white-space:pre-wrap para mostrar saltos de línea -->
         <div class="modal-body"><div id="notaFull" class="mb-0" style="white-space:pre-wrap"></div></div>
         <div class="modal-footer"><button class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button></div>
       </div>
@@ -631,7 +634,6 @@
                     <option value="cancelacion">Cancelación</option>
                   </optgroup>
                 </select>
-                <!-- bandera opcional por si quieres leerla en backend en el futuro -->
                 <input type="hidden" name="force_balon" id="forceBalon" value="0">
               </div>
               <div class="col-md-6">
@@ -640,7 +642,7 @@
               </div>
             </div>
 
-            {{-- CONVENIO (cronograma sin "Balón") --}}
+            {{-- CONVENIO --}}
             <div id="formConvenio" class="row g-2">
               <div class="col-md-3">
                 <label class="form-label">Nro cuotas</label>
@@ -659,7 +661,7 @@
                 <input type="date" id="cvFechaIni" class="form-control">
                 <div class="form-text" id="cvHintDia">Día de pago: —</div>
               </div>
-            
+
               <div class="col-12">
                 <div class="d-flex gap-2 align-items-center mb-2">
                   <button type="button" id="cvGen" class="btn btn-outline-secondary btn-sm">
@@ -667,7 +669,7 @@
                   </button>
                   <span class="text-secondary small">Puedes editar fechas y montos después de generar.</span>
                 </div>
-            
+
                 <div class="table-responsive">
                   <table class="table table-sm align-middle tbl-compact" id="tblCrono">
                     <thead>
@@ -688,10 +690,10 @@
                     </tfoot>
                   </table>
                 </div>
-            
+
                 {{-- inputs ocultos que se envían --}}
                 <div id="cvHidden"></div>
-            
+
                 <div class="row g-2 mt-2">
                   <div class="col-md-4">
                     <div class="form-text">Deuda capital seleccionada: <b>S/ <span id="cvCapSel">0.00</span></b></div>
@@ -703,7 +705,7 @@
                     <div class="form-text">Cuota balón estimada (capital − convenio): <b>S/ <span id="cvBalonEst">0.00</span></b></div>
                   </div>
                 </div>
-            
+
                 <div class="form-text mt-1">
                   * El total del cronograma debe coincidir con el <b>Monto convenio</b>.
                 </div>
@@ -749,13 +751,13 @@
         </div>
 
         <div class="modal-body">
-          {{-- N.º de carta (mostrar el correlativo que tocaría) --}}
+          {{-- N.º de carta --}}
           <div class="mb-3">
             <label class="form-label">N.º de carta</label>
             <input class="form-control" value="{{ $nextNroCarta ?? '—' }}" disabled>
             <div class="form-text">Se asignará este correlativo al guardar.</div>
           </div>
-          
+
           {{-- Fecha de pago y monto pagado --}}
           <div class="row g-2">
             <div class="col-md-6">
@@ -853,14 +855,13 @@
 @push('scripts')
 <script>
     (function(){
-      // ===== Map de saldos por operación (inyectado desde Blade)
-      // => { "6799186": 1400.23, ... }
+      /* === Map de saldos por operación === */
       const OP_SALDOS = @json($cuentas->pluck('saldo_capital','operacion'));
-    
-      // ===== Refs del cronograma
+
+      /* === Refs cronograma === */
       const nro   = document.getElementById('cvNro');
-      const total = document.getElementById('cvTotal');   // Monto convenio
-      const cuota = document.getElementById('cvCuota');   // sugerido (opcional)
+      const total = document.getElementById('cvTotal');
+      const cuota = document.getElementById('cvCuota');
       const fIni  = document.getElementById('cvFechaIni');
       const gen   = document.getElementById('cvGen');
       const tblEl = document.getElementById('tblCrono');
@@ -868,32 +869,23 @@
       const hid   = document.getElementById('cvHidden');
       const btnGuardar = document.querySelector('#formPropuesta button[type="submit"]');
       const hintDia = document.getElementById('cvHintDia');
-    
-      // Resumenes extra
-      const capSelOut = document.getElementById('cvCapSel');   // span para capital seleccionado
-      const balonOut  = document.getElementById('cvBalonEst'); // span para cuota balón estimada
-    
+
+      const capSelOut = document.getElementById('cvCapSel');
+      const balonOut  = document.getElementById('cvBalonEst');
+
       if (!tblEl || !nro || !total || !hid) return;
       const tbl = tblEl.querySelector('tbody');
-    
-      // ===== Utils
+
       const to2 = n => String(n).padStart(2,'0');
       const fmt = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
       const num = v => Number(String(v ?? '').replace(',','.')) || 0;
-    
+
       const selectedOps = () =>
         [...document.querySelectorAll('#opsHidden input[name="operaciones[]"]')].map(i => i.value);
-    
+
       const capitalSeleccionado = () =>
         selectedOps().reduce((s, op) => s + (num(OP_SALDOS?.[op])||0), 0);
-    
-      // Ocultar la columna BALÓN (ya no se usa en convenio estándar)
-      (function hideBalonColumn(){
-        const ths = document.querySelectorAll('#tblCrono thead th');
-        if (ths.length >= 4) ths[3].style.display = 'none';
-      })();
-    
-      // ===== Render de filas del cronograma
+
       function renderRows(n){
         tbl.innerHTML = '';
         for (let i=1; i<=n; i++){
@@ -902,45 +894,36 @@
             <td class="text-center">${to2(i)}</td>
             <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
             <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
-            <td style="display:none"></td>
           `;
           tbl.appendChild(tr);
         }
         recalc();
       }
-    
-      // ===== Recalc + sincronización de inputs ocultos
+
       function recalc(){
-        // 1) totalizar cronograma
         let s = 0;
-        const rows = [...tbl.querySelectorAll('tr')];
-        rows.forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
+        [...tbl.querySelectorAll('tr')].forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
         if (suma) suma.textContent = fmt(s);
-    
-        // 2) sincronizar ocultos
+
         hid.innerHTML = '';
-        rows.forEach(tr => {
+        [...tbl.querySelectorAll('tr')].forEach(tr => {
           const f = tr.querySelector('.cr-fecha')?.value || '';
           const m = tr.querySelector('.cr-monto')?.value || '';
           hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_fecha[]" value="${f}">`);
           hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
         });
-        // (no enviamos cron_balon)
-    
-        // 3) resumenes: capital seleccionado y cuota balón estimada
+
         const capSel = capitalSeleccionado();
         const montoConvenio = num(total.value);
         const balon = Math.max(0, +(capSel - montoConvenio).toFixed(2));
         if (capSelOut) capSelOut.textContent = fmt(capSel);
         if (balonOut)  balonOut.textContent  = fmt(balon);
-    
-        // 4) validación: suma cronograma == monto convenio
+
         const ok = Math.abs(s - montoConvenio) <= 0.01;
         if (btnGuardar) btnGuardar.disabled = !ok;
         if (suma) suma.classList.toggle('text-danger', !ok);
       }
-    
-      // ===== Autogenerar cronograma
+
       function addMonthsNoOverflow(base, months){
         const d = new Date(base);
         const day = d.getDate();
@@ -952,10 +935,10 @@
         const n = Math.max(1, parseInt(nro.value || '0', 10));
         if (!n) return;
         if (tbl.children.length !== n) renderRows(n);
-    
+
         const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
         const m = num(cuota?.value) || (num(total.value) / n);
-    
+
         [...tbl.querySelectorAll('tr')].forEach((tr, idx)=>{
           const f = tr.querySelector('.cr-fecha');
           const mm = tr.querySelector('.cr-monto');
@@ -967,16 +950,10 @@
         });
         recalc();
       }
-    
-      // ===== Eventos cronograma
+
       gen?.addEventListener('click', genAuto);
-      nro.addEventListener('change', ()=>{
-        const n = Math.max(1, parseInt(nro.value || '1', 10));
-        renderRows(n);
-      });
-      tbl.addEventListener('input', e=>{
-        if (e.target.matches('.cr-monto, .cr-fecha')) recalc();
-      });
+      nro.addEventListener('change', ()=>{ renderRows(Math.max(1, parseInt(nro.value || '1', 10))); });
+      tbl.addEventListener('input', e=>{ if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
       fIni?.addEventListener('change', ()=>{
         const v = fIni.value;
         if (!hintDia) return;
@@ -985,21 +962,20 @@
         hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
       });
       total?.addEventListener('input', recalc);
-    
-      // Estado inicial
+
       renderRows(Math.max(1, parseInt(nro.value || '1', 10)));
     })();
-    
+
     /* ================== Utilidades generales de la vista ================== */
-    
+
     // Tooltips
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{ new bootstrap.Tooltip(el); });
-    
+
     // Copiar DNI
     document.getElementById('btnCopyDni')?.addEventListener('click', async ()=>{
       try{ await navigator.clipboard.writeText(String(@json($dni))); alert('DNI copiado.'); }catch(e){ alert('No se pudo copiar.'); }
     });
-    
+
     // Copiar tabla (sin CSV)
     function copyTableToClipboard(tableId, cols){
       const t = document.getElementById(tableId); if(!t) return;
@@ -1018,14 +994,14 @@
     document.getElementById('btnCopyPag')?.addEventListener('click', async ()=>{
       try{ await copyTableToClipboard('tblPagos'); alert('Pagos copiados.'); }catch(e){ alert('No se pudo copiar.'); }
     });
-    
+
     // Modal Nota — soporta data-nota y data-nota-json
     (function(){
       const modal = document.getElementById('modalNota');
       if (!modal) return;
 
       modal.addEventListener('show.bs.modal', (ev) => {
-        const btn = ev.relatedTarget; // botón que abrió el modal
+        const btn = ev.relatedTarget;
         let txt = '';
         if (!btn) return;
 
@@ -1033,7 +1009,6 @@
           try { txt = JSON.parse(btn.getAttribute('data-nota-json') || '""') || ''; }
           catch { txt = ''; }
         } else if (btn.hasAttribute('data-nota')) {
-          // viene ya como texto plano
           txt = btn.getAttribute('data-nota') || '';
         }
 
@@ -1041,13 +1016,13 @@
         if (tgt) tgt.textContent = String(txt);
       });
     })();
-    
+
     // ===== Selección de cuentas (para el modal de propuesta)
     const chkAll   = document.getElementById('chkAll');
     const chks     = Array.from(document.querySelectorAll('.chkOp'));
     const btnProp  = document.getElementById('btnPropuesta');
     const selCount = document.getElementById('selCount');
-    
+
     function refreshSelection(){
       const selected = chks.filter(c => c.checked && !c.disabled).map(c => c.value).filter(Boolean);
       selCount.textContent = String(selected.length);
@@ -1064,44 +1039,40 @@
       if (enabled) chkAll.checked = (checked === enabled);
       refreshSelection();
     }));
-    
-    // ===== Modal Propuesta: llenar operaciones y recalcular capital/balón
+
+    // ===== Modal Propuesta
     const modalProp = document.getElementById('modalPropuesta');
     const opsResumen = document.getElementById('opsResumen');
     const opsHidden  = document.getElementById('opsHidden');
-    
+
     modalProp?.addEventListener('show.bs.modal', () => {
       const ops = refreshSelection();
-    
-      // Resumen visible
+
       opsResumen.innerHTML = ops.length
         ? ops.map(o => `<span class="badge rounded-pill text-bg-light border me-1">${o}</span>`).join('')
         : '<span class="text-secondary">Ninguna</span>';
-    
-      // Hidden inputs
+
       opsHidden.innerHTML = '';
       ops.forEach(op => {
         const i = document.createElement('input');
         i.type = 'hidden'; i.name = 'operaciones[]'; i.value = String(op);
         opsHidden.appendChild(i);
       });
-    
-      // Disparar recálculo (para capital seleccionado / balón estimado)
+
       document.getElementById('cvTotal')?.dispatchEvent(new Event('input'));
     });
-    
-    // ===== Alternar bloques por tipo (y DESHABILITAR el bloque oculto)
+
+    // ===== Alternar bloques por tipo
     const tipo = document.getElementById('tipoPropuesta');
     const fCon = document.getElementById('formConvenio');
     const fCan = document.getElementById('formCancelacion');
-    
+
     function setEnabled(container, enabled){
       if (!container) return;
       container.querySelectorAll('input,select,textarea,button').forEach(el=>{
         if (enabled) el.removeAttribute('disabled');
         else el.setAttribute('disabled','disabled');
       });
-      // Limpia valores del bloque oculto para no mandar basura
       if (!enabled){
         container.querySelectorAll('input:not([type="hidden"]),textarea').forEach(el=>{ el.value=''; });
       }
@@ -1112,13 +1083,12 @@
     }
     function toggleTipo(){
       const t = tipo.value;
-      // Mostrar/ocultar
       fCon.classList.toggle('d-none', t !== 'convenio');
       fCan.classList.toggle('d-none', t !== 'cancelacion');
-      // Habilitar/deshabilitar
+
       setEnabled(fCon, t === 'convenio');
       setEnabled(fCan, t === 'cancelacion');
-      // Requireds
+
       const fields = {
         convenio: ['nro_cuotas','monto_convenio'],
         cancelacion: ['fecha_pago_cancel','monto_cancel']
@@ -1129,8 +1099,8 @@
     }
     tipo?.addEventListener('change', toggleTipo);
     toggleTipo();
-    
-    // Hint opcional (si usas fecha inicial)
+
+    // Hint opcional
     const fechaPagoConvenio = document.getElementById('fechaPagoConvenio') || document.querySelector('[name="fecha_pago"]');
     const hintDiaMes = document.getElementById('hintDiaMes');
     function actualizarHint(){
@@ -1145,7 +1115,7 @@
     fechaPagoConvenio?.addEventListener('change', actualizarHint);
     actualizarHint();
 
-  // ====== Selección de operaciones (reutiliza tus .chkOp) ======
+  // ====== Selección de operaciones para CNA ======
   const cnaBtn      = document.getElementById('btnSolicitarCna');
   const cnaSelCount = document.getElementById('cnaSelCount');
   const cnaOpsHidden= document.getElementById('cnaOpsHidden');
@@ -1168,7 +1138,6 @@
   document.getElementById('chkAll')?.addEventListener('change', refreshUI);
   refreshUI();
 
-  // Al abrir el modal, ponemos los hidden de operaciones[]
   document.getElementById('modalCna')?.addEventListener('show.bs.modal', () => {
     const ops = getOpsSeleccionadas();
     cnaOpsHidden.innerHTML = '';
