@@ -1,31 +1,27 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>@yield('title','CONSORCIO DE ABOGADOS DEL PERU')</title>
+  <title>@yield('title','KP INVEST')</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#00a81c">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    /* ======= TOKENS (marca rojo sobrio) ======= */
+    /* ======= TOKENS (marca verde KP) ======= */
     :root{
-      --brand:#cc3024;            /* principal */
-      --brand-ink:#a32820;        /* hover/ink */
-      --brand-tint:#fde6e3;       /* tint suave */
+      --brand:#00a81c;            /* verde principal */
+      --brand-ink:#008517;        /* hover/ink */
+      --brand-tint:#e9f9ec;       /* tint suave */
       --radius:14px; --radius-sm:10px;
       --shadow:0 12px 36px rgba(15,23,42,.08);
       --shadow-sm:0 8px 22px rgba(15,23,42,.06);
       --font:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-      --content-max:1220px; /* un poco más compacto */
-    }
+      --content-max:1220px;
 
-    /* ======= ESCALA GLOBAL (similar a 90-94% de zoom) ======= */
-    html{ font-size:15px; }           /* 15px ≈ 93.75% del 16px default */
-    @media (min-width: 1600px){ html{ font-size:14.5px; } } /* pantallas grandes ≈ 90% */
-
-    [data-theme="light"]{
+      /* Tema ÚNICO (light) */
       --bg:#f7f8fc; --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
       --ink:#151a23; --muted:#6d7b8a;
 
@@ -33,14 +29,10 @@
       --bs-secondary-color:var(--muted); --bs-border-color:var(--border);
       --bs-card-bg:var(--surface); --bs-card-border-color:var(--border);
     }
-    [data-theme="dark"]{
-      --bg:#0b1016; --surface:#0f141b; --surface-2:#0c1218; --border:#1a232e;
-      --ink:#eaf0f6; --muted:#97a6b7;
 
-      --bs-body-bg:var(--bg); --bs-body-color:var(--ink); --bs-heading-color:var(--ink);
-      --bs-secondary-color:var(--muted); --bs-border-color:var(--border);
-      --bs-card-bg:var(--surface); --bs-card-border-color:var(--border);
-    }
+    /* ======= ESCALA GLOBAL ======= */
+    html{ font-size:15px; }
+    @media (min-width: 1600px){ html{ font-size:14.5px; } }
 
     html,body{height:100%}
     body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font)}
@@ -52,32 +44,22 @@
     .rail{
       width:240px; flex:0 0 240px; height:100vh; position:sticky; top:0;
       background:
-        radial-gradient(900px 500px at -10% -10%, color-mix(in oklab, var(--brand) 6%, transparent), transparent 60%),
+        radial-gradient(900px 500px at -10% -10%, color-mix(in oklab, var(--brand) 8%, transparent), transparent 60%),
         linear-gradient(180deg, var(--surface-2), var(--surface));
       border-right:1px solid var(--border);
       display:flex; flex-direction:column;
-    }
-    [data-theme="dark"] .rail{
-      background:
-        radial-gradient(900px 500px at -10% -10%, color-mix(in oklab, var(--brand) 10%, transparent), transparent 60%),
-        linear-gradient(180deg, var(--surface-2), var(--surface));
     }
 
     .brand{ display:flex; gap:12px; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border) }
     .brand .mark{
       width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
-      background: color-mix(in oklab, var(--brand) 12%, transparent);
+      background: color-mix(in oklab, var(--brand) 14%, transparent);
       color:var(--brand);
       flex:0 0 40px;
       font-size:1.05rem;
     }
-    /* LOGO: más compacto y swap por tema */
     .logo { display:flex; align-items:center; gap:10px }
-    .logo img{ height:36px; width:auto; display:block }
-    .logo .logo-light{ display:inline-block }
-    .logo .logo-dark{ display:none }
-    [data-theme="dark"] .logo .logo-light{ display:none }
-    [data-theme="dark"] .logo .logo-dark{ display:inline-block }
+    .logo img{ height:36px; width:auto; display:block } /* usa 1 solo logo.png */
 
     .who{padding:10px 16px; border-bottom:1px solid var(--border)}
     .who .n{font-weight:700}
@@ -93,36 +75,26 @@
     }
     .navy a i{
       color:var(--brand);
-      background: color-mix(in oklab, var(--brand) 14%, transparent);
+      background: color-mix(in oklab, var(--brand) 16%, transparent);
       width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
       font-size:1rem;
     }
     .navy a:hover{
-      background: color-mix(in oklab, var(--brand) 8%, transparent);
-      border-color: color-mix(in oklab, var(--brand) 20%, transparent);
+      background: color-mix(in oklab, var(--brand) 10%, transparent);
+      border-color: color-mix(in oklab, var(--brand) 26%, transparent);
     }
     .navy a.active{
-      background: color-mix(in oklab, var(--brand) 12%, transparent);
-      border-color: color-mix(in oklab, var(--brand) 32%, transparent);
+      background: color-mix(in oklab, var(--brand) 14%, transparent);
+      border-color: color-mix(in oklab, var(--brand) 36%, transparent);
       font-weight:600;
     }
     .navy a.active::before{
       content:""; position:absolute; left:-10px; top:8px; bottom:8px; width:4px;
       background: linear-gradient(180deg, var(--brand), var(--brand-ink)); border-radius:8px;
     }
-    [data-theme="dark"] .navy a:hover{
-      background: color-mix(in oklab, var(--brand) 14%, transparent);
-      border-color: color-mix(in oklab, var(--brand) 38%, transparent);
-    }
 
     .rail-foot{margin-top:auto; padding:12px; border-top:1px solid var(--border)}
-    .theme-btn{
-      width:100%; height:40px; border-radius:12px; border:1px solid var(--border);
-      background:var(--surface); display:flex; align-items:center; justify-content:center; gap:8px;
-      color:var(--ink); font-weight:500; font-size:.96rem;
-    }
-    .theme-btn .sun{display:inline} .theme-btn .moon{display:none}
-    [data-theme="dark"] .theme-btn .sun{display:none} [data-theme="dark"] .theme-btn .moon{display:inline}
+    .rail-foot .small{ color:var(--muted); }
 
     /* ======= MAIN ======= */
     .main{flex:1; min-width:0; display:flex; flex-direction:column;}
@@ -154,7 +126,7 @@
     .chip:hover{transform:translateY(-1px); box-shadow:var(--shadow)}
     .chip .t{display:flex; align-items:center; gap:10px; font-weight:600}
     .chip .t i{
-      color:var(--brand); background:color-mix(in oklab, var(--brand) 16%, transparent);
+      color:var(--brand); background:color-mix(in oklab, var(--brand) 18%, transparent);
       width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
       font-size:1rem;
     }
@@ -177,7 +149,7 @@
       outline-offset:2px; border-radius:10px;
     }
 
-    /* ======= Tablas / formularios más compactos ======= */
+    /* ======= Tablas / formularios compactos ======= */
     .table> :not(caption)>*>*{ padding:.55rem .75rem; }
     .form-control,.form-select{ background:var(--surface); border-color:var(--border); }
     .form-control::placeholder{ color:var(--muted) }
@@ -186,15 +158,14 @@
       border-color: color-mix(in oklab, var(--brand) 52%, var(--border));
       box-shadow: 0 0 0 .25rem color-mix(in oklab, var(--brand) 22%, transparent);
     }
-    [data-theme="dark"] .form-control,[data-theme="dark"] .form-select{ color:var(--ink) }
 
-    /* ======= Botones globales en rojo marca (sustituye azul bootstrap) ======= */
+    /* ======= Botones globales en verde ======= */
     .btn-primary{ background:var(--brand); border-color:var(--brand); }
     .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink); }
     .btn-primary:focus{ box-shadow:0 0 0 .25rem color-mix(in oklab, var(--brand) 28%, transparent) }
 
     .btn-outline-primary{ color:var(--brand); border-color:var(--brand); }
-    .btn-outline-primary:hover{ color:var(--brand-ink); border-color:var(--brand-ink); background:color-mix(in oklab, var(--brand) 12%, transparent) }
+    .btn-outline-primary:hover{ color:#fff; border-color:var(--brand-ink); background:var(--brand-ink) }
     .btn-outline-primary:focus{ box-shadow:0 0 0 .25rem color-mix(in oklab, var(--brand) 20%, transparent) }
 
     /* ======= Scrollbar ======= */
@@ -219,9 +190,8 @@
       <div class="brand">
         <div class="mark"><i class="bi bi-building"></i></div>
         <div class="logo">
-          {{-- Usa estos dos assets: negro para claro, blanco para oscuro --}}
-          <img class="logo-light" src="{{ asset('assets/img/logo.png') }}" alt="Logo">
-          <img class="logo-dark"  src="{{ asset('assets/img/logo-blanco.png') }}" alt="Logo">
+          <!-- ÚNICO logo -->
+          <img src="{{ asset('assets/img/logo.png') }}" alt="KP INVEST">
         </div>
       </div>
 
@@ -237,7 +207,7 @@
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-graph-up"></i><span>Estadísticas</span></a>
 
         @auth
-          @if(in_array(auth()->user()->role,['supervisor','administrador','sistemas']))
+          @if(in_array(strtolower(auth()->user()->role),['supervisor','administrador','sistemas']))
             <div class="lab">SUPERVISOR</div>
             <a class="{{ request()->is('reportes/pagos') ? 'active' : '' }}" href="{{ url('/reportes/pagos') }}"><i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span></a>
             <a class="{{ request()->is('reportes/gestiones') ? 'active' : '' }}" href="{{ url('/reportes/gestiones') }}"><i class="bi bi-chat-dots"></i><span>Reporte de Gestiones</span></a>
@@ -256,15 +226,13 @@
           <div class="lab">CUENTA</div>
           <form method="POST" action="{{ route('logout') }}" class="px-2">
             @csrf
-            <button class="btn btn-outline-secondary w-100"><i class="bi bi-box-arrow-right me-1"></i> Salir</button>
+            <button class="btn btn-outline-primary w-100"><i class="bi bi-box-arrow-right me-1"></i> Salir</button>
           </form>
         @endauth
       </nav>
 
       <div class="rail-foot">
-        <button class="theme-btn js-theme">
-          <i class="bi bi-sun sun"></i><i class="bi bi-moon moon"></i> Cambiar tema
-        </button>
+        <div class="small">© {{ date('Y') }} KP INVEST</div>
       </div>
     </aside>
 
@@ -275,7 +243,7 @@
     <main class="main">
       <div class="appbar">
         <div class="appbar-in">
-          <button class="btn btn-outline-secondary d-lg-none" onclick="toggleRail()"><i class="bi bi-list"></i></button>
+          <button class="btn btn-outline-primary d-lg-none" onclick="toggleRail()"><i class="bi bi-list"></i></button>
           <div class="crumb">@yield('crumb','')</div>
         </div>
       </div>
@@ -283,7 +251,7 @@
       <div class="content">
         <div class="content-in">
           @yield('content')
-          <div class="footer small">© {{ date('Y') }} CONSORCIO DE ABOGADOS DEL PERU</div>
+          <div class="footer small">© {{ date('Y') }} KP INVEST</div>
         </div>
       </div>
     </main>
@@ -294,19 +262,6 @@
       document.getElementById('rail').classList.toggle('show');
       document.getElementById('backdrop').classList.toggle('show');
     }
-
-    // Tema: guarda preferencia y realiza swap CSS-only (logos cambian solos)
-    const THEME_KEY='impulse.theme';
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initial = localStorage.getItem(THEME_KEY) || (prefersDark ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', initial);
-
-    document.querySelector('.js-theme')?.addEventListener('click',()=>{
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem(THEME_KEY, next);
-    });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   @stack('scripts')
