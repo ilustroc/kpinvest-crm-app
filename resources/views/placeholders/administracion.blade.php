@@ -4,39 +4,80 @@
 
 @push('head')
 <style>
-  h5{font-size:1.05rem; margin-bottom:.75rem}
-  .card.pad{padding:10px 12px}
-  .chip .s{font-size:.88rem}
-  .helper{color:var(--muted); font-size:.82rem}
+  /* ——— Paleta consistente con el layout ——— */
+  :root{
+    /* usa --brand (verde) y --accent (azul) del layout */
+  }
 
-  .table thead th{font-size:.88rem}
-  .table tbody td{font-size:.92rem}
-  .table> :not(caption)>*>*{padding:.55rem .75rem}
+  /* ——— Tipografía / espaciado base ——— */
+  h5{ font-size:1.08rem; margin-bottom:.85rem }
+  .helper{ color:var(--muted); font-size:.85rem }
+  .card.pad{ padding:16px 18px; border-radius:16px }
 
-  .form-control,.form-select{background:var(--surface); border-color:var(--border)}
-  .form-control::placeholder{color:var(--muted)}
+  /* KPIs */
+  .chip{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px }
+  .chip .t{ display:flex; align-items:center; gap:.55rem; font-weight:600; }
+  .chip .t i{
+    color:var(--accent);
+    background:color-mix(in oklab, var(--accent) 14%, transparent);
+    width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
+  }
+  .chip .s{ font-size:.9rem; color:var(--muted) }
+
+  /* Formularios */
+  .form-control,.form-select{ background:var(--surface); border-color:var(--border) }
+  .form-control::placeholder{ color:var(--muted) }
   .form-control:focus,.form-select:focus{
-    background:var(--surface);
-    border-color: color-mix(in oklab, var(--brand) 52%, var(--border));
+    border-color: var(--brand);
     box-shadow: 0 0 0 .25rem color-mix(in oklab, var(--brand) 22%, transparent);
   }
 
-  .badge-soft{background:color-mix(in oklab, var(--brand) 10%, transparent); color:var(--brand); border:1px solid color-mix(in oklab, var(--brand) 22%, transparent)}
-  [data-theme="dark"] .badge-soft{background:color-mix(in oklab, var(--brand) 18%, transparent); color:var(--brand)}
+  /* Estados */
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:.35rem }
+  .dot.on{ background: #16a34a }       /* verde */
+  .dot.off{ background: #d32f2f }      /* rojo */
+  .badge-state{
+    border-radius:999px; padding:.2rem .6rem; border:1px solid var(--border); font-weight:700;
+    background:var(--surface);
+  }
+  .badge-state.on{ color:#166534; background:rgba(22,163,52,.10) }
+  .badge-state.off{ color:#7f1d1d; background:rgba(211,47,47,.10) }
 
-  /* Estado */
-  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:.35rem}
-  .on{background:#16a34a}
-  .off{background:#b91c1c}
-  .badge-state{border-radius:999px;padding:.15rem .55rem;border:1px solid var(--border);font-weight:600}
-  .badge-state.on{color:#166534; background:rgba(22,163,52,.1)}
-  .badge-state.off{color:#991b1b; background:rgba(185,28,28,.08)}
+  /* —— Tabla de estructura (más aire + cebreado + sticky head) —— */
+  .struct .table{ border-collapse:separate; border-spacing:0 }
+  .struct .table thead th{
+    position:sticky; top:0; z-index:1;
+    background: color-mix(in oklab, var(--accent) 9%, #fff);
+    color: var(--ink);
+    text-transform:uppercase; letter-spacing:.3px; font-size:.82rem;
+    box-shadow: 0 3px 8px rgba(15,23,42,.06);
+    border-bottom:1px solid var(--border);
+  }
+  .struct .table> :not(caption)>*>*{ padding:.70rem .85rem }   /* más alto */
+  .struct .table tbody tr:nth-child(odd) td{
+    background: color-mix(in oklab, var(--surface-2) 18%, transparent);
+  }
+  .struct .table tbody tr:hover td{
+    background: color-mix(in oklab, var(--brand) 10%, transparent);
+    transition: background .15s ease;
+  }
 
-  /* Sección estructura: mejoras light/dark */
-  .struct .table thead th{ color: var(--muted); background: color-mix(in oklab, var(--surface-2) 55%, transparent); }
-  [data-theme="dark"] .struct .table thead th{ background: color-mix(in oklab, var(--surface-2) 40%, transparent); }
-  .struct .table tbody tr:nth-child(odd) td{ background: color-mix(in oklab, var(--surface-2) 35%, transparent); }
-  [data-theme="dark"] .struct .table tbody tr:nth-child(odd) td{ background: color-mix(in oklab, var(--surface-2) 20%, transparent); }
+  /* “Tarjetitas” para cada asesor dentro de la celda */
+  .assignee{
+    display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+    padding:.5rem .6rem; border:1px solid var(--border); border-radius:12px;
+    background:var(--surface);
+  }
+  .assignee i{ color:var(--accent) }
+
+  /* Botones coherentes */
+  .btn-primary{ background:var(--brand); border-color:var(--brand) }
+  .btn-primary:hover{ background:color-mix(in oklab, var(--brand) 85%, black); border-color:color-mix(in oklab, var(--brand) 85%, black) }
+  .btn-outline-primary{ color:var(--brand); border-color:var(--brand) }
+  .btn-outline-primary:hover{ color:#fff; background:var(--brand); border-color:var(--brand) }
+
+  /* Separadores suaves */
+  hr{ border-color:var(--border); opacity:1 }
 </style>
 @endpush
 
@@ -78,7 +119,7 @@
     <div class="col-lg-6">
       <div class="card pad">
         <h5 class="mb-3 d-flex align-items-center gap-2">
-          <i class="bi bi-person-gear"></i> <span>Crear Supervisor</span>
+          <i class="bi bi-person-gear" style="color:var(--accent)"></i> <span>Crear Supervisor</span>
         </h5>
         <form method="POST" action="{{ route('administracion.supervisores.store') }}" class="vstack gap-3" autocomplete="off">
           @csrf
@@ -109,7 +150,7 @@
     <div class="col-lg-6">
       <div class="card pad">
         <h5 class="mb-3 d-flex align-items-center gap-2">
-          <i class="bi bi-person-plus"></i> <span>Crear Asesor</span>
+          <i class="bi bi-person-plus" style="color:var(--accent)"></i> <span>Crear Asesor</span>
         </h5>
         <form method="POST" action="{{ route('administracion.asesores.store') }}" class="vstack gap-3" autocomplete="off">
           @csrf
@@ -133,9 +174,7 @@
             <select name="supervisor_id" class="form-select" required>
               <option value="">Selecciona…</option>
               @foreach($supervisores as $sup)
-                <option value="{{ $sup->id }}" @selected(old('supervisor_id')==$sup->id)>
-                  {{ $sup->name }} — {{ $sup->email }}
-                </option>
+                <option value="{{ $sup->id }}" @selected(old('supervisor_id')==$sup->id)>{{ $sup->name }} — {{ $sup->email }}</option>
               @endforeach
             </select>
             @error('supervisor_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
@@ -151,7 +190,7 @@
   {{-- Estructura: Supervisores y Asesores --}}
   <div class="card pad mt-3 struct">
     <h5 class="mb-3 d-flex align-items-center gap-2">
-      <i class="bi bi-diagram-3"></i> <span>Estructura</span>
+      <i class="bi bi-diagram-3" style="color:var(--accent)"></i> <span>Estructura</span>
     </h5>
 
     @if($supervisores->isEmpty())
@@ -181,7 +220,9 @@
                   </span>
                 </td>
                 <td class="text-center">
-                  <span class="badge badge-soft" style="border-radius:20px">{{ $sup->asesores_count }}</span>
+                  <span class="badge" style="border-radius:999px; background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 28%, transparent)">
+                    {{ $sup->asesores_count }}
+                  </span>
                 </td>
                 <td>
                   @if($sup->asesores->isEmpty())
@@ -189,8 +230,8 @@
                   @else
                     <div class="vstack gap-2">
                       @foreach($sup->asesores as $asesor)
-                        <div class="d-flex flex-wrap align-items-center gap-2 py-1">
-                          <i class="bi bi-person-badge text-secondary"></i>
+                        <div class="assignee">
+                          <i class="bi bi-person-badge"></i>
                           <span class="me-2">
                             {{ $asesor->name }}
                             <span class="text-secondary">({{ $asesor->email }})</span>
@@ -203,7 +244,7 @@
                           {{-- Reasignar --}}
                           <form method="POST" action="{{ route('administracion.asesores.reassign', $asesor->id) }}" class="d-flex gap-2 ms-auto">
                             @csrf @method('PATCH')
-                            <select name="supervisor_id" class="form-select form-select-sm" style="width:auto; min-width: 180px">
+                            <select name="supervisor_id" class="form-select form-select-sm" style="width:auto; min-width: 200px">
                               @foreach($todosSupervisores as $sid => $sname)
                                 <option value="{{ $sid }}" @selected($asesor->supervisor_id == $sid)>{{ $sname }}</option>
                               @endforeach
@@ -262,7 +303,6 @@
                 {{-- Acciones supervisor --}}
                 <td class="text-end">
                   <div class="d-inline-flex gap-2">
-                    {{-- Activar/Desactivar supervisor --}}
                     <form method="POST" action="{{ route('administracion.usuarios.toggle', $sup) }}" onsubmit="return confirm('¿Seguro?')">
                       @csrf @method('PATCH')
                       <button class="btn btn-sm {{ $sup->is_active ? 'btn-outline-danger' : 'btn-outline-success' }}">
@@ -271,7 +311,6 @@
                       </button>
                     </form>
 
-                    {{-- Cambiar password supervisor --}}
                     <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $sup->id }}">
                       <i class="bi bi-key"></i><span class="d-none d-md-inline ms-1">Contraseña</span>
                     </button>
