@@ -8,10 +8,17 @@
   .card.pad{ background:#fff }
   .shadow-soft{ box-shadow:0 6px 20px rgba(15,23,42,.06) }
 
-  .kpi{ display:flex; align-items:center; gap:.75rem; border:1px solid var(--bs-border-color);
-        border-radius:14px; padding:.9rem 1rem; background:#fff }
-  .kpi .ico{ width:44px;height:44px;border-radius:50%; display:flex;align-items:center;justify-content:center;
-             background: color-mix(in oklab, var(--bs-danger) 12%, #fff); color: var(--bs-danger) }
+  .kpi{
+    display:flex; align-items:center; gap:.75rem;
+    border:1px solid var(--bs-border-color);
+    border-radius:14px; padding:.9rem 1rem; background:#fff
+  }
+  .kpi .ico{
+    width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background: color-mix(in oklab, var(--brand) 14%, #fff);
+    color: var(--brand);
+  }
   .kpi .lbl{ font-size:.86rem; color:var(--bs-secondary-color) }
   .kpi .val{ font-weight:800; font-size:1.15rem; line-height:1 }
 
@@ -20,37 +27,49 @@
   .chart-card .toolbar{ display:flex; align-items:center; gap:.5rem }
   .chart-wrap{ position:relative; width:100%; height:280px }
 
-  .notifs{ border:1px solid var(--bs-border-color); border-radius:16px; overflow:hidden; background:#fff }
-  .notifs-header{ background: var(--bs-danger); color:#fff; font-weight:700; padding:.7rem .95rem;
-                  display:flex; align-items:center; gap:.55rem }
+  .notifs{
+    border:1px solid var(--bs-border-color); border-radius:16px; overflow:hidden; background:#fff
+  }
+  .notifs-header{
+    background: var(--brand); color:#fff; font-weight:700; padding:.7rem .95rem;
+    display:flex; align-items:center; gap:.55rem
+  }
   .notifs-body{ padding:.6rem .6rem .2rem; max-height:70vh; overflow:auto; background:#fff }
   .notif-group{ padding:.25rem .25rem .6rem }
-  .notif-title{ display:flex; align-items:center; gap:.5rem; padding:.25rem .15rem; font-weight:600 }
-  .notif-title .icon{ width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-                      background: color-mix(in oklab, var(--bs-danger) 12%, #fff); color: var(--bs-danger) }
-  .notif-count{ margin-left:auto; font-weight:700; font-size:.8rem; background:#fff; color:var(--bs-danger);
-                border:1px solid color-mix(in oklab, var(--bs-danger) 35%, #fff); border-radius:999px; padding:.15rem .55rem }
+  .notif-title{
+    display:flex; align-items:center; gap:.5rem; padding:.25rem .15rem; font-weight:600
+  }
+  .notif-title .icon{
+    width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    background: color-mix(in oklab, var(--accent) 12%, #fff); color: var(--accent)
+  }
+  .notif-count{
+    margin-left:auto; font-weight:700; font-size:.8rem; background:#fff; color:var(--accent);
+    border:1px solid color-mix(in oklab, var(--accent) 35%, #fff); border-radius:999px; padding:.15rem .55rem
+  }
   .notif-list{ list-style:none; padding-left:0; margin:0 }
-  .notif-item{ display:flex; align-items:center; gap:.7rem; padding:.6rem; border-radius:12px; text-decoration:none; color:inherit;
-               border:1px solid transparent; background:#fff; transition:.15s }
+  .notif-item{
+    display:flex; align-items:center; gap:.7rem; padding:.6rem; border-radius:12px; text-decoration:none; color:inherit;
+    border:1px solid transparent; background:#fff; transition:.15s
+  }
   .notif-item:hover{ background:var(--bs-tertiary-bg); border-color:var(--bs-border-color) }
-  .notif-dot{ width:9px;height:9px;border-radius:50%; background:var(--bs-danger) }
+  .notif-dot{ width:9px;height:9px;border-radius:50%; background:var(--accent) } /* azul por defecto */
   .notif-body .notif-main{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .notif-body .notif-sub{ font-size:.85rem; color:var(--bs-secondary-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  .notif-cta{ font-size:.75rem; border:1px solid var(--bs-border-color); background:#fff; border-radius:999px; padding:.18rem .55rem; white-space:nowrap }
+  .notif-cta{
+    font-size:.75rem; border:1px solid var(--bs-border-color); background:#fff; border-radius:999px; padding:.18rem .55rem; white-space:nowrap
+  }
   .notifs-footer{ border-top:1px dashed var(--bs-border-color); padding:.5rem .6rem .6rem; background:#fff }
 </style>
 @endpush
 
 @section('content')
 @php
-  // Fallback por si aún no cambiaste el controller
   $role  = $role  ?? strtolower(auth()->user()->role ?? '');
   $isAsesor = $isAsesor ?? ($role==='asesor');
   $isSupervisor = $isSupervisor ?? ($role==='supervisor');
   $isAdmin = $isAdmin ?? in_array($role,['administrador','sistemas']);
 
-  // Colecciones para asesor (evita errores si no existen)
   $misSup = $misSup ?? collect();
   $misPre = $misPre ?? collect();
   $misRes = $misRes ?? collect();
@@ -74,7 +93,7 @@
           <form id="frmQuickDni" class="d-flex" role="search">
             <input id="inpQuickDni" class="form-control form-control-sm me-2" inputmode="numeric" autocomplete="off"
                    placeholder="Buscar cliente por DNI" aria-label="DNI">
-            <button class="btn btn-danger btn-sm" type="submit">
+            <button class="btn btn-primary btn-sm" type="submit">
               <i class="bi bi-search me-1"></i> Buscar
             </button>
           </form>
@@ -107,7 +126,7 @@
       @unless($isAsesor)
       <div class="card pad shadow-soft quick">
         <div class="d-flex flex-wrap gap-2">
-          <a href="{{ route('autorizacion') }}" class="btn btn-outline-danger"><i class="bi bi-inboxes me-1"></i> Autorización</a>
+          <a href="{{ route('autorizacion') }}" class="btn btn-outline-primary"><i class="bi bi-inboxes me-1"></i> Autorización</a>
           <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary"><i class="bi bi-people me-1"></i> Clientes</a>
           <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-graph-up me-1"></i> Dashboard</a>
           <a href="{{ route('reportes.pdp') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Reportes</a>
@@ -119,7 +138,7 @@
       <div class="card pad shadow-soft chart-card">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="mb-0 d-flex align-items-center gap-2">
-            <i class="bi bi-bar-chart-steps text-danger"></i> Pagos del mes
+            <i class="bi bi-bar-chart-steps" style="color:var(--accent)"></i> Pagos del mes
           </h6>
           <div class="toolbar">
             @php $curr = \Carbon\Carbon::createFromFormat('Y-m',$mes); @endphp
@@ -188,7 +207,7 @@
                 @forelse($misPre as $p)
                   <li>
                     <a href="{{ route('clientes.show',$p->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:var(--bs-info)"></div>
+                      <div class="notif-dot" style="background:var(--accent)"></div>
                       <div class="notif-body">
                         <div class="notif-main">
                           <span class="fw-semibold">{{ $p->dni }}</span>
@@ -274,7 +293,7 @@
                 @forelse($cnaPre as $c)
                   <li>
                     <a href="{{ route('clientes.show',$c->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:var(--bs-info)"></div>
+                      <div class="notif-dot" style="background:var(--accent)"></div>
                       <div class="notif-body">
                         <div class="notif-main"><span class="fw-semibold">DNI {{ $c->dni }}</span></div>
                         <div class="notif-sub">Pre-aprobada (esperando Administración)</div>
@@ -366,7 +385,7 @@
                   @php $ops = collect((array)$c->operaciones)->filter()->implode(', '); @endphp
                   <li>
                     <a href="{{ route('autorizacion') }}#cna" class="notif-item">
-                      <div class="notif-dot" style="background:var(--bs-info)"></div>
+                      <div class="notif-dot" style="background:var(--accent)"></div>
                       <div class="notif-body">
                         <div class="notif-main">
                           <span class="fw-semibold">CNA #{{ $c->nro_carta }}</span>
@@ -451,15 +470,25 @@
     window.location.assign(url.toString());
   });
 
-  // Gráfica de pagos del mes
+  // Gráfica de pagos del mes (usa azul --accent)
   (()=>{
     const el = document.getElementById('chartPagos');
     if(!el) return;
     const payload = (()=>{ try{ return JSON.parse(el.dataset.chart||'{}'); }catch(_){ return {}; }})();
+
     const labels = payload.labels || [];
     const data   = payload.data   || [];
-    const ctx = el.getContext('2d');
-    new Chart(ctx, {
+    const css    = (v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const ACCENT = css('--accent') || '#0b4ea2';
+
+    const hexToRgba = (hex, a=1)=>{
+      const h = hex.replace('#','').trim();
+      const bigint = parseInt(h.length===3 ? h.split('').map(x=>x+x).join('') : h, 16);
+      const r=(bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255;
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    };
+
+    new Chart(el.getContext('2d'), {
       type: 'bar',
       data: {
         labels,
@@ -467,9 +496,9 @@
           label: 'S/ por día',
           data,
           borderWidth: 2,
-          borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bs-danger') || '#c62828',
-          backgroundColor: 'rgba(220, 53, 69, .15)',
-          hoverBackgroundColor: 'rgba(220, 53, 69, .25)',
+          borderColor: ACCENT,
+          backgroundColor: hexToRgba(ACCENT, .15),
+          hoverBackgroundColor: hexToRgba(ACCENT, .25),
           borderRadius: 6
         }]
       },
@@ -479,11 +508,18 @@
         animation: { duration: 250 },
         scales: {
           x: { grid: { display:false } },
-          y: { beginAtZero:true, ticks: { callback:(v)=>'S/ '+Number(v).toLocaleString() } }
+          y: {
+            beginAtZero:true,
+            ticks: { callback:(v)=>'S/ '+Number(v).toLocaleString() }
+          }
         },
         plugins: {
           legend: { display:false },
-          tooltip: { callbacks: { label: (ctx)=> 'S/ ' + Number(ctx.parsed.y ?? 0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}) } }
+          tooltip: {
+            callbacks: {
+              label: (ctx)=> 'S/ ' + Number(ctx.parsed.y ?? 0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})
+            }
+          }
         }
       }
     });
