@@ -4,6 +4,18 @@
 
 @push('head')
 <style>
+  /* ====== Marca KP: verde primario + azul acento ====== */
+  :root{
+    --brand:#00a81c;        /* verde KP */
+    --brand-ink:#008517;    /* hover/ink */
+    --accent:#0b4ea2;       /* azul KP */
+    --accent-ink:#093f82;
+
+    /* estos vienen del layout; los declaramos por si el cache de CSS tarda */
+    --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
+    --ink:#151a23; --muted:#6d7b8a;
+  }
+
   /* ========= Filtros / toolbar ========= */
   .cli-filters .form-control,
   .cli-filters .form-select{
@@ -26,8 +38,8 @@
   .cli-actions .btn{ height:36px }
   .cli-actions .btn-outline-primary{ color:var(--brand); border-color:var(--brand) }
   .cli-actions .btn-outline-primary:hover{
-    color:var(--brand-ink); border-color:var(--brand-ink);
-    background:color-mix(in oklab, var(--brand) 12%, transparent)
+    color:#fff; border-color:var(--brand-ink);
+    background:var(--brand-ink);
   }
 
   /* ========= Tabla ========= */
@@ -41,23 +53,23 @@
     border-bottom:1px solid var(--border);
     box-shadow: 0 3px 8px rgba(15,23,42,.06); /* leve sombra al fijarse */
   }
-  [data-theme="dark"] .cli-table thead th{
-    background: color-mix(in oklab, var(--surface-2) 42%, transparent);
-    box-shadow: 0 3px 10px rgba(0,0,0,.25);
-  }
 
   .cli-table tbody td{ color: var(--ink) }
   .cli-table tbody tr:nth-child(even){
     background: color-mix(in oklab, var(--surface-2) 16%, transparent);
   }
   .cli-table tbody tr:hover{
-    background: color-mix(in oklab, var(--brand) 10%, transparent);
+    /* mezcla un toque de azul para contraste con el verde primario */
+    background: color-mix(in oklab, var(--accent) 10%, var(--brand) 4%);
     transition: background .15s ease;
   }
 
   /* Fila clicable (además del botón Ver) */
   .cli-row{ cursor:pointer }
-  .cli-row:focus-visible{ outline:3px solid color-mix(in oklab, var(--brand) 35%, transparent); outline-offset:-3px; border-radius:4px }
+  .cli-row:focus-visible{
+    outline:3px solid color-mix(in oklab, var(--accent) 40%, transparent);
+    outline-offset:-3px; border-radius:4px
+  }
 
   /* Anchos útiles: DNI / Operación fijos, Titular elipsis */
   .cli-table tbody td:nth-child(2){ width: 9rem }   /* DNI */
@@ -79,8 +91,8 @@
     padding:.42rem .75rem;
   }
   .cli-pager .page-item .page-link:hover{
-    background: color-mix(in oklab, var(--brand) 10%, transparent);
-    border-color: color-mix(in oklab, var(--brand) 28%, transparent);
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 30%, transparent);
     color: var(--ink);
   }
   .cli-pager .page-item.active .page-link{
@@ -93,7 +105,7 @@
     background: var(--surface);
   }
   .cli-pager .page-link:focus{
-    box-shadow:0 0 0 .25rem color-mix(in oklab, var(--brand) 22%, transparent);
+    box-shadow:0 0 0 .25rem color-mix(in oklab, var(--accent) 22%, transparent);
   }
 
   /* ========= Resaltado de coincidencias ========= */
@@ -105,10 +117,10 @@
   /* Scrollbar del contenedor de tabla */
   .table-responsive::-webkit-scrollbar{ height:10px }
   .table-responsive::-webkit-scrollbar-thumb{
-    background: color-mix(in oklab, var(--brand) 22%, transparent); border-radius:10px
+    background: color-mix(in oklab, var(--accent) 24%, transparent); border-radius:10px
   }
 
-  /* Coherencia primario con marca (fallback si layout cachea) */
+  /* Coherencia primario (fallback si layout cachea) */
   .btn-primary{ background:var(--brand); border-color:var(--brand) }
   .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
 </style>
@@ -239,7 +251,6 @@
       const href = tr.dataset.href;
       if(!href) return;
       tr.addEventListener('click', e=>{
-        // Evitar conflicto si se hace click en el botón "Ver"
         if(e.target.closest('a,button')) return;
         window.location.href = href;
       });
@@ -256,14 +267,12 @@
     const q = (body.dataset.q || '').trim();
     if(!q) return;
 
-    // divide por espacios y quita duplicados, construye un regex seguro
     const parts = Array.from(new Set(q.split(/\s+/).filter(Boolean)));
     if(!parts.length) return;
     const esc = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const rx = new RegExp('(' + esc.join('|') + ')', 'ig');
 
     body.querySelectorAll('td').forEach(td=>{
-      // no resaltar en la celda de acciones
       if(td.querySelector('a,button')) return;
       const txt = td.textContent;
       if(!txt) return;
@@ -277,7 +286,7 @@
       const table = document.getElementById('cliTable');
       const rows = [...table.querySelectorAll('tbody tr')];
       if(!rows.length) return;
-      const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4); // sin la col de acciones
+      const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4);
       const data = rows.map(r => {
         const tds = r.querySelectorAll('td');
         return [tds[0]?.innerText.trim(), tds[1]?.innerText.trim(), tds[2]?.innerText.trim(), tds[3]?.innerText.trim()];
@@ -293,7 +302,7 @@
     const table = document.getElementById('cliTable');
     const rows = [...table.querySelectorAll('tbody tr')];
     if(!rows.length) return;
-    const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4); // sin acciones
+    const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4);
     const csvEsc = v => `"${(v??'').toString().replace(/"/g,'""')}"`;
     const data = rows.map(r => {
       const tds = r.querySelectorAll('td');
@@ -309,4 +318,3 @@
   });
 </script>
 @endpush
-
