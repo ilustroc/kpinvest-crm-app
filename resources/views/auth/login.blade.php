@@ -114,7 +114,7 @@
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
           <!-- coloca tu archivo real del logo -->
-          <img src="/assets/img/kp-invest-logo.png" alt="KP Invest" loading="lazy" decoding="async">
+          <img src="/assets/img/logo.png" alt="KP Invest" loading="lazy" decoding="async">
         </a>
       </div>
 
