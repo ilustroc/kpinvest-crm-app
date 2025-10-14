@@ -9,21 +9,22 @@
 @if(session('warn')) <pre class="alert alert-warning small mb-3">{{ session('warn') }}</pre>@endif
 @if($errors->any())  <div class="alert alert-danger">{{ $errors->first() }}</div>@endif
 
-<div class="card p-3">
-  <div class="d-flex align-items-center justify-content-between">
+<div class="card pad">
+  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
     <div>
       <h2 class="h6 mb-1">Clientes (master)</h2>
       <div class="text-muted small">Cargar/actualizar la tabla única <code>clientes_cuentas</code>.</div>
     </div>
-    <a class="btn btn-outline-secondary"
+    <a class="btn btn-outline-primary"
        href="{{ route('integracion.data.clientes.template') }}">
        Descargar plantilla CSV
     </a>
   </div>
 
-  <hr>
+  <hr class="my-3">
 
-  <form class="vstack gap-2" method="POST"
+  <form class="vstack gap-2"
+        method="POST"
         action="{{ route('integracion.data.clientes.import') }}"
         enctype="multipart/form-data">
     @csrf
@@ -32,7 +33,9 @@
       <input type="file" name="archivo" class="form-control" accept=".csv,text/csv" required>
       <div class="form-text">Encabezados: CARTERA, TIPO_DOC, DNI, OPERACIÓN, CONCATENAR, ...</div>
     </div>
-    <button class="btn btn-danger">Subir y procesar</button>
+    <button class="btn btn-primary">
+      Subir y procesar
+    </button>
   </form>
 </div>
 @endsection
