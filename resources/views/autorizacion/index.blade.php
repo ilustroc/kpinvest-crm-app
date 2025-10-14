@@ -3,6 +3,73 @@
 @section('title','Autorización de Promesas')
 @section('crumb','Autorización')
 
+@push('head')
+<style>
+  /* ======= Marca KP: verde primario + azul acento ======= */
+  :root{
+    --brand:#00a81c;        /* Verde KP (primario) */
+    --brand-ink:#008517;    /* Hover/ink */
+    --accent:#0b4ea2;       /* Azul KP (acento) */
+    --accent-ink:#093f82;
+
+    --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
+    --ink:#151a23; --muted:#6d7b8a;
+  }
+
+  /* Botonería con coherencia de marca */
+  .btn-primary{ background:var(--brand); border-color:var(--brand) }
+  .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
+  .btn-outline-primary{ color:var(--accent); border-color:var(--accent) }
+  .btn-outline-primary:hover{ color:#fff; background:var(--accent-ink); border-color:var(--accent-ink) }
+
+  /* Inputs / buscador */
+  .card .form-control{ background:var(--surface); border-color:var(--border) }
+  .card .form-control::placeholder{ color:var(--muted) }
+  .card .form-control:focus{
+    border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
+    box-shadow: 0 0 0 .2rem color-mix(in oklab, var(--accent) 22%, transparent);
+  }
+
+  /* Tablas: encabezado fijo + hover suave con acento */
+  .table-responsive{ max-height: none } /* deja crecer; los modales ya son scrollables */
+  table thead th{
+    position:sticky; top:0; z-index:1;
+    background: color-mix(in oklab, var(--surface-2) 55%, transparent) !important;
+    color: var(--ink);
+    text-transform: uppercase; letter-spacing:.3px; font-size:.82rem;
+    border-bottom:1px solid var(--border);
+    box-shadow:0 3px 8px rgba(15,23,42,.06);
+  }
+  .table.table-hover tbody tr:hover{
+    background: color-mix(in oklab, var(--accent) 10%, var(--brand) 6%);
+  }
+
+  /* Chips/badges suaves (si se usan en celdas) */
+  .badge-soft{
+    background:color-mix(in oklab, var(--brand) 12%, transparent);
+    color:var(--brand);
+    border:1px solid color-mix(in oklab, var(--brand) 24%, transparent);
+    border-radius:999px; padding:.18rem .55rem; font-weight:600
+  }
+
+  /* Paginación bootstrap (si aparece) */
+  .pagination .page-link{ border-color:var(--border); color:var(--ink) }
+  .pagination .page-link:hover{
+    background:color-mix(in oklab, var(--brand) 10%, transparent);
+    border-color:color-mix(in oklab, var(--brand) 28%, transparent);
+  }
+  .pagination .page-item.active .page-link{
+    background:var(--brand); border-color:var(--brand)
+  }
+
+  /* Scrollbar horizontal en tablas anchas */
+  .table-responsive::-webkit-scrollbar{ height:10px }
+  .table-responsive::-webkit-scrollbar-thumb{
+    background: color-mix(in oklab, var(--accent) 22%, transparent); border-radius:10px
+  }
+</style>
+@endpush
+
 @section('content')
 <div class="container-fluid">
   <div class="card">
@@ -33,7 +100,7 @@
     <div class="card-body p-0">
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
-          <thead class="table-light">
+          <thead>
             <tr>
               <th class="text-center">DNI</th>
               <th class="text-center">Operación(es)</th>
@@ -215,7 +282,7 @@
             <h6 class="mb-2" id="crono_titulo">Cronograma de cuotas</h6>
             <div class="table-responsive">
               <table class="table table-sm align-middle">
-                <thead class="table-light">
+                <thead>
                   <tr>
                     <th style="width:60px" class="text-center">#</th>
                     <th style="width:160px" class="text-center">Fecha</th>
@@ -255,7 +322,7 @@
     <div class="card-body p-0">
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead class="table-light">
+          <thead>
             <tr>
               <th class="text-center">DNI</th>
               <th class="text-center">No. Carta</th>
@@ -269,25 +336,19 @@
             <tbody>
             @forelse($cnaRows as $cna)
               @php
-                // Operaciones como array normalizado (string, sin vacíos)
                 $ops = collect((array)($cna->operaciones ?? []))
                           ->map(fn($x)=>trim((string)$x))
                           ->filter()
                           ->values();
 
-                // Productos únicos según operación (si tienes $prodByOp)
                 $productos = $ops->map(fn($op) => $prodByOp[(string)$op] ?? null)
                                 ->filter()
                                 ->unique()
                                 ->values();
 
-                // Representación para la celda de Operaciones
-                // Opción A: badges
                 $opsBadges = $ops->map(fn($op) =>
                   '<span class="badge rounded-pill text-bg-light border">'.$op.'</span>'
                 )->implode(' ');
-
-                // Opción B (si prefieres cadena simple): $opsCadena = $ops->implode(', ');
               @endphp
 
               <tr>
@@ -305,21 +366,19 @@
                   @endif
                 </td>
 
-                {{-- Operaciones (todas en una sola celda) --}}
+                {{-- Operaciones --}}
                 <td class="text-center text-nowrap">
                   {!! $opsBadges ?: '—' !!}
-                  {{-- Si prefieres texto: {{ $ops->implode(', ') ?: '—' }} --}}
                 </td>
 
                 <td class="text-center text-nowrap">{{ optional($cna->created_at)->format('Y-m-d') }}</td>
 
-                {{-- Observación en lugar de nota --}}
+                {{-- Observación --}}
                 <td class="text-truncate" style="max-width:420px" title="{{ $cna->observacion }}">
                   {{ $cna->observacion ?: '—' }}
                 </td>
 
                 <td class="text-end">
-                  {{-- Ver pagos --}}
                   <button type="button"
                           class="btn btn-outline-secondary btn-sm me-1 js-ver-pagos"
                           data-dni="{{ $cna->dni }}"
@@ -351,7 +410,6 @@
             </tbody>
         </table>
       </div>
-      {{-- paginación de CNA (propia) --}}
       <div class="p-2">
         {{ $cnaRows->withQueryString()->onEachSide(1)->links('pagination::bootstrap-5') }}
       </div>
@@ -372,7 +430,7 @@
         <div class="modal-body">
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead class="table-light">
+              <thead>
                 <tr>
                   <th class="text-nowrap">Operación/Pagaré</th>
                   <th class="text-nowrap">Fecha</th>
@@ -393,6 +451,7 @@
   </div>
 
 @endsection
+
 @push('scripts')
 <script>
   // =================== Modal de NOTA (Pre-aprobar / Aprobar) ===================
@@ -444,8 +503,8 @@
       const set = (id, v)=> (document.getElementById('t_'+id).textContent = (v||'—'));
       set('tipo', tipo ? (tipo==='cancelacion' ? 'Cancelación' : 'Convenio') : '—');
       set('cartera', btn.dataset.cartera);
-      set('asesor',  btn.dataset.asesor);   // Equipo = AGENTE
-      set('agente',  btn.dataset.agente);   // quien creó
+      set('asesor',  btn.dataset.asesor);
+      set('agente',  btn.dataset.agente);
       set('titular', btn.dataset.titular);
       set('trab',    btn.dataset.trabaja);
       set('clasificacion', btn.dataset.clasificacion);
@@ -472,11 +531,10 @@
         acc.innerHTML = '';
         let cuentas = [];
         try {
-          const raw = btn.getAttribute('data-cuentas'); // más seguro para JSON largo
+          const raw = btn.getAttribute('data-cuentas');
           cuentas = raw ? JSON.parse(raw) : [];
         } catch(e) { cuentas = []; }
 
-        // Muestra las operaciones en el encabezado
         document.getElementById('f_op').textContent = cuentas.length
           ? cuentas.map(c=>c.operacion).join(', ')
           : (btn.dataset.operacion || '—');
@@ -529,7 +587,7 @@
       let crono = [];
       try { crono = JSON.parse(btn.getAttribute('data-crono') || '[]'); } catch(_) { crono = []; }
 
-      if (tipo === 'cancelacion') { cronoWrap.classList.add('d-none'); return; }
+      if ((btn.dataset.tipo || '').toLowerCase() === 'cancelacion') { cronoWrap.classList.add('d-none'); return; }
 
       const hasBalon = (btn.dataset.hasbalon === '1') || crono.some(r => !!r.es_balon);
       titulo.textContent = hasBalon ? 'Cronograma de cuotas (con balón)' : 'Cronograma de cuotas';
@@ -564,9 +622,6 @@
   });
 
   // ============================== Ver PAGOS ===================================
-  // Requiere un modal con:
-  //  - <span id="pagos_dni"></span>  (en el título)
-  //  - <tbody id="pagos_tbody"></tbody> (cuerpo de la tabla)
   (function(){
     const modalEl = document.getElementById('modalPagos');
     if (!modalEl) return;
