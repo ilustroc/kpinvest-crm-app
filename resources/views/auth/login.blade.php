@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Ingreso | IMPULSE GO</title>
+  <title>Ingreso | KPINVEST</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -94,12 +94,12 @@
     <div class="side col-12 col-lg-6 d-flex flex-column">
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
-          <img src="{{ asset('assets/img/logo.png') }}" alt="IMPULSE GO">
+          <img src="/assets/img/logo.png" alt="IMPULSE GO">
         </a>
       </div>
 
       <div class="side-hero flex-grow-1">
-        <img class="illus img-fluid" src="{{ asset('assets/img/login-illustration.png') }}" alt="Ilustración">
+        <img class="illus img-fluid" src="/assets/img/login-illustration.png" alt="Ilustración">
         <p class="mt-3 mb-0">Bienvenido a Consorcio de Abogados del Perú.</p>
       </div>
 
@@ -206,4 +206,3 @@
   </script>
 </body>
 </html>
-
