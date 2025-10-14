@@ -2,32 +2,39 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Ingreso | KPINVEST</title>
+  <title>Ingreso | KP Invest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b4ea2">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
     :root{
-      --brand:#cc3024;      /* rojo de marca */
-      --brand-700:#b02a21;  /* hover */
-      --bg:#f7f8fc;         /* fondo súper claro */
-      --surface:#ffffff;    /* tarjetas */
-      --ink:#1f2328;        /* texto */
-      --muted:#6d7b8a;      /* texto secundario */
-      --border:#e9edf3;     /* bordes */
-      --ring:0 0 0 4px rgba(204,48,36,.16);
+      /* Colores del logo */
+      --brand:#0b4ea2;        /* azul KP */
+      --brand-700:#093f82;    /* hover */
+      --accent:#00a81c;       /* verde KP */
+      --accent-700:#008517;
+
+      --bg:#f6f8fb;
+      --surface:#ffffff;
+      --ink:#1f2328;
+      --muted:#6d7b8a;
+      --border:#e9edf3;
+      --ring:0 0 0 4px rgba(11,78,162,.18);
     }
 
     html,body{height:100%}
     body{
       background:
-        radial-gradient(900px 500px at -10% -10%, rgba(204,48,36,.05), transparent 60%),
-        radial-gradient(700px 400px at 120% 0%, rgba(204,48,36,.04), transparent 60%),
-        linear-gradient(#fbfcff,#f7f8fc);
+        radial-gradient(900px 500px at -10% -10%, rgba(11,78,162,.06), transparent 60%),
+        radial-gradient(700px 400px at 120% 0%, rgba(0,168,28,.05), transparent 60%),
+        linear-gradient(#fbfcff,#f6f8fb);
       color:var(--ink);
       display:flex; align-items:center; justify-content:center;
-      padding:24px;
+      padding:clamp(16px, 2.8vw, 24px);
+      padding-top:calc(env(safe-area-inset-top,0) + 16px);
+      padding-bottom:calc(env(safe-area-inset-bottom,0) + 16px);
     }
 
     .wrap{
@@ -39,17 +46,18 @@
       overflow:hidden;
     }
 
-    /* Lado ilustración, bien claro */
+    /* Lado ilustración */
     .side{
       background:
         linear-gradient(180deg,#fff, #fff),
-        radial-gradient(60% 60% at 40% 30%, rgba(204,48,36,.08), transparent 70%);
-      padding:34px;
+        radial-gradient(60% 60% at 40% 30%, rgba(11,78,162,.09), transparent 72%);
+      padding:clamp(18px, 3vw, 34px);
+      min-height: 280px;
     }
-    .brand img{height:36px}
+    .brand img{height:36px; width:auto; object-fit:contain}
     .side-hero{
       display:grid; place-items:center; text-align:center;
-      margin:16px 0 8px;
+      margin:14px 0 8px;
     }
     .illus{
       max-height:300px; width:auto; border-radius:14px;
@@ -57,9 +65,9 @@
     }
     .side p{ color:var(--muted) }
 
-    /* Panel de formulario */
+    /* Panel formulario */
     .panel{
-      padding:34px;
+      padding:clamp(18px, 3vw, 34px);
       background:var(--surface);
     }
     .card-soft{
@@ -67,7 +75,7 @@
       border:1px solid var(--border);
       border-radius:16px;
       box-shadow:0 8px 28px rgba(15,23,42,.05);
-      padding:28px;
+      padding:clamp(18px, 2.4vw, 28px);
     }
     .form-control{
       background:#fff; color:var(--ink); border:1px solid var(--border);
@@ -85,28 +93,40 @@
     .link:hover{ text-decoration:underline }
     .help{ color:var(--muted) }
     .caps{ color:#b54708 }
+
+    /* Mobile tuning */
+    @media (max-width: 575.98px){
+      .side { padding:16px }
+      .illus{ max-height:220px }
+      .brand img{ height:30px }
+      .wrap{ border-radius:16px }
+    }
+    @media (max-width: 420px){
+      .illus{ display:none }  /* ahorra data y mejora estabilidad en móviles chicos */
+    }
   </style>
 </head>
 <body>
 
   <div class="wrap row g-0">
-    <!-- LADO IZQUIERDO (claro) -->
+    <!-- IZQUIERDA -->
     <div class="side col-12 col-lg-6 d-flex flex-column">
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
-          <img src="/assets/img/logo.png" alt="IMPULSE GO">
+          <!-- coloca tu archivo real del logo -->
+          <img src="/assets/img/kp-invest-logo.png" alt="KP Invest" loading="lazy" decoding="async">
         </a>
       </div>
 
       <div class="side-hero flex-grow-1">
-        <img class="illus img-fluid" src="/assets/img/login-illustration.png" alt="Ilustración">
-        <p class="mt-3 mb-0">Bienvenido a Consorcio de Abogados del Perú.</p>
+        <img class="illus img-fluid" src="/assets/img/login-illustration.png" alt="Ilustración" loading="lazy" decoding="async">
+        <p class="mt-3 mb-0">Bienvenido a <strong>KP Invest</strong>.</p>
       </div>
 
-      <div class="help small">&copy; {{ date('Y') }} Consorcio de Abogados del Perú</div>
+      <div class="help small">&copy; {{ date('Y') }} KP Invest</div>
     </div>
 
-    <!-- LADO DERECHO (form) -->
+    <!-- DERECHA (form) -->
     <div class="col-12 col-lg-6 panel d-flex align-items-center">
       <div class="card-soft w-100">
         <h1 class="h3 mb-1 fw-semibold">Iniciar sesión</h1>
@@ -156,6 +176,7 @@
 
         <div class="mt-4 d-flex justify-content-between small">
           <a class="link" href="mailto:impulse.conciliacion-cobranza@mgi-go.com">Soporte</a>
+          <span class="text-muted">KP Invest</span>
         </div>
       </div>
     </div>
