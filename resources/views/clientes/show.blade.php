@@ -227,8 +227,7 @@
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
               @php
-                // ahora mira por CUENTA, no por operación
-                $items = collect($cnasByCuenta[$c->cuenta] ?? []);
+              @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
               @endphp
 
               @if($items->count())
