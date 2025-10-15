@@ -111,7 +111,7 @@
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
           <!-- ÚNICO logo -->
-          <img src="/assets/img/logo.png" alt="KP Invest" loading="lazy" decoding="async">
+          <img src="{{ asset('assets/img/logo.png') }}" alt="KP Invest" loading="lazy" decoding="async">
         </a>
       </div>
 
