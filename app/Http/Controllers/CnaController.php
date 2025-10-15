@@ -35,32 +35,44 @@ class CnaController extends Controller
             ]);
 
             $ops = array_values(array_filter(array_map('strval', $data['operaciones'] ?? [])));
-            if (!$ops) return back()->withErrors('Selecciona al menos una operación para la CNA.');
+            if (!$ops) {
+                return back()->withErrors('Selecciona al menos una operación para la CNA.');
+            }
 
-            // Titular (fallback a BD)
+            // Titular (fallback a BD) — usa numdoc y, por compatibilidad, dni; además hace COALESCE con nombre
             $titular = $data['titular'] ?? DB::table('clientes_cuentas')
-                ->where('dni', $dni)->whereNotNull('titular')->value('titular');
+                ->where(function ($q) use ($dni) {
+                    $q->where('numdoc', $dni)->orWhere('dni', $dni);
+                })
+                ->value(DB::raw('COALESCE(titular, nombre)'));
 
             // Producto de referencia (opcional)
             $productoAuto = DB::table('clientes_cuentas')
                 ->whereIn('operacion', $ops)->whereNotNull('producto')
                 ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
 
-            // Cosecha única + entidad
+            // Cosecha única + entidad (desde las operaciones)
             $rowsOps  = DB::table('clientes_cuentas')
-                ->select('operacion','cosecha','entidad')->whereIn('operacion', $ops)->get();
+                ->select('operacion','cosecha','entidad')
+                ->whereIn('operacion', $ops)
+                ->get();
 
             $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
-            if ($cosechas->count() !== 1) return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
+            if ($cosechas->count() !== 1) {
+                return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
+            }
             $cosecha = (string) $cosechas->first();
 
             $origen = $this->originFromCosecha($cosecha);
-            if (!$origen) return back()->withErrors('Cosecha no reconocida: "'.$cosecha.'".');
+            if (!$origen) {
+                return back()->withErrors('Cosecha no reconocida: "'.$cosecha.'".');
+            }
 
-            ['serie'=>$serie, 'suffix'=>$suffix] = $this->seriesConfig($origen);
+            ['serie' => $serie, 'suffix' => $suffix] = $this->seriesConfig($origen);
 
-            $solicitud = DB::transaction(function () use (/* … */) {
-                DB::table('cna_solicitudes')->lockForUpdate()->get();
+            // Crear con correlativo (lock)
+            $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
+                DB::table('cna_solicitudes')->lockForUpdate()->get(); // evita colisiones
                 $next = $this->nextCartaForSerie($serie, $suffix);
 
                 return CnaSolicitud::create([
@@ -84,10 +96,10 @@ class CnaController extends Controller
 
         } catch (\Throwable $e) {
             \Log::error('CNA store error', [
-                'dni' => $dni,
-                'msg' => $e->getMessage(),
-                'file'=> $e->getFile(),
-                'line'=> $e->getLine(),
+                'dni'  => $dni,
+                'msg'  => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
             return back()->withErrors('No se pudo guardar la CNA: '.$e->getMessage())->withInput();
         }
@@ -218,14 +230,18 @@ class CnaController extends Controller
         $ops = array_values(array_filter(array_map('strval', $ops)));
 
         $rows = DB::table('clientes_cuentas')
-            ->select('operacion','cosecha','entidad')->whereIn('operacion', $ops)->get();
+            ->select('operacion','cosecha','entidad')
+            ->whereIn('operacion', $ops)
+            ->get();
 
         $cosecha = (string) ($rows->pluck('cosecha')->filter()->unique()->first() ?? '');
         $origen  = $this->originFromCosecha($cosecha) ?? 'KP INVEST SAC';
         $cfg     = $this->seriesConfig($origen);
         $tpl     = $cfg['template'];
 
-        if (!is_file($tpl)) throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen);
+        if (!is_file($tpl)) {
+            throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen);
+        }
 
         // Asegura directorios
         $docxDir = 'cna/docx'; $pdfDir = 'cna/pdfs';
@@ -240,7 +256,14 @@ class CnaController extends Controller
 
         // Datos para plantilla
         $tp = new TemplateProcessor($tpl);
-        $titular = $cna->titular ?: DB::table('clientes_cuentas')->where('dni',$cna->dni)->value('titular');
+
+        // Titular por numdoc (fallback a dni) y COALESCE
+        $titular = $cna->titular ?: DB::table('clientes_cuentas')
+            ->where(function ($q) use ($cna) {
+                $q->where('numdoc', $cna->dni)->orWhere('dni', $cna->dni);
+            })
+            ->value(DB::raw('COALESCE(titular, nombre)'));
+
         Carbon::setLocale('es');
         $aprobadoAtStr = ($cna->aprobado_at ? Carbon::parse($cna->aprobado_at) : now())->translatedFormat('d \\de F \\de Y');
         $cuenta  = $ops[0] ?? '';
@@ -261,7 +284,7 @@ class CnaController extends Controller
             $this->convertDocxToPdfViaIlovepdf(storage_path('app/'.$docxRel), storage_path('app/'.$pdfRel));
             $cna->pdf_path = $pdfRel;
         } catch (\Throwable $e) {
-            Log::error('Error iLovePDF DOCX→PDF: '.$e->getMessage(), ['cna_id'=>$cna->id]);
+            Log::error('Error iLovePDF DOCX→PDF: '.$e->getMessage(), ['cna_id' => $cna->id]);
             $cna->pdf_path = null;
         }
 
@@ -291,7 +314,9 @@ class CnaController extends Controller
             $latest = collect(glob($outDir.'/*.pdf'))->sortByDesc(fn($p) => filemtime($p))->first();
             if ($latest) $expected = $latest;
         }
-        if (!is_file($expected)) throw new \RuntimeException('No se pudo localizar el PDF generado.');
+        if (!is_file($expected)) {
+            throw new \RuntimeException('No se pudo localizar el PDF generado.');
+        }
 
         if ($expected !== $pdfAbs) { @unlink($pdfAbs); rename($expected, $pdfAbs); }
     }
@@ -321,12 +346,12 @@ class CnaController extends Controller
     {
         $o = strtoupper($origen);
         if (str_contains($o, 'ACREENCIA II')) {
-            return ['serie'=>'F2','suffix'=>'F2','template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
+            return ['serie' => 'F2','suffix' => 'F2','template' => storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
         }
         if (str_contains($o, 'FONDO ACREENCIA AREQUIPA') || str_contains($o,'FONDO ACREENCIAS AREQUIPA')) {
-            return ['serie'=>'F', 'suffix'=>'F', 'template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];
+            return ['serie' => 'F', 'suffix' => 'F', 'template' => storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];
         }
-        return ['serie'=>'KPI','suffix'=>'', 'template'=>storage_path('app/templates/cna_kpinvest.docx')]; // default
+        return ['serie' => 'KPI','suffix' => '', 'template' => storage_path('app/templates/cna_kpinvest.docx')]; // default
     }
 
     /** Siguiente número por serie (lock). Retorna ['corr'=>int,'nro'=>'000123F'] */
@@ -335,11 +360,13 @@ class CnaController extends Controller
         DB::table('cna_solicitudes')->lockForUpdate()->get();
 
         $query = DB::table('cna_solicitudes')->selectRaw("MAX(CAST(LEFT(nro_carta,6) AS UNSIGNED)) as m");
-        if ($suffix !== '') $query->where('nro_carta','like',"%{$suffix}");
+        if ($suffix !== '') {
+            $query->where('nro_carta','like',"%{$suffix}");
+        }
         $max  = $query->value('m');
 
         $corr = (int)($max ?: 0) + 1;
         $nro  = str_pad((string)$corr, 6, '0', STR_PAD_LEFT) . $suffix;
-        return ['corr'=>$corr,'nro'=>$nro];
+        return ['corr' => $corr, 'nro' => $nro];
     }
 }
