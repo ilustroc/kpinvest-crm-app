@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PagoLote;
-use App\Models\PagoPropia; // (por ahora seguimos usando este modelo hasta unificar a `pagos`)
+use App\Models\PagoPropia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;

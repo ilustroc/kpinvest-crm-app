@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use Carbon\Carbon;
 use App\Models\PromesaPago;
 use App\Models\CnaSolicitud;
-use App\Models\PagoPropia;
-use App\Models\PagoCajaCuscoCastigada;
-use App\Models\PagoCajaCuscoExtrajudicial;
+use App\Models\PagoPropia as Pago;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -22,9 +21,9 @@ class AutorizacionController extends Controller
         $q      = trim((string)($req->q ?? ''));
         $status = $req->status;
 
-        // ===== PROMESAS (sin duplicar)
+        // ===== PROMESAS
         $promesas = PromesaPago::query()
-            ->with(['operaciones'])                                 // pivot de operaciones
+            ->with(['operaciones'])
             ->leftJoin('users as u','u.id','=','promesas_pago.user_id')
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function ($x) use ($q) {
@@ -48,7 +47,7 @@ class AutorizacionController extends Controller
                          ->orderByDesc('promesas_pago.fecha_promesa')
                          ->get();
 
-        // ===== Prefetch por DNI para fallback (por si la promesa no guardó pivote)
+        // ===== Prefetch por DNI (fallback)
         $dnis = $rows->pluck('dni')->filter()->unique()->values()->all();
         $opsByDni = [];
         if ($dnis) {
@@ -61,8 +60,7 @@ class AutorizacionController extends Controller
                 ->all();
         }
 
-        // ===== Traer cuentas por operación (para el acordeón + agregados)
-        // Primero arma el universo de operaciones de todas las promesas
+        // ===== Cuentas por operación (sin columna cartera)
         $opsAll = $rows->flatMap(function($p) use ($opsByDni){
                 if ($p->relationLoaded('operaciones') && $p->operaciones->count()) {
                     return $p->operaciones->pluck('operacion');
@@ -70,7 +68,6 @@ class AutorizacionController extends Controller
                 if (!empty($p->operacion)) {
                     return collect(array_filter(array_map('trim', explode(',', (string)$p->operacion))));
                 }
-                // fallback: todas las ops del DNI
                 return collect($opsByDni[$p->dni] ?? []);
             })
             ->filter()->unique()->values()->all();
@@ -79,7 +76,7 @@ class AutorizacionController extends Controller
         if (!empty($opsAll)) {
             $ccByOp = DB::table('clientes_cuentas')
                 ->select([
-                    'operacion','dni','cartera','titular','entidad','producto','moneda',
+                    'operacion','dni','titular','entidad','producto','moneda',
                     'saldo_capital','deuda_total','agente','anio_castigo',
                     'clasificacion','hasta','capital_descuento'
                 ])
@@ -88,24 +85,19 @@ class AutorizacionController extends Controller
                 ->keyBy('operacion');
         }
 
-        // ===== Armar cada fila (agregados + JSON de cuentas)
+        // ===== Enriquecer filas
         $rows = $rows->map(function($p) use ($opsByDni,$ccByOp) {
 
-            // Operaciones de la promesa: pivote → legacy → fallback por DNI
             $ops = $p->relationLoaded('operaciones') && $p->operaciones->count()
                 ? $p->operaciones->pluck('operacion')->map(fn($x)=>(string)$x)->values()
                 : collect(array_filter(array_map('trim', explode(',', (string)($p->operacion ?? '')))));
-            if ($ops->isEmpty()) {
-                $ops = collect($opsByDni[$p->dni] ?? []);
-            }
+            if ($ops->isEmpty()) $ops = collect($opsByDni[$p->dni] ?? []);
 
-            // Texto para la columna
             $p->operacion = $ops->implode(', ');
             $p->ops_list  = $ops->values();
 
-            // Acumuladores + per-cuenta
             $sumCap=0.0; $sumDeu=0.0;
-            $agentes = collect(); $clasifs = collect(); $carteras = collect(); $titulares = collect();
+            $agentes = collect(); $clasifs = collect(); $titulares = collect();
             $cuentas = [];
 
             foreach ($ops as $op) {
@@ -117,7 +109,6 @@ class AutorizacionController extends Controller
 
                 if ($cc->agente)        $agentes->push($cc->agente);
                 if ($cc->clasificacion) $clasifs->push($cc->clasificacion);
-                if ($cc->cartera)       $carteras->push($cc->cartera);
                 if ($cc->titular)       $titulares->push($cc->titular);
 
                 $cuentas[] = [
@@ -133,20 +124,19 @@ class AutorizacionController extends Controller
             }
 
             $uniq = fn($c)=>$c->filter()->unique()->implode(' / ');
-            $p->asesor_nombre = $uniq($agentes);          // Equipo = AGENTE
-            $p->clasificacion = $uniq($clasifs);          // Clasificación SBS
-            $p->cartera       = $uniq($carteras);
+            $p->asesor_nombre = $uniq($agentes);
+            $p->clasificacion = $uniq($clasifs);
             $p->titular       = $uniq($titulares);
 
-            $p->deuda_total   = $sumDeu;                  // Deuda total = suma de deudas
-            $p->saldo_capital = $sumCap;                  // (por si lo usas en cálculos)
+            $p->deuda_total   = $sumDeu;
+            $p->saldo_capital = $sumCap;
 
-            $p->cuentas_json  = $cuentas;                 // << para el acordeón
+            $p->cuentas_json  = $cuentas;
 
             return $p;
         });
 
-        // ===== Cronogramas (igual que antes)
+        // ===== Cronogramas
         $ids = $rows->pluck('id')->filter()->all();
         $cuotasById = collect();
         if (!empty($ids) && Schema::hasTable('promesa_cuotas')) {
@@ -171,7 +161,7 @@ class AutorizacionController extends Controller
             return $p;
         });
 
-        // ===== CNA (sin cambios relevantes)
+        // ===== CNA
         $cnaBase = CnaSolicitud::query()
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function($x) use ($q){
@@ -195,7 +185,7 @@ class AutorizacionController extends Controller
             ->paginate(10, ['*'], 'page_cna')
             ->withQueryString();
 
-        // Mapa para mostrar producto en la tabla CNA (opcional)
+        // Producto por operación (opcional)
         $opsAllCna = collect($cnaRows->items())
             ->flatMap(fn($c) => (array)($c->operaciones ?? []))
             ->filter()->map(fn($op)=>(string)$op)->unique()->values()->all();
@@ -217,8 +207,8 @@ class AutorizacionController extends Controller
             'q'            => $q,
             'isSupervisor' => strtolower($user->role) === 'supervisor',
         ]);
-
     }
+
     // ===== SUPERVISOR =====
     public function preaprobar(Request $req, PromesaPago $promesa)
     {
@@ -241,6 +231,7 @@ class AutorizacionController extends Controller
         WorkflowMailer::promesaPreaprobada($promesa);
         return back()->with('ok', 'Promesa pre-aprobada.');
     }
+
     public function rechazarSup(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('supervisor');
@@ -255,10 +246,11 @@ class AutorizacionController extends Controller
             'rechazado_at'    => now(),
             'nota_rechazo'    => substr((string)$req->input('nota_estado'), 0, 500),
         ]);
-        
+
         WorkflowMailer::promesaRechazadaSup($promesa, $req->input('nota_estado'));
         return back()->with('ok', 'Promesa rechazada por supervisor.');
     }
+
     // ===== ADMIN =====
     public function aprobar(Request $req, PromesaPago $promesa)
     {
@@ -281,6 +273,7 @@ class AutorizacionController extends Controller
         WorkflowMailer::promesaResuelta($promesa, true, $req->input('nota_estado'));
         return back()->with('ok', 'Promesa APROBADA.');
     }
+
     public function rechazarAdmin(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('administrador');
@@ -299,6 +292,7 @@ class AutorizacionController extends Controller
         WorkflowMailer::promesaResuelta($promesa, false, $req->input('nota_estado'));
         return back()->with('ok', 'Promesa rechazada por administrador.');
     }
+
     private function authorizeActionFor(string $role)
     {
         $user = Auth::user();
@@ -306,35 +300,20 @@ class AutorizacionController extends Controller
             abort(403, 'No autorizado.');
         }
     }
-    // ===== LISTA PAGOS =====
+
+    // ===== LISTA PAGOS POR DNI (unificada)
     public function pagosDni(string $dni)
     {
-        $propia = PagoPropia::where('dni',$dni)->select(
-            DB::raw('DATE(fecha_de_pago) as fecha'),
-            DB::raw('pagado_en_soles as monto'),
-            'operacion as oper',
-            DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
-            DB::raw("UPPER(COALESCE(status, '-')) as estado")
-        );
-
-        $castig = PagoCajaCuscoCastigada::where('dni',$dni)->select(
-            DB::raw('DATE(fecha_de_pago) as fecha'),
-            DB::raw('pagado_en_soles as monto'),
-            DB::raw('pagare as oper'),
-            DB::raw("'-' as gestor"),
-            DB::raw("UPPER('-') as estado")
-        );
-
-        $extra = PagoCajaCuscoExtrajudicial::where('dni',$dni)->select(
-            DB::raw('DATE(fecha_de_pago) as fecha'),
-            DB::raw('pagado_en_soles as monto'),
-            DB::raw('pagare as oper'),
-            DB::raw("'-' as gestor"),
-            DB::raw("UPPER('-') as estado")
-        );
-
-        $rows = $propia->get()->concat($castig->get())->concat($extra->get())
-            ->sortByDesc('fecha')->values()->map(function($r){
+        $rows = Pago::where('dni',$dni)->select(
+                DB::raw('DATE(fecha_de_pago) as fecha'),
+                DB::raw('pagado_en_soles as monto'),
+                'operacion as oper',
+                DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
+                DB::raw("UPPER(COALESCE(status, '-')) as estado")
+            )
+            ->orderByDesc('fecha_de_pago')
+            ->get()
+            ->map(function($r){
                 return [
                     'oper'   => (string)($r->oper ?? ''),
                     'fecha'  => (string)($r->fecha ?? ''),

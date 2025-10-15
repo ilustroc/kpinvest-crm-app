@@ -5,12 +5,8 @@
 @push('head')
 <style>
   /* ===== Identidad KP: usa variables globales del layout (verde/azul) ===== */
-  .sect{
-    display:flex; align-items:center; gap:.6rem; font-weight:700; margin:6px 0 10px
-  }
-  .sect::before{
-    content:""; width:8px; height:18px; border-radius:4px; background:var(--accent); /* azul */
-  }
+  .sect{ display:flex; align-items:center; gap:.6rem; font-weight:700; margin:6px 0 10px }
+  .sect::before{ content:""; width:8px; height:18px; border-radius:4px; background:var(--accent) } /* azul */
 
   .kpi{
     position:relative; background:var(--surface); border:1px solid var(--border);
@@ -19,16 +15,13 @@
   }
   .kpi::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
-    background:linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 65%, black)); /* azul */
+    background:linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 65%, black));
     border-top-left-radius:12px; border-bottom-left-radius:12px; opacity:.95;
   }
   .kpi .label{ color:var(--muted); font-size:.9rem }
   .kpi .value{ font-weight:800; font-size:1.9rem; line-height:1 }
 
-  .viz{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:14px; padding:14px; height:100%
-  }
+  .viz{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; height:100% }
   .viz h6{ margin:0 0 10px; font-weight:700; color:var(--ink) }
   .viz .sub{ color:var(--muted); font-size:.9rem }
 
@@ -52,17 +45,10 @@
         >
       </div>
 
+      {{-- Cartera (fijo: General) --}}
       <div class="col-md-4">
         <label class="form-label">Cartera</label>
-        <select name="cartera" class="form-select">
-          <option value="propia" {{ ($cartera ?? request('cartera')) === 'propia' ? 'selected' : '' }}>Propia</option>
-          <option value="caja-cusco-castigada" {{ ($cartera ?? request('cartera')) === 'caja-cusco-castigada' ? 'selected' : '' }}>
-            Caja Cusco ▸ Castigada
-          </option>
-          <option value="caja-cusco-extrajudicial" {{ ($cartera ?? request('cartera')) === 'caja-cusco-extrajudicial' ? 'selected' : '' }}>
-            Caja Cusco ▸ Extrajudicial
-          </option>
-        </select>
+        <input type="text" class="form-control" value="General" readonly>
       </div>
 
       <div class="col-md-4">
@@ -173,11 +159,11 @@
   const pdpCai  = {{ (int)($k['pdp_caidas'] ?? 0) }};
   const pctCumpl = (pdpGen>0)? Math.round((pdpCum/pdpGen)*100):0;
 
-  // Auto-submit en cambios de filtros
+  // Auto-submit en cambios de filtros (mes/supervisor)
   document.querySelectorAll('#filtrosDash input[name="mes"], #filtrosDash select')
     .forEach(el => el.addEventListener('change', () => document.getElementById('filtrosDash').requestSubmit()));
 
-  // LINE: Pagos (azul)
+  // LINE: Pagos
   const ctxL = document.getElementById('linePagos');
   const line = new Chart(ctxL, {
     type:'line',
@@ -191,14 +177,11 @@
     }
   });
 
-  // BAR: Generadas (azul), Cumplidas (verde), Caídas (azul claro)
+  // BAR: Generadas / Cumplidas / Caídas
   const ctxB = document.getElementById('barPDP');
   const bar = new Chart(ctxB, {
     type:'bar',
-    data:{
-      labels:['Generadas','Cumplidas','Caídas'],
-      datasets:[{ data:[pdpGen,pdpCum,pdpCai]}]
-    },
+    data:{ labels:['Generadas','Cumplidas','Caídas'], datasets:[{ data:[pdpGen,pdpCum,pdpCai]}] },
     options:{
       plugins:{ legend:{display:false} },
       scales:{
@@ -208,7 +191,7 @@
     }
   });
 
-  // GAUGE: Cumplimiento (verde vs gris)
+  // GAUGE: Cumplimiento
   const ctxG = document.getElementById('gaugePDP');
   const gauge = new Chart(ctxG, {
     type:'doughnut',
@@ -216,33 +199,21 @@
     options:{ rotation:-90, circumference:180, plugins:{ legend:{display:false}, tooltip:{enabled:false} } }
   });
 
-  // Aplicar colores identidad (sin modo oscuro)
+  // Colores desde CSS vars
   function colorize(){
-    const a = col.accent();               // azul
-    const g = col.brand();                // verde
-    const m = col.muted();
-    const b = col.border();
-
-    // Línea
-    line.data.datasets[0].borderColor = a;
-    line.data.datasets[0].backgroundColor = a;
+    const a = col.accent(), g = col.brand(), m = col.muted(), b = col.border();
+    line.data.datasets[0].borderColor = a; line.data.datasets[0].backgroundColor = a;
     line.options.scales.x.ticks.color = m; line.options.scales.y.ticks.color = m;
     line.options.scales.x.grid.color  = b; line.options.scales.y.grid.color  = b;
 
-    // Barras
-    bar.data.datasets[0].backgroundColor = [
-      a,                          // Generadas: azul
-      g,                          // Cumplidas: verde
-      'color-mix(in oklab, '+a+' 35%, white)'  // Caídas: azul claro
-    ];
+    bar.data.datasets[0].backgroundColor = [a, g, 'color-mix(in oklab, '+a+' 35%, white)'];
     bar.options.scales.x.ticks.color = m; bar.options.scales.y.ticks.color = m; bar.options.scales.y.grid.color = b;
 
-    // Gauge
     gauge.data.datasets[0].backgroundColor = [g, b];
 
     line.update(); bar.update(); gauge.update();
   }
-  colorize(); // sin observer (no hay tema oscuro)
+  colorize();
 })();
 </script>
 @endpush

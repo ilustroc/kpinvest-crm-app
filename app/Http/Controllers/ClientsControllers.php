@@ -7,15 +7,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use App\Support\WorkflowMailer;
+
 use App\Models\PromesaPago;
 use App\Models\PromesaOperacion;
 use App\Models\PromesaCuota;
-use App\Models\PagoPropia;
-use App\Models\PagoCajaCuscoCastigada;
-use App\Models\PagoCajaCuscoExtrajudicial;
+use App\Models\PagoPropia as Pago;
+
 use App\Models\ClienteCuenta;
 use App\Models\CnaSolicitud;
-
 
 class ClientsControllers extends Controller
 {
@@ -25,12 +24,12 @@ class ClientsControllers extends Controller
         $pp = (int)($r->query('pp', 20)) ?: 20;
 
         $clientes = ClienteCuenta::query()
-            ->select('cartera','dni','operacion','titular','updated_at')
+            ->select('dni','operacion','titular','updated_at')   // ← sin 'cartera'
             ->when($q !== '', function ($w) use ($q) {
                 $w->where('dni','like',"%{$q}%")
                   ->orWhere('operacion','like',"%{$q}%")
-                  ->orWhere('titular','like',"%{$q}%")
-                  ->orWhere('cartera','like',"%{$q}%");
+                  ->orWhere('titular','like',"%{$q}%");
+                  // quitado: orWhere('cartera','like', ...)
             })
             ->orderByDesc('updated_at')
             ->paginate($pp)->withQueryString();
@@ -49,50 +48,28 @@ class ClientsControllers extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->titular;
 
-            // ===== A) Consolidado de pagos (3 fuentes) — versión simple
-            $propia = PagoPropia::where('dni',$dni)->select(
-                DB::raw('DATE(fecha_de_pago) as fecha'),
-                DB::raw('pagado_en_soles as monto'),
-                'operacion as oper',
-                DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
-                DB::raw("UPPER(COALESCE(status, '-')) as estado"),
-                DB::raw("'PROPIA' as fuente")
-            );
-
-            $cast = PagoCajaCuscoCastigada::where('dni',$dni)->select(
-                DB::raw('DATE(fecha_de_pago) as fecha'),
-                DB::raw('pagado_en_soles as monto'),
-                'pagare as oper',
-                DB::raw("'-' as gestor"),
-                DB::raw("'-' as estado"),
-                DB::raw("'CUSCO CASTIGADA' as fuente")
-            );
-
-            $extra = PagoCajaCuscoExtrajudicial::where('dni',$dni)->select(
-                DB::raw('DATE(fecha_de_pago) as fecha'),
-                DB::raw('pagado_en_soles as monto'),
-                'pagare as oper',
-                DB::raw("'-' as gestor"),
-                DB::raw("'-' as estado"),
-                DB::raw("'CUSCO EXTRAJUDICIAL' as fuente")
-            );
-
-            $pagos = $propia->get()
-                ->concat($cast->get())
-                ->concat($extra->get())
-                ->sortByDesc('fecha')
-                ->values();
+            // ===== A) Pagos (UNIFICADO)
+            $pagos = Pago::where('dni',$dni)->select(
+                    DB::raw('DATE(fecha_de_pago) as fecha'),
+                    DB::raw('pagado_en_soles as monto'),
+                    'operacion as oper',
+                    DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
+                    DB::raw("UPPER(COALESCE(status, '-')) as estado"),
+                    DB::raw("'PAGOS' as fuente")
+                )
+                ->orderByDesc('fecha_de_pago')
+                ->get();
 
             $totPagos = (float) $pagos->sum('monto');
 
-            // ===== B) Promesas (si tienes los scopes/relaciones)
+            // ===== B) Promesas
             $promesas = PromesaPago::where('dni',$dni)
                 ->when(method_exists(PromesaPago::class,'scopeWithDecisionRefs'), fn($q)=>$q->withDecisionRefs())
                 ->with('operaciones')
                 ->orderByDesc('fecha_promesa')
                 ->get();
 
-            // ===== C) CCD (opcional) – solo si existe la tabla
+            // ===== C) CCD (opcional si existe tabla)
             $ccd        = collect();
             $ccdByCodigo= collect();
 
@@ -114,34 +91,21 @@ class ClientsControllers extends Controller
                 }
             }
 
-            // ===== D) Métricas por operación (pagos_count/sum/list para cada cuenta)
+            // ===== D) Métricas por operación (desde pagos unificados)
             $ops = $cuentas->pluck('operacion')->filter()->unique()->values();
 
             $pagosPorOperacion = collect();
             if ($ops->isNotEmpty()) {
-                $q1 = DB::table('pagos_propia')->select([
-                    'operacion',
-                    DB::raw('fecha_de_pago as fecha'),
-                    DB::raw('pagado_en_soles as monto'),
-                    DB::raw("'PROPIA' as fuente"),
-                ])->where('dni',$dni)->whereIn('operacion',$ops);
+                $pagosFlat = DB::table('pagos')->select([
+                        'operacion',
+                        DB::raw('fecha_de_pago as fecha'),
+                        DB::raw('pagado_en_soles as monto'),
+                        DB::raw("'PAGOS' as fuente"),
+                    ])
+                    ->where('dni',$dni)
+                    ->whereIn('operacion',$ops)
+                    ->get();
 
-                $q2 = DB::table('pagos_caja_cusco_castigada')->select([
-                    DB::raw('pagare as operacion'),
-                    DB::raw('fecha_de_pago as fecha'),
-                    DB::raw('pagado_en_soles as monto'),
-                    DB::raw("'CUSCO CASTIGADA' as fuente"),
-                ])->where('dni',$dni)->whereIn('pagare',$ops);
-
-                $q3 = DB::table('pagos_caja_cusco_extrajudicial')->select([
-                    DB::raw('pagare as operacion'),
-                    DB::raw('fecha_de_pago as fecha'),
-                    DB::raw('pagado_en_soles as monto'),
-                    DB::raw("'CUSCO EXTRAJUDICIAL' as fuente"),
-                ])->where('dni',$dni)->whereIn('pagare',$ops);
-
-                $union = $q1->unionAll($q2)->unionAll($q3);
-                $pagosFlat = DB::query()->fromSub($union,'p')->get();
                 $pagosPorOperacion = $pagosFlat->groupBy('operacion');
 
                 $cuentas = $cuentas->map(function ($c) use ($pagosPorOperacion) {
@@ -161,21 +125,20 @@ class ClientsControllers extends Controller
                 });
             }
 
-            // ===== E) CNAs por operación (100% defensivo)
+            // ===== E) CNAs por operación (defensivo)
             $cnasByOperacion = collect();
             if (Schema::hasTable('cna_solicitudes')) {
                 $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
-            
-                // Trae estado y, si existen, rutas a archivos
-                $want = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
+
+                $want   = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
                 $selCna = collect($want)->filter(fn($c)=>in_array($c,$colsCna))->values()->all();
-            
+
                 $cnas = DB::table('cna_solicitudes')
                     ->select($selCna)
                     ->where('dni',$dni)
                     ->orderByDesc('created_at')
                     ->get();
-            
+
                 $map = [];
                 foreach ($cnas as $row) {
                     $opsRaw = $row->operaciones ?? '[]';
@@ -183,7 +146,7 @@ class ClientsControllers extends Controller
                     if (!is_array($opsArr)) {
                         $opsArr = array_filter(array_map('trim', explode(',', (string)$opsRaw)));
                     }
-            
+
                     foreach ($opsArr as $op) {
                         if (!$op) continue;
                         $map[$op] = $map[$op] ?? collect();
@@ -200,11 +163,11 @@ class ClientsControllers extends Controller
                 $cnasByOperacion = collect($map);
             }
 
-            // ===== F) Próximo N.º de carta CNA (para el modal)
+            // ===== F) Próximo N.º de carta CNA (para modal)
             $nextNroCarta = null;
             if (Schema::hasTable('cna_solicitudes')) {
                 $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
-                $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT); // 000001, 000002, ...
+                $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT);
             }
 
             return view('clientes.show', compact(
@@ -212,7 +175,7 @@ class ClientsControllers extends Controller
             ) + [
                 'ccdByCodigo'     => $ccdByCodigo,
                 'cnasByOperacion' => $cnasByOperacion,
-                'nextNroCarta'    => $nextNroCarta,   // << NUEVO
+                'nextNroCarta'    => $nextNroCarta,
             ]);
         } catch (\Throwable $e) {
             \Log::error('Clientes.show ERROR', ['dni'=>$dni,'msg'=>$e->getMessage(),'file'=>$e->getFile(),'line'=>$e->getLine()]);
@@ -234,7 +197,7 @@ class ClientsControllers extends Controller
             'tipo'          => 'required|in:convenio,cancelacion',
             'nota'          => 'nullable|string|max:500',
 
-            // <<-- HAZ LA LISTA OBLIGATORIA
+            // Lista de operaciones obligatoria
             'operaciones'   => 'required|array|min:1',
             'operaciones.*' => 'string|max:50',
 
@@ -266,7 +229,7 @@ class ClientsControllers extends Controller
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
         }
 
-        // ===== REGLAS CONVENIO (igual que tenías)
+        // ===== REGLAS CONVENIO
         if ($r->input('tipo') === 'convenio') {
             $n = max(1, (int)$r->input('nro_cuotas'));
             if (count($cronFechas) !== $n || count($cronMontos) !== $n) {
@@ -334,14 +297,13 @@ class ClientsControllers extends Controller
             $promesa->operacion = implode(', ', $ops);
             $promesa->save();
 
-            // Detalle: una fila por operación
+            // Detalle: una fila por operación (sin 'cartera')
             $now = now();
             $rows = [];
             foreach ($ops as $op) {
                 $rows[] = [
                     'promesa_id' => $promesa->id,
                     'operacion'  => $op,
-                    'cartera'    => 'PROPIA', // o la cartera real por operación si la tienes
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -366,7 +328,7 @@ class ClientsControllers extends Controller
             }
 
             DB::commit();
-            
+
             WorkflowMailer::promesaPendiente($promesa);
             return back()->with('ok', 'Propuesta registrada y enviada para autorización.');
         } catch (\Throwable $e) {
