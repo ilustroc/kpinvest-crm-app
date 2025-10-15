@@ -371,7 +371,6 @@
           <thead class="position-sticky top-0 bg-body">
             <tr>
               <th class="text-nowrap">Fecha</th>
-              <th class="text-nowrap">DNI</th>
               <th class="text-nowrap">Operación</th>
               <th>Nombre</th>
               <th class="text-end text-nowrap">Monto (S/)</th>
@@ -384,7 +383,6 @@
           <tbody>
             @forelse($pagos as $p)
               @php
-                $dni     = $p->dni ?? $p['dni'] ?? '-';
                 $oper    = $p->operacion ?? $p['operacion'] ?? '-';
                 $entidad = $p->entidad ?? $p['entidad'] ?? '-';
                 $nombre  = $p->nombre_cliente ?? $p['nombre_cliente'] ?? '-';
@@ -396,7 +394,6 @@
               @endphp
               <tr>
                 <td class="text-nowrap">{{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '' }}</td>
-                <td class="text-nowrap">{{ $dni }}</td>
                 <td class="text-nowrap">{{ $oper }}</td>
                 <td>{{ $nombre }}</td>
                 <td class="text-end text-nowrap">{{ number_format((float)$monto, 2, '.', ',') }}</td>
