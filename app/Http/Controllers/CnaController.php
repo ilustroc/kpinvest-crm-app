@@ -15,7 +15,9 @@ use PhpOffice\PhpWord\TemplateProcessor;
 
 class CnaController extends Controller
 {
-    // ======= CREAR SOLICITUD =======
+    // =========================================================
+    // CREAR SOLICITUD
+    // =========================================================
     public function store(Request $request, string $dni)
     {
         try {
@@ -27,7 +29,7 @@ class CnaController extends Controller
                 'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
                 'operaciones'           => ['required','array','min:1'],
                 'operaciones.*'         => ['string','max:50'],
-                'cuenta'                => ['nullable','string','max:50'], // operación base opcional
+                'cuenta'                => ['nullable','string','max:50'], // operación/cuenta base opcional (preview)
             ], [], [
                 'fecha_pago_realizado'  => 'fecha de pago realizado',
                 'monto_pagado'          => 'monto pagado',
@@ -39,7 +41,7 @@ class CnaController extends Controller
                 return back()->withErrors('Selecciona al menos una operación para la CNA.');
             }
 
-            // Titular (fallback a BD) — usa numdoc y, por compatibilidad, dni; además hace COALESCE con nombre
+            // Titular (usa numdoc y, por compatibilidad, dni; COALESCE con nombre)
             $titular = $data['titular'] ?? DB::table('clientes_cuentas')
                 ->where(function ($q) use ($dni) {
                     $q->where('numdoc', $dni)->orWhere('dni', $dni);
@@ -48,11 +50,12 @@ class CnaController extends Controller
 
             // Producto de referencia (opcional)
             $productoAuto = DB::table('clientes_cuentas')
-                ->whereIn('operacion', $ops)->whereNotNull('producto')
+                ->whereIn('operacion', $ops)
+                ->whereNotNull('producto')
                 ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
 
-            // Cosecha única + entidad (desde las operaciones)
-            $rowsOps  = DB::table('clientes_cuentas')
+            // Cosecha única + entidad (derivadas de las operaciones)
+            $rowsOps = DB::table('clientes_cuentas')
                 ->select('operacion','cosecha','entidad')
                 ->whereIn('operacion', $ops)
                 ->get();
@@ -70,9 +73,9 @@ class CnaController extends Controller
 
             ['serie' => $serie, 'suffix' => $suffix] = $this->seriesConfig($origen);
 
-            // Crear con correlativo (lock)
+            // Crear con correlativo (lock de tabla para evitar colisiones)
             $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
-                DB::table('cna_solicitudes')->lockForUpdate()->get(); // evita colisiones
+                DB::table('cna_solicitudes')->lockForUpdate()->get();
                 $next = $this->nextCartaForSerie($serie, $suffix);
 
                 return CnaSolicitud::create([
@@ -81,7 +84,7 @@ class CnaController extends Controller
                     'dni'                  => $dni,
                     'titular'              => $titular,
                     'producto'             => $productoAuto,
-                    'operaciones'          => $ops,
+                    'operaciones'          => $ops, // cast array -> JSON/TEXT
                     'nota'                 => $data['nota'] ?? null,
                     'observacion'          => $data['observacion'] ?? null,
                     'fecha_pago_realizado' => $data['fecha_pago_realizado'],
@@ -92,25 +95,33 @@ class CnaController extends Controller
             });
 
             WorkflowMailer::cnaPendiente($solicitud);
-            return back()->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
 
+            // PRG: vuelve a la ficha del cliente (evita quedarse en /{dni}/cnas)
+            return redirect()->route('clientes.show', $dni)
+                ->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
         } catch (\Throwable $e) {
-            \Log::error('CNA store error', [
+            Log::error('CNA store error', [
                 'dni'  => $dni,
                 'msg'  => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
-            return back()->withErrors('No se pudo guardar la CNA: '.$e->getMessage())->withInput();
+            return redirect()->route('clientes.show', $dni)
+                ->withErrors('No se pudo guardar la CNA: '.$e->getMessage())
+                ->withInput();
         }
     }
 
-    // ======= FLUJO (SUPERVISOR) =======
+    // =========================================================
+    // FLUJO DE APROBACIÓN
+    // =========================================================
     public function preaprobar(CnaSolicitud $cna)
     {
         $this->authorizeRole('supervisor');
-        if ($cna->workflow_estado !== 'pendiente')
+
+        if ($cna->workflow_estado !== 'pendiente') {
             return back()->withErrors('Solo se puede pre-aprobar una solicitud pendiente.');
+        }
 
         $cna->update([
             'workflow_estado' => 'preaprobada',
@@ -128,8 +139,10 @@ class CnaController extends Controller
     public function rechazarSup(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('supervisor');
-        if ($cna->workflow_estado !== 'pendiente')
+
+        if ($cna->workflow_estado !== 'pendiente') {
             return back()->withErrors('Solo se puede rechazar una solicitud pendiente.');
+        }
 
         $nota = substr((string)$request->input('nota_estado',''), 0, 500);
 
@@ -144,15 +157,22 @@ class CnaController extends Controller
         return back()->with('ok', 'CNA rechazada por supervisor.');
     }
 
-    // ======= FLUJO (ADMIN) =======
     public function aprobar(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('administrador');
-        if ($cna->workflow_estado !== 'preaprobada')
-            return back()->withErrors('Solo se puede aprobar una CNA pre-aprobada.');
 
-        $cna->update(['workflow_estado' => 'aprobada', 'aprobado_por' => Auth::id(), 'aprobado_at' => now()]);
-        $this->generateOutputsFromTemplate($cna); // DOCX + PDF
+        if ($cna->workflow_estado !== 'preaprobada') {
+            return back()->withErrors('Solo se puede aprobar una CNA pre-aprobada.');
+        }
+
+        $cna->update([
+            'workflow_estado' => 'aprobada',
+            'aprobado_por'    => Auth::id(),
+            'aprobado_at'     => now(),
+        ]);
+
+        // Genera DOCX + PDF
+        $this->generateOutputsFromTemplate($cna);
 
         WorkflowMailer::cnaResuelta($cna, true, $request->input('nota_estado'));
         return back()->with('ok', 'CNA aprobada y archivos generados.');
@@ -161,8 +181,10 @@ class CnaController extends Controller
     public function rechazarAdmin(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('administrador');
-        if ($cna->workflow_estado !== 'preaprobada')
+
+        if ($cna->workflow_estado !== 'preaprobada') {
             return back()->withErrors('Solo se puede rechazar una solicitud pre-aprobada.');
+        }
 
         $nota = substr((string)$request->input('nota_estado',''), 0, 500);
 
@@ -177,8 +199,9 @@ class CnaController extends Controller
         return back()->with('ok', 'CNA rechazada por administrador.');
     }
 
-    // ======= DESCARGAS =======
-    /** GET /cna/{id}/pdf */
+    // =========================================================
+    // DESCARGAS
+    // =========================================================
     public function pdf(int $id)
     {
         $cna = CnaSolicitud::findOrFail($id);
@@ -186,7 +209,6 @@ class CnaController extends Controller
         return $this->downloadPreferred($cna, 'pdf');
     }
 
-    /** GET /cna/{id}/docx */
     public function docx(int $id)
     {
         $cna = CnaSolicitud::findOrFail($id);
@@ -194,14 +216,6 @@ class CnaController extends Controller
         return $this->downloadPreferred($cna, 'docx');
     }
 
-    // ======= HELPERS (SEGURIDAD / ARCHIVOS / PLANTILLAS / CORRELATIVO) =======
-    private function authorizeRole(string $role): void
-    {
-        $user = Auth::user();
-        if (!$user || !in_array(strtolower($user->role), [$role, 'sistemas'])) abort(403, 'No autorizado.');
-    }
-
-    /** Descarga priorizando $primary ('pdf'|'docx'), con fallback al otro. */
     private function downloadPreferred(CnaSolicitud $cna, string $primary)
     {
         $base = sprintf('CNA %s - %s', $cna->nro_carta, $cna->dni);
@@ -219,18 +233,30 @@ class CnaController extends Controller
         abort(404, 'Archivo no encontrado.');
     }
 
+    // =========================================================
+    // HELPERS (SEGURIDAD / PLANTILLAS / CORRELATIVO)
+    // =========================================================
+    private function authorizeRole(string $role): void
+    {
+        $user = Auth::user();
+        if (!$user || !in_array(strtolower($user->role), [$role, 'sistemas'])) {
+            abort(403, 'No autorizado.');
+        }
+    }
+
     /**
      * Genera DOCX (plantilla) + PDF (iLovePDF) y guarda rutas.
      * Placeholders: ${nro_carta}, ${nombre}, ${numdoc}, ${aprobado_at}, ${cuenta}, ${operacion}, ${entidad}
      */
     private function generateOutputsFromTemplate(CnaSolicitud $cna): void
     {
-        // Operaciones normalizadas + metadatos
+        // Operaciones normalizadas
         $ops = is_array($cna->operaciones) ? $cna->operaciones : (json_decode($cna->operaciones ?? '[]', true) ?: []);
         $ops = array_values(array_filter(array_map('strval', $ops)));
 
+        // Trae también la CUENTA para rellenar ${cuenta}
         $rows = DB::table('clientes_cuentas')
-            ->select('operacion','cosecha','entidad')
+            ->select('operacion','cuenta','cosecha','entidad')
             ->whereIn('operacion', $ops)
             ->get();
 
@@ -243,21 +269,21 @@ class CnaController extends Controller
             throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen);
         }
 
-        // Asegura directorios
+        // Directorios
         $docxDir = 'cna/docx'; $pdfDir = 'cna/pdfs';
         Storage::makeDirectory($docxDir);
         Storage::makeDirectory($pdfDir);
 
-        // Nombres destino
+        // Nombres
         $docxName = "CNA {$cna->nro_carta} - {$cna->dni}.docx";
         $pdfName  = "CNA {$cna->nro_carta} - {$cna->dni}.pdf";
         $docxRel  = $docxDir.'/'.$docxName;
         $pdfRel   = $pdfDir.'/'.$pdfName;
 
-        // Datos para plantilla
+        // Plantilla
         $tp = new TemplateProcessor($tpl);
 
-        // Titular por numdoc (fallback a dni) y COALESCE
+        // Titular por numdoc (fallback a dni) y COALESCE(titular, nombre)
         $titular = $cna->titular ?: DB::table('clientes_cuentas')
             ->where(function ($q) use ($cna) {
                 $q->where('numdoc', $cna->dni)->orWhere('dni', $cna->dni);
@@ -265,11 +291,14 @@ class CnaController extends Controller
             ->value(DB::raw('COALESCE(titular, nombre)'));
 
         Carbon::setLocale('es');
-        $aprobadoAtStr = ($cna->aprobado_at ? Carbon::parse($cna->aprobado_at) : now())->translatedFormat('d \\de F \\de Y');
-        $cuenta  = $ops[0] ?? '';
+        $aprobadoAtStr = ($cna->aprobado_at ? Carbon::parse($cna->aprobado_at) : now())
+            ->translatedFormat('d \\de F \\de Y');
+
+        // Derivar cuenta (si por alguna razón hay más de una, usa la primera)
+        $cuenta  = (string) ($rows->pluck('cuenta')->filter()->unique()->first() ?? ($ops[0] ?? ''));
         $entidad = (string) ($rows->pluck('entidad')->filter()->unique()->first() ?? '');
 
-        // Relleno
+        // Relleno de placeholders
         $tp->setValue('nro_carta',   $cna->nro_carta);
         $tp->setValue('nombre',      (string) $titular);
         $tp->setValue('numdoc',      $cna->dni);
@@ -277,9 +306,11 @@ class CnaController extends Controller
         $tp->setValue('cuenta',      $cuenta);
         $tp->setValue('operacion',   implode(', ', $ops));
         $tp->setValue('entidad',     $entidad);
-        $tp->saveAs(storage_path('app/'.$docxRel)); // DOCX listo
 
-        // PDF (best-effort)
+        // Guarda DOCX
+        $tp->saveAs(storage_path('app/'.$docxRel));
+
+        // Convierte a PDF (best-effort)
         try {
             $this->convertDocxToPdfViaIlovepdf(storage_path('app/'.$docxRel), storage_path('app/'.$pdfRel));
             $cna->pdf_path = $pdfRel;
@@ -307,16 +338,14 @@ class CnaController extends Controller
 
         $outDir = dirname($pdfAbs);
         if (!is_dir($outDir)) @mkdir($outDir, 0775, true);
-        $task->download($outDir); // guarda con mismo nombre base .pdf
+        $task->download($outDir);
 
         $expected = $outDir.'/'.basename($docxAbs, '.docx').'.pdf';
         if (!is_file($expected)) {
             $latest = collect(glob($outDir.'/*.pdf'))->sortByDesc(fn($p) => filemtime($p))->first();
             if ($latest) $expected = $latest;
         }
-        if (!is_file($expected)) {
-            throw new \RuntimeException('No se pudo localizar el PDF generado.');
-        }
+        if (!is_file($expected)) throw new \RuntimeException('No se pudo localizar el PDF generado.');
 
         if ($expected !== $pdfAbs) { @unlink($pdfAbs); rename($expected, $pdfAbs); }
     }
@@ -346,12 +375,12 @@ class CnaController extends Controller
     {
         $o = strtoupper($origen);
         if (str_contains($o, 'ACREENCIA II')) {
-            return ['serie' => 'F2','suffix' => 'F2','template' => storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
+            return ['serie'=>'F2','suffix'=>'F2','template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
         }
         if (str_contains($o, 'FONDO ACREENCIA AREQUIPA') || str_contains($o,'FONDO ACREENCIAS AREQUIPA')) {
-            return ['serie' => 'F', 'suffix' => 'F', 'template' => storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];
+            return ['serie'=>'F', 'suffix'=>'F', 'template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];
         }
-        return ['serie' => 'KPI','suffix' => '', 'template' => storage_path('app/templates/cna_kpinvest.docx')]; // default
+        return ['serie'=>'KPI','suffix'=>'', 'template'=>storage_path('app/templates/cna_kpinvest.docx')];
     }
 
     /** Siguiente número por serie (lock). Retorna ['corr'=>int,'nro'=>'000123F'] */
@@ -360,13 +389,11 @@ class CnaController extends Controller
         DB::table('cna_solicitudes')->lockForUpdate()->get();
 
         $query = DB::table('cna_solicitudes')->selectRaw("MAX(CAST(LEFT(nro_carta,6) AS UNSIGNED)) as m");
-        if ($suffix !== '') {
-            $query->where('nro_carta','like',"%{$suffix}");
-        }
+        if ($suffix !== '') $query->where('nro_carta','like',"%{$suffix}");
         $max  = $query->value('m');
 
         $corr = (int)($max ?: 0) + 1;
         $nro  = str_pad((string)$corr, 6, '0', STR_PAD_LEFT) . $suffix;
-        return ['corr' => $corr, 'nro' => $nro];
+        return ['corr'=>$corr,'nro'=>$nro];
     }
 }
