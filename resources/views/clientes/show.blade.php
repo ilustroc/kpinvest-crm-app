@@ -226,7 +226,11 @@
 
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
-              @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
+              @php
+                // ahora mira por CUENTA, no por operación
+                $items = collect($cnasByCuenta[$c->cuenta] ?? []);
+              @endphp
+
               @if($items->count())
                 <span class="badge text-bg-secondary me-2">{{ $items->count() }} reg.</span>
               @endif
