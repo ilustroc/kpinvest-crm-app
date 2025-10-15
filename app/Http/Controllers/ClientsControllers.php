@@ -128,7 +128,7 @@ class ClientsControllers extends Controller
                 })->values();
 
                 // ← clave para agrupar/generar CNA por CUENTA
-                $c->cuenta = (string)($op2cta[$c->operacion] ?? $c->operacion);
+                $c->cta_grupo = (string)($op2cta[$c->operacion] ?? $c->cuenta);
                 return $c;
             });
 

@@ -18,69 +18,79 @@ class CnaController extends Controller
     // ======= CREAR SOLICITUD =======
     public function store(Request $request, string $dni)
     {
-        $data = $request->validate([
-            'titular'               => ['nullable','string','max:150'],
-            'nota'                  => ['nullable','string','max:1000'],
-            'observacion'           => ['nullable','string','max:1000'],
-            'fecha_pago_realizado'  => ['required','date'],
-            'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
-            'operaciones'           => ['required','array','min:1'],
-            'operaciones.*'         => ['string','max:50'],
-            'cuenta'                => ['nullable','string','max:50'], // operación base opcional
-        ], [], [
-            'fecha_pago_realizado'  => 'fecha de pago realizado',
-            'monto_pagado'          => 'monto pagado',
-            'operaciones'           => 'operaciones',
-        ]);
-
-        $ops = array_values(array_filter(array_map('strval', $data['operaciones'] ?? [])));
-        if (!$ops) return back()->withErrors('Selecciona al menos una operación para la CNA.');
-
-        // Titular (fallback a BD)
-        $titular = $data['titular'] ?? DB::table('clientes_cuentas')
-            ->where('dni', $dni)->whereNotNull('titular')->value('titular');
-
-        // Producto de referencia (opcional)
-        $productoAuto = DB::table('clientes_cuentas')
-            ->whereIn('operacion', $ops)->whereNotNull('producto')
-            ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
-
-        // Cosecha única + entidad
-        $rowsOps  = DB::table('clientes_cuentas')
-            ->select('operacion','cosecha','entidad')->whereIn('operacion', $ops)->get();
-
-        $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
-        if ($cosechas->count() !== 1) return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
-        $cosecha = (string) $cosechas->first();
-
-        $origen = $this->originFromCosecha($cosecha);
-        if (!$origen) return back()->withErrors('Cosecha no reconocida: "'.$cosecha.'".');
-
-        ['serie'=>$serie, 'suffix'=>$suffix] = $this->seriesConfig($origen);
-
-        // Crear con correlativo (lock)
-        $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
-            DB::table('cna_solicitudes')->lockForUpdate()->get(); // evita colisiones
-            $next = $this->nextCartaForSerie($serie, $suffix);
-
-            return CnaSolicitud::create([
-                'correlativo'          => $next['corr'],
-                'nro_carta'            => $next['nro'],
-                'dni'                  => $dni,
-                'titular'              => $titular,
-                'producto'             => $productoAuto,
-                'operaciones'          => $ops,
-                'nota'                 => $data['nota'] ?? null,
-                'observacion'          => $data['observacion'] ?? null,
-                'fecha_pago_realizado' => $data['fecha_pago_realizado'],
-                'monto_pagado'         => $data['monto_pagado'],
-                'workflow_estado'      => 'pendiente',
-                'user_id'              => Auth::id(),
+        try {
+            $data = $request->validate([
+                'titular'               => ['nullable','string','max:150'],
+                'nota'                  => ['nullable','string','max:1000'],
+                'observacion'           => ['nullable','string','max:1000'],
+                'fecha_pago_realizado'  => ['required','date'],
+                'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
+                'operaciones'           => ['required','array','min:1'],
+                'operaciones.*'         => ['string','max:50'],
+                'cuenta'                => ['nullable','string','max:50'], // operación base opcional
+            ], [], [
+                'fecha_pago_realizado'  => 'fecha de pago realizado',
+                'monto_pagado'          => 'monto pagado',
+                'operaciones'           => 'operaciones',
             ]);
-        });
 
-        WorkflowMailer::cnaPendiente($solicitud);
-        return back()->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
+            $ops = array_values(array_filter(array_map('strval', $data['operaciones'] ?? [])));
+            if (!$ops) return back()->withErrors('Selecciona al menos una operación para la CNA.');
+
+            // Titular (fallback a BD)
+            $titular = $data['titular'] ?? DB::table('clientes_cuentas')
+                ->where('dni', $dni)->whereNotNull('titular')->value('titular');
+
+            // Producto de referencia (opcional)
+            $productoAuto = DB::table('clientes_cuentas')
+                ->whereIn('operacion', $ops)->whereNotNull('producto')
+                ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
+
+            // Cosecha única + entidad
+            $rowsOps  = DB::table('clientes_cuentas')
+                ->select('operacion','cosecha','entidad')->whereIn('operacion', $ops)->get();
+
+            $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
+            if ($cosechas->count() !== 1) return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
+            $cosecha = (string) $cosechas->first();
+
+            $origen = $this->originFromCosecha($cosecha);
+            if (!$origen) return back()->withErrors('Cosecha no reconocida: "'.$cosecha.'".');
+
+            ['serie'=>$serie, 'suffix'=>$suffix] = $this->seriesConfig($origen);
+
+            $solicitud = DB::transaction(function () use (/* … */) {
+                DB::table('cna_solicitudes')->lockForUpdate()->get();
+                $next = $this->nextCartaForSerie($serie, $suffix);
+
+                return CnaSolicitud::create([
+                    'correlativo'          => $next['corr'],
+                    'nro_carta'            => $next['nro'],
+                    'dni'                  => $dni,
+                    'titular'              => $titular,
+                    'producto'             => $productoAuto,
+                    'operaciones'          => $ops,
+                    'nota'                 => $data['nota'] ?? null,
+                    'observacion'          => $data['observacion'] ?? null,
+                    'fecha_pago_realizado' => $data['fecha_pago_realizado'],
+                    'monto_pagado'         => $data['monto_pagado'],
+                    'workflow_estado'      => 'pendiente',
+                    'user_id'              => Auth::id(),
+                ]);
+            });
+
+            WorkflowMailer::cnaPendiente($solicitud);
+            return back()->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
+
+        } catch (\Throwable $e) {
+            \Log::error('CNA store error', [
+                'dni' => $dni,
+                'msg' => $e->getMessage(),
+                'file'=> $e->getFile(),
+                'line'=> $e->getLine(),
+            ]);
+            return back()->withErrors('No se pudo guardar la CNA: '.$e->getMessage())->withInput();
+        }
     }
 
     // ======= FLUJO (SUPERVISOR) =======

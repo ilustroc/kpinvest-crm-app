@@ -1029,7 +1029,7 @@
 
   /* ====== Generar CNA (por martillo) — AGRUPAR POR CUENTA ====== */
   (function(){
-    const modal     = document.getElementById('modalCna');            // <— AHORA SÍ DEFINIDO
+    const modal     = document.getElementById('modalCna');
     const opsHidden = document.getElementById('cnaOpsHidden');
     const opsList   = document.getElementById('cnaOpsList');
     const inCuenta  = document.getElementById('cnaCuentaInput');
