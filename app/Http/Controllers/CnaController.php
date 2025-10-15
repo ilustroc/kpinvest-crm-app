@@ -28,6 +28,7 @@ class CnaController extends Controller
             'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
             'operaciones'           => ['required','array','min:1'],
             'operaciones.*'         => ['string','max:50'],
+            'cuenta'                => ['nullable','string','max:50'], // operación base (botón martillo)
         ], [], [
             'fecha_pago_realizado'  => 'fecha de pago realizado',
             'monto_pagado'          => 'monto pagado',
@@ -45,23 +46,45 @@ class CnaController extends Controller
             ->whereNotNull('titular')
             ->value('titular');
 
-        // (Opcional) Derivar un "producto" de referencia con las operaciones elegidas
+        // Producto de referencia (opcional)
         $productoAuto = DB::table('clientes_cuentas')
             ->whereIn('operacion', $ops)
             ->whereNotNull('producto')
             ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
 
-        $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto) {
+        // === Lee cosecha/entidad de las operaciones y valida cosecha única
+        $rowsOps  = DB::table('clientes_cuentas')
+            ->select('operacion','cosecha','entidad')
+            ->whereIn('operacion', $ops)
+            ->get();
+
+        $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
+        if ($cosechas->count() !== 1) {
+            return back()->withErrors('Todas las operaciones seleccionadas deben pertenecer a la MISMA cosecha.');
+        }
+        $cosecha = (string)$cosechas->first();
+
+        $origen = $this->originFromCosecha($cosecha);
+        if (!$origen) {
+            return back()->withErrors('No se reconoce la cosecha "'.$cosecha.'" para seleccionar plantilla.');
+        }
+        ['serie'=>$serie, 'suffix'=>$suffix] = $this->seriesConfig($origen);
+
+        // Entidad de referencia
+        $entidad = $rowsOps->pluck('entidad')->filter()->unique()->first();
+
+        // Operación base (la del botón)
+        $cuentaSel = (string)($data['cuenta'] ?? ($ops[0] ?? ''));
+
+        // === correlativo por SERIE (con lock)
+        $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
             // Bloqueo para evitar colisiones de correlativo
             DB::table('cna_solicitudes')->lockForUpdate()->get();
 
-            $last = (int) DB::table('cna_solicitudes')->max('correlativo');
-            $next = $last + 1;
-            $nro  = str_pad((string)$next, 6, '0', STR_PAD_LEFT);
-
+            $next = $this->nextCartaForSerie($serie, $suffix);
             return CnaSolicitud::create([
-                'correlativo'          => $next,
-                'nro_carta'            => $nro,
+                'correlativo'          => $next['corr'],      // correlativo numérico de la serie
+                'nro_carta'            => $next['nro'],       // 000001 / 000001F / 000001F2
                 'dni'                  => $dni,
                 'titular'              => $titular,
                 'producto'             => $productoAuto,
@@ -72,6 +95,7 @@ class CnaController extends Controller
                 'monto_pagado'         => $data['monto_pagado'],
                 'workflow_estado'      => 'pendiente',
                 'user_id'              => Auth::id(),
+                // Si agregas columnas, puedes guardar: serie/origen/plantilla/cuenta/entidad_ref
             ]);
         });
 
@@ -84,7 +108,6 @@ class CnaController extends Controller
      * ======================================================= */
 
     // ── Supervisor
-
     public function preaprobar(CnaSolicitud $cna)
     {
         $this->authorizeRole('supervisor');
@@ -121,12 +144,12 @@ class CnaController extends Controller
             'motivo_rechazo'  => substr((string)$request->input('nota_estado',''), 0, 500),
         ]);
 
-        WorkflowMailer::cnaRechazadaSup($cna, $req->input('nota_estado'));
+        WorkflowMailer::cnaRechazadaSup($cna, $request->input('nota_estado'));
         return back()->with('ok', 'CNA rechazada por supervisor.');
     }
 
     // ── Administrador
-    public function aprobar(CnaSolicitud $cna)
+    public function aprobar(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('administrador');
 
@@ -140,10 +163,10 @@ class CnaController extends Controller
             'aprobado_at'     => now(),
         ]);
 
-        // Generar DOCX + PDF desde plantilla
+        // Generar DOCX + PDF desde plantilla (según cosecha/serie)
         $this->generateOutputsFromTemplate($cna);
 
-        WorkflowMailer::cnaResuelta($cna, true, $req->input('nota_estado'));
+        WorkflowMailer::cnaResuelta($cna, true, $request->input('nota_estado'));
         return back()->with('ok', 'CNA aprobada y archivos generados.');
     }
 
@@ -162,7 +185,7 @@ class CnaController extends Controller
             'motivo_rechazo'  => substr((string)$request->input('nota_estado',''), 0, 500),
         ]);
 
-        WorkflowMailer::cnaResuelta($cna, false, $req->input('nota_estado'));
+        WorkflowMailer::cnaResuelta($cna, false, $request->input('nota_estado'));
         return back()->with('ok', 'CNA rechazada por administrador.');
     }
 
@@ -178,7 +201,6 @@ class CnaController extends Controller
             abort(403, 'Solo disponible para CNA aprobadas.');
         }
 
-        // Construye SIEMPRE el nombre esperado
         $base   = sprintf('CNA %s - %s', $cna->nro_carta, $cna->dni);
         $pdfRel = 'cna/pdfs/'.$base.'.pdf';
 
@@ -186,7 +208,6 @@ class CnaController extends Controller
             return Storage::download($pdfRel, $base.'.pdf');
         }
 
-        // Si no existe, intenta servir el DOCX como respaldo
         $docxRel = 'cna/docx/'.$base.'.docx';
         if (Storage::exists($docxRel)) {
             return Storage::download($docxRel, $base.'.docx');
@@ -209,7 +230,6 @@ class CnaController extends Controller
             return Storage::download($docxRel, $base.'.docx');
         }
 
-        // Respaldo: si el PDF existe, al menos entrega eso
         $pdfRel = 'cna/pdfs/'.$base.'.pdf';
         if (Storage::exists($pdfRel)) {
             return Storage::download($pdfRel, $base.'.pdf');
@@ -231,120 +251,70 @@ class CnaController extends Controller
     }
 
     /**
-     * Llena storage/app/templates/cna_template.docx y crea:
-     *  - DOCX en storage/app/cna/docx
-     *  - PDF  en storage/app/cna/pdfs (vía iLovePDF)
+     * Según la cosecha, elige plantilla y rellena placeholders:
+     *  ${nro_carta}, ${nombre}, ${numdoc}, ${aprobado_at}, ${cuenta}, ${operacion}, ${entidad}
      */
     private function generateOutputsFromTemplate(CnaSolicitud $cna): void
     {
-        $tplPath = storage_path('app/templates/cna_template.docx');
-        if (!is_file($tplPath)) {
-            throw new \RuntimeException('Plantilla cna_template.docx no encontrada en storage/app/templates/');
+        // Extrae cosecha/entidad de las operaciones
+        $ops = is_array($cna->operaciones) ? $cna->operaciones : (json_decode($cna->operaciones ?? '[]', true) ?: []);
+        $ops = array_values(array_filter(array_map('strval', $ops)));
+
+        $rows = DB::table('clientes_cuentas')
+            ->select('operacion','cosecha','entidad')
+            ->whereIn('operacion', $ops)
+            ->get();
+
+        $cosecha = (string)($rows->pluck('cosecha')->filter()->unique()->first() ?? '');
+        $origen  = $this->originFromCosecha($cosecha) ?? 'KP INVEST SAC';
+        ['template'=>$tpl] = $this->seriesConfig($origen);
+
+        if (!is_file($tpl)) {
+            throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen);
         }
 
-        $docxDir = 'cna/docx';
-        $pdfDir  = 'cna/pdfs';
-        \Storage::makeDirectory($docxDir);
-        \Storage::makeDirectory($pdfDir);
+        $docxDir = 'cna/docx'; $pdfDir = 'cna/pdfs';
+        Storage::makeDirectory($docxDir);
+        Storage::makeDirectory($pdfDir);
 
         $docxName = "CNA {$cna->nro_carta} - {$cna->dni}.docx";
         $pdfName  = "CNA {$cna->nro_carta} - {$cna->dni}.pdf";
         $docxRel  = $docxDir.'/'.$docxName;
         $pdfRel   = $pdfDir.'/'.$pdfName;
 
-        // ---------- Rellenar DOCX ----------
-        $tp = new TemplateProcessor($tplPath);
+        $tp = new TemplateProcessor($tpl);
 
-        $titular = $cna->titular ?? \DB::table('clientes_cuentas')
-            ->where('dni', $cna->dni)->value('titular');
+        // Datos base
+        $titular = $cna->titular ?: DB::table('clientes_cuentas')->where('dni',$cna->dni)->value('titular');
+        Carbon::setLocale('es');
+        $aprobadoAtStr = ($cna->aprobado_at ? Carbon::parse($cna->aprobado_at) : now())->translatedFormat('d \\de F \\de Y');
 
-        // Fecha de pago (opcional)
-        $fechaPago = '';
-        if ($cna->fecha_pago_realizado) {
-            try { $fechaPago = Carbon::parse($cna->fecha_pago_realizado)->format('d/m/Y'); }
-            catch (\Throwable $e) { $fechaPago = (string)$cna->fecha_pago_realizado; }
-        }
+        // Operación base: la primera si no llega otra
+        $cuenta  = $ops[0] ?? '';
+        $entidad = (string)($rows->pluck('entidad')->filter()->unique()->first() ?? '');
 
-        // >>> NUEVO: fecha de aprobación en español <<<
-        // Usa la fecha de aprobación si existe; si no, hoy.
-        try {
-            Carbon::setLocale('es');
-            $aprobadoAt = $cna->aprobado_at
-                ? Carbon::parse($cna->aprobado_at)
-                : now();
-            // “26 de setiembre de 2025”
-            $aprobadoAtStr = $aprobadoAt->translatedFormat('d \\de F \\de Y');
-            // Opcional: capitalizar el mes (si tu plantilla lo quiere así)
-            // $aprobadoAtStr = mb_convert_case($aprobadoAtStr, MB_CASE_TITLE, 'UTF-8');
-        } catch (\Throwable $e) {
-            $aprobadoAtStr = now()->format('d/m/Y');
-        }
+        // Placeholders
+        $tp->setValue('nro_carta',   $cna->nro_carta);
+        $tp->setValue('nombre',      (string)$titular);
+        $tp->setValue('numdoc',      $cna->dni);
+        $tp->setValue('aprobado_at', $aprobadoAtStr);
+        $tp->setValue('cuenta',      $cuenta);
+        $tp->setValue('operacion',   implode(', ', $ops));
+        $tp->setValue('entidad',     $entidad);
 
-        foreach ([
-            'nro_carta'    => $cna->nro_carta,
-            'NRO_CARTA'    => $cna->nro_carta,
-            'dni'          => $cna->dni,
-            'DNI'          => $cna->dni,
-            'titular'      => (string)($titular ?? ''),
-            'TITULAR'      => (string)($titular ?? ''),
-            'FECHA_PAGO'   => $fechaPago,
-            'MONTO_PAGADO' => number_format((float)$cna->monto_pagado, 2),
-            'OBSERVACION'  => (string)($cna->observacion ?? ''),
-            'APROBADO_AT'  => $aprobadoAtStr,
-        ] as $k => $v) {
-            $tp->setValue($k, $v);
-        }
-
-        // Operaciones
-        $ops = is_array($cna->operaciones)
-            ? $cna->operaciones
-            : (json_decode($cna->operaciones ?? '[]', true) ?: []);
-        $ops = array_values(array_filter(array_map('strval', $ops)));
-
-        $byOp = collect();
-        if ($ops) {
-            $byOp = \DB::table('clientes_cuentas')
-                ->select('operacion','producto','entidad')
-                ->whereIn('operacion', $ops)
-                ->get()
-                ->keyBy('operacion');
-        }
-
-        $rows = max(count($ops), 1);
-        $tp->cloneRow('OPERACION', $rows);
-
-        if ($rows === 1) {
-            $op  = $ops[0] ?? '—';
-            $row = $byOp->get($op);
-            $tp->setValue('OPERACION#1', $op ?: '—');
-            $tp->setValue('PRODUCTO#1',  $row->producto ?? '—');
-            $tp->setValue('ENTIDAD#1',   $row->entidad ?? '—');
-        } else {
-            foreach ($ops as $i => $op) {
-                $row = $byOp->get($op);
-                $n   = $i + 1;
-                $tp->setValue("OPERACION#{$n}", $op ?: '—');
-                $tp->setValue("PRODUCTO#{$n}",  $row->producto ?? '—');
-                $tp->setValue("ENTIDAD#{$n}",   $row->entidad ?? '—');
-            }
-        }
-
-        // Guardar DOCX
+        // Guarda DOCX
         $tp->saveAs(storage_path('app/'.$docxRel));
 
-        // ---------- Convertir a PDF ----------
+        // Convierte a PDF
         try {
-            $this->convertDocxToPdfViaIlovepdf(
-                storage_path('app/'.$docxRel),
-                storage_path('app/'.$pdfRel)
-            );
+            $this->convertDocxToPdfViaIlovepdf(storage_path('app/'.$docxRel), storage_path('app/'.$pdfRel));
             $cna->pdf_path = $pdfRel;
         } catch (\Throwable $e) {
-            \Log::error('Error iLovePDF DOCX→PDF: '.$e->getMessage(), ['cna_id' => $cna->id]);
+            Log::error('Error iLovePDF DOCX→PDF: '.$e->getMessage(), ['cna_id'=>$cna->id]);
             $cna->pdf_path = null;
         }
 
-        // Persistir rutas (y por si acaso aseguramos guardar aprobado_at existente)
+        // Persistir rutas
         $cna->docx_path = $docxRel;
         $cna->save();
     }
@@ -392,5 +362,64 @@ class CnaController extends Controller
             @unlink($pdfAbs);
             rename($expected, $pdfAbs);
         }
+    }
+
+    /** Cosecha → Origen (normalizado) */
+    private function originFromCosecha(?string $cosecha): ?string
+    {
+        if (!$cosecha) return null;
+        $c = strtoupper(trim($cosecha));
+
+        // === Mapa según tu cuadro ===
+        $faa = ['BBVA3','BBVA4','BBVA5','BBVA6','CAJAAQP3'];
+        $faa2= ['BBVA7','BBVA8','CONFIANZA_5'];
+        $kpi = [
+            'BBVA1','BBVA2','CAJAAQP1','CAJAAQP2','COMPARTAMOS_1','CONFIANZA','CONFIANZA_2','CONFIANZA_3',
+            'CONFIANZA_4','CONFIANZA_6','CONFIANZA_7','CONFIANZA_8','CONFIANZA_9','CONFIANZA_10',
+            'CONFIANZA_11','CONFIANZA_12','SEMBRANDO',
+        ];
+
+        if (in_array($c, $faa, true))  return 'FONDO ACREENCIA AREQUIPA';
+        if (in_array($c, $faa2, true)) return 'ACREENCIA II';
+        if (in_array($c, $kpi, true))  return 'KP INVEST SAC';
+
+        return null; // por defecto: no reconoce
+    }
+
+    /** Origen → plantilla y sufijo de serie */
+    private function seriesConfig(string $origen): array
+    {
+        $o = strtoupper($origen);
+        if (str_contains($o, 'ACREENCIA II')) {
+            return ['serie' => 'F2', 'suffix' => 'F2', 'template' => storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
+        }
+        if (str_contains($o, 'FONDO ACREENCIA AREQUIPA') || str_contains($o,'FONDO ACREENCIAS AREQUIPA')) {
+            return ['serie' => 'F',  'suffix' => 'F',  'template' => storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];
+        }
+        // KPI por defecto
+        return ['serie' => 'KPI','suffix' => '',   'template' => storage_path('app/templates/cna_kpinvest.docx')];
+    }
+
+    /** Siguiente nro por serie (con lock). Devuelve ['corr'=>int,'nro'=>'000123F'] */
+    private function nextCartaForSerie(string $serie, string $suffix): array
+    {
+        // Lock tabla para evitar colisiones
+        DB::table('cna_solicitudes')->lockForUpdate()->get();
+
+        // Tomamos máx 6 dígitos a la izquierda según sufijo
+        if ($suffix === '') {
+            $max = DB::table('cna_solicitudes')
+                ->selectRaw("MAX(CAST(LEFT(nro_carta,6) AS UNSIGNED)) as m")
+                ->value('m');
+        } else {
+            $max = DB::table('cna_solicitudes')
+                ->where('nro_carta','like',"%{$suffix}")
+                ->selectRaw("MAX(CAST(LEFT(nro_carta,6) AS UNSIGNED)) as m")
+                ->value('m');
+        }
+
+        $corr = (int)($max ?: 0) + 1;
+        $nro  = str_pad((string)$corr, 6, '0', STR_PAD_LEFT) . $suffix;
+        return ['corr'=>$corr,'nro'=>$nro];
     }
 }

@@ -149,7 +149,7 @@
     </div>
   </div>
 
-  {{-- CUENTAS --}}
+  {{-- ========== CUENTAS ========== --}}
   <div class="card pad mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h2 class="h6 mb-0 d-flex align-items-center gap-2">
@@ -165,12 +165,6 @@
         <button class="btn btn-primary btn-sm" id="btnPropuesta" type="button" data-bs-toggle="modal" data-bs-target="#modalPropuesta" disabled>
           <i class="bi bi-flag"></i> Generar propuesta
           <span class="ms-1 badge rounded-pill text-bg-light align-middle" id="selCount">0</span>
-        </button>
-
-        {{-- Solicitar CNA --}}
-        <button class="btn btn-success btn-sm" id="btnSolicitarCna" type="button" data-bs-toggle="modal" data-bs-target="#modalCna" disabled>
-          <i class="bi bi-file-earmark-text"></i> Solicitar CNA
-          <span class="ms-1 badge rounded-pill text-bg-light align-middle" id="cnaSelCount">0</span>
         </button>
       </div>
     </div>
@@ -219,7 +213,7 @@
             };
           @endphp
 
-          <tr>
+          <tr data-oper="{{ $c->operacion }}" data-cosecha="{{ $c->cosecha }}" data-entidad="{{ $c->entidad }}">
             <td class="text-center">
               <input type="checkbox" class="chkOp" value="{{ $c->operacion }}" {{ empty($c->operacion) ? 'disabled' : '' }}>
             </td>
@@ -233,40 +227,24 @@
 
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
+              {{-- Histórico (si existe) --}}
               @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
-              @if($items->count() === 1)
-                @php
-                  $x      = $items->first();
-                  $estado = strtolower($x->estado ?? $x->workflow_estado ?? 'pendiente');
-                @endphp
-                @if($estado === 'aprobada')
-                  <a href="{{ route('cna.pdf', $x->id) }}" target="_blank" class="btn btn-sm btn-outline-success">
-                    <i class="bi bi-filetype-pdf me-1"></i> PDF
-                  </a>
-                @else
-                  <span class="badge rounded-pill text-bg-{{ $badgeFor($estado) }}">{{ ucfirst($estado) }}</span>
-                @endif
-              @elseif($items->count() > 1)
-                <div class="btn-group">
-                  <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
-                    CNA ({{ $items->count() }})
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    @foreach($items as $x)
-                      @php $estado = strtolower($x->estado ?? $x->workflow_estado ?? 'pendiente'); @endphp
-                      <li class="px-3 py-1 d-flex align-items-center justify-content-between">
-                        @if($estado === 'aprobada')
-                          <a href="{{ route('cna.pdf', $x->id) }}" class="btn btn-sm btn-link" target="_blank">PDF</a>
-                        @else
-                          <span class="badge text-bg-{{ $badgeFor($estado) }}">{{ ucfirst($estado) }}</span>
-                        @endif
-                      </li>
-                    @endforeach
-                  </ul>
-                </div>
-              @else
-                <span class="text-secondary">—</span>
+              @if($items->count())
+                <span class="badge text-bg-secondary me-2">{{ $items->count() }} reg.</span>
               @endif
+
+              {{-- Generar CNA (martillo) --}}
+              <button type="button"
+                      class="btn btn-sm btn-outline-success genCnaBtn"
+                      title="Generar CNA para esta cuenta"
+                      data-dni="{{ $dni }}"
+                      data-oper="{{ $c->operacion }}"
+                      data-cosecha="{{ $c->cosecha }}"
+                      data-entidad="{{ $c->entidad }}"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalCna">
+                <i class="bi bi-gavel"></i>
+              </button>
             </td>
             {{-- === /CELDA CNA === --}}
 
@@ -719,11 +697,12 @@
         </div>
 
         <div class="modal-body">
-          {{-- N.º de carta --}}
-          <div class="mb-3">
-            <label class="form-label">N.º de carta</label>
-            <input class="form-control" value="{{ $nextNroCarta ?? '—' }}" disabled>
-            <div class="form-text">Se asignará este correlativo al guardar.</div>
+          <div class="alert alert-info small">
+            <div><b>Cuenta:</b> <span id="cnaCuenta">—</span></div>
+            <div><b>Cosecha:</b> <span id="cnaCosecha">—</span></div>
+            <div><b>Origen / Plantilla:</b> <span id="cnaPlantilla">—</span></div>
+            <div><b>Operaciones incluidas:</b> <span id="cnaOpsList" class="d-inline-flex flex-wrap gap-1 align-middle"></span></div>
+            <div class="mt-1">El correlativo se asignará por <b>serie</b> (KPI, F, F2) al guardar.</div>
           </div>
 
           {{-- Fecha de pago y monto pagado --}}
@@ -738,17 +717,14 @@
             </div>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-3 mt-2">
             <label class="form-label">Observación (opcional)</label>
             <textarea name="observacion" class="form-control" rows="3" placeholder="Algún comentario contextual"></textarea>
           </div>
 
-          {{-- Hidden con operaciones seleccionadas --}}
+          {{-- Hidden con operación base (cuenta) y operaciones[] --}}
+          <input type="hidden" name="cuenta" id="cnaCuentaInput">
           <div id="cnaOpsHidden"></div>
-
-          <div class="alert alert-info small mb-0">
-            Se adjuntarán las <b>operaciones seleccionadas</b> para esta CNA.
-          </div>
         </div>
 
         <div class="modal-footer">
@@ -765,170 +741,269 @@
 
 @push('scripts')
 <script>
-    (function(){
-      /* === Map de saldos por operación === */
-      const OP_SALDOS = @json($cuentas->pluck('saldo_capital','operacion'));
+  (function(){
+    /* === Map de saldos por operación === */
+    const OP_SALDOS = @json($cuentas->pluck('saldo_capital','operacion'));
 
-      /* === Refs cronograma === */
-      const nro   = document.getElementById('cvNro');
-      const total = document.getElementById('cvTotal');
-      const cuota = document.getElementById('cvCuota');
-      const fIni  = document.getElementById('cvFechaIni');
-      const gen   = document.getElementById('cvGen');
-      const tblEl = document.getElementById('tblCrono');
-      const suma  = document.getElementById('cvSuma');
-      const hid   = document.getElementById('cvHidden');
-      const btnGuardar = document.querySelector('#formPropuesta button[type="submit"]');
-      const hintDia = document.getElementById('cvHintDia');
+    /* === Refs cronograma === */
+    const nro   = document.getElementById('cvNro');
+    const total = document.getElementById('cvTotal');
+    const cuota = document.getElementById('cvCuota');
+    const fIni  = document.getElementById('cvFechaIni');
+    const gen   = document.getElementById('cvGen');
+    const tblEl = document.getElementById('tblCrono');
+    const suma  = document.getElementById('cvSuma');
+    const hid   = document.getElementById('cvHidden');
+    const btnGuardar = document.querySelector('#formPropuesta button[type="submit"]');
+    const hintDia = document.getElementById('cvHintDia');
 
-      const capSelOut = document.getElementById('cvCapSel');
-      const balonOut  = document.getElementById('cvBalonEst');
+    const capSelOut = document.getElementById('cvCapSel');
+    const balonOut  = document.getElementById('cvBalonEst');
 
-      if (!tblEl || !nro || !total || !hid) return;
-      const tbl = tblEl.querySelector('tbody');
+    if (!tblEl || !nro || !total || !hid) return;
+    const tbl = tblEl.querySelector('tbody');
 
-      const to2 = n => String(n).padStart(2,'0');
-      const fmt = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
-      const num = v => Number(String(v ?? '').replace(',','.')) || 0;
+    const to2 = n => String(n).padStart(2,'0');
+    const fmt = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
+    const num = v => Number(String(v ?? '').replace(',','.')) || 0;
 
-      const selectedOps = () =>
-        [...document.querySelectorAll('#opsHidden input[name="operaciones[]"]')].map(i => i.value);
+    const selectedOps = () =>
+      [...document.querySelectorAll('#opsHidden input[name="operaciones[]"]')].map(i => i.value);
 
-      const capitalSeleccionado = () =>
-        selectedOps().reduce((s, op) => s + (num(OP_SALDOS?.[op])||0), 0);
+    const capitalSeleccionado = () =>
+      selectedOps().reduce((s, op) => s + (num(OP_SALDOS?.[op])||0), 0);
 
-      function renderRows(n){
-        tbl.innerHTML = '';
-        for (let i=1; i<=n; i++){
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="text-center">${to2(i)}</td>
-            <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
-            <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
-          `;
-          tbl.appendChild(tr);
-        }
-        recalc();
+    function renderRows(n){
+      tbl.innerHTML = '';
+      for (let i=1; i<=n; i++){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-center">${to2(i)}</td>
+          <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
+          <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
+        `;
+        tbl.appendChild(tr);
       }
-
-      function recalc(){
-        let s = 0;
-        [...tbl.querySelectorAll('tr')].forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
-        if (suma) suma.textContent = fmt(s);
-
-        hid.innerHTML = '';
-        [...tbl.querySelectorAll('tr')].forEach(tr => {
-          const f = tr.querySelector('.cr-fecha')?.value || '';
-          const m = tr.querySelector('.cr-monto')?.value || '';
-          hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_fecha[]" value="${f}">`);
-          hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
-        });
-
-        const capSel = capitalSeleccionado();
-        const montoConvenio = num(total.value);
-        const balon = Math.max(0, +(capSel - montoConvenio).toFixed(2));
-        if (capSelOut) capSelOut.textContent = fmt(capSel);
-        if (balonOut)  balonOut.textContent  = fmt(balon);
-
-        const ok = Math.abs(s - montoConvenio) <= 0.01;
-        if (btnGuardar) btnGuardar.disabled = !ok;
-        if (suma) suma.classList.toggle('text-danger', !ok);
-      }
-
-      function addMonthsNoOverflow(base, months){
-        const d = new Date(base);
-        const day = d.getDate();
-        d.setMonth(d.getMonth() + months);
-        if (d.getDate() !== day) d.setDate(0);
-        return d;
-      }
-      function genAuto(){
-        const n = Math.max(1, parseInt(nro.value || '0', 10));
-        if (!n) return;
-        if (tbl.children.length !== n) renderRows(n);
-
-        const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
-        const m = num(cuota?.value) || (num(total.value) / n);
-
-        [...tbl.querySelectorAll('tr')].forEach((tr, idx)=>{
-          const f = tr.querySelector('.cr-fecha');
-          const mm = tr.querySelector('.cr-monto');
-          if (start){
-            const d = addMonthsNoOverflow(start, idx);
-            f.valueAsDate = d;
-          }
-          mm.value = fmt(m);
-        });
-        recalc();
-      }
-
-      gen?.addEventListener('click', genAuto);
-      nro.addEventListener('change', ()=>{ renderRows(Math.max(1, parseInt(nro.value || '1', 10))); });
-      tbl.addEventListener('input', e=>{ if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
-      fIni?.addEventListener('change', ()=>{
-        const v = fIni.value;
-        if (!hintDia) return;
-        if (!v){ hintDia.textContent = 'Día de pago: —'; return; }
-        const d = new Date(v + 'T00:00:00');
-        hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
-      });
-      total?.addEventListener('input', recalc);
-
-      renderRows(Math.max(1, parseInt(nro.value || '1', 10)));
-    })();
-
-    /* ================== Utilidades generales de la vista ================== */
-
-    // Tooltips
-    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{ new bootstrap.Tooltip(el); });
-
-    // Copiar DNI
-    document.getElementById('btnCopyDni')?.addEventListener('click', async ()=>{
-      try{ await navigator.clipboard.writeText(String(@json($dni))); alert('DNI copiado.'); }catch(e){ alert('No se pudo copiar.'); }
-    });
-
-    // Copiar tabla (sin CSV)
-    function copyTableToClipboard(tableId, cols){
-      const t = document.getElementById(tableId); if(!t) return;
-      const head = [...t.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0, cols ?? undefined);
-      const body = [...t.querySelectorAll('tbody tr')].map(tr=>{
-        const tds = tr.querySelectorAll('td'); const arr=[];
-        for(let i=0;i<(cols ?? tds.length);i++){ arr.push((tds[i]?.innerText ?? '').trim()); }
-        return arr.join('\t');
-      });
-      const txt = [head.join('\t'), ...body].join('\n');
-      return navigator.clipboard.writeText(txt);
+      recalc();
     }
-    document.getElementById('btnCopyCtas')?.addEventListener('click', async ()=>{
-      try{ await copyTableToClipboard('tblCuentas'); alert('Cuentas copiadas.'); }catch(e){ alert('No se pudo copiar.'); }
-    });
-    document.getElementById('btnCopyPag')?.addEventListener('click', async ()=>{
-      try{ await copyTableToClipboard('tblPagos'); alert('Pagos copiados.'); }catch(e){ alert('No se pudo copiar.'); }
-    });
 
-    // Modal Nota — soporta data-nota y data-nota-json
-    (function(){
-      const modal = document.getElementById('modalNota');
-      if (!modal) return;
+    function recalc(){
+      let s = 0;
+      [...tbl.querySelectorAll('tr')].forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
+      if (suma) suma.textContent = fmt(s);
 
-      modal.addEventListener('show.bs.modal', (ev) => {
-        const btn = ev.relatedTarget;
-        let txt = '';
-        if (!btn) return;
-
-        if (btn.hasAttribute('data-nota-json')) {
-          try { txt = JSON.parse(btn.getAttribute('data-nota-json') || '""') || ''; }
-          catch { txt = ''; }
-        } else if (btn.hasAttribute('data-nota')) {
-          txt = btn.getAttribute('data-nota') || '';
-        }
-
-        const tgt = modal.querySelector('#notaFull');
-        if (tgt) tgt.textContent = String(txt);
+      hid.innerHTML = '';
+      [...tbl.querySelectorAll('tr')].forEach(tr => {
+        const f = tr.querySelector('.cr-fecha')?.value || '';
+        const m = tr.querySelector('.cr-monto')?.value || '';
+        hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_fecha[]" value="${f}">`);
+        hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
       });
-    })();
 
-    // ===== Selección de cuentas (para el modal de propuesta)
+      const capSel = capitalSeleccionado();
+      const montoConvenio = num(total.value);
+      const balon = Math.max(0, +(capSel - montoConvenio).toFixed(2));
+      if (capSelOut) capSelOut.textContent = fmt(capSel);
+      if (balonOut)  balonOut.textContent  = fmt(balon);
+
+      const ok = Math.abs(s - montoConvenio) <= 0.01;
+      if (btnGuardar) btnGuardar.disabled = !ok;
+      if (suma) suma.classList.toggle('text-danger', !ok);
+    }
+
+    function addMonthsNoOverflow(base, months){
+      const d = new Date(base);
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + months);
+      if (d.getDate() !== day) d.setDate(0);
+      return d;
+    }
+    function genAuto(){
+      const n = Math.max(1, parseInt(nro.value || '0', 10));
+      if (!n) return;
+      if (tbl.children.length !== n) renderRows(n);
+
+      const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
+      const m = num(cuota?.value) || (num(total.value) / n);
+
+      [...tbl.querySelectorAll('tr')].forEach((tr, idx)=>{
+        const f = tr.querySelector('.cr-fecha');
+        const mm = tr.querySelector('.cr-monto');
+        if (start){
+          const d = addMonthsNoOverflow(start, idx);
+          f.valueAsDate = d;
+        }
+        mm.value = fmt(m);
+      });
+      recalc();
+    }
+
+    gen?.addEventListener('click', genAuto);
+    nro.addEventListener('change', ()=>{ renderRows(Math.max(1, parseInt(nro.value || '1', 10))); });
+    tbl.addEventListener('input', e=>{ if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
+    fIni?.addEventListener('change', ()=>{
+      const v = fIni.value;
+      if (!hintDia) return;
+      if (!v){ hintDia.textContent = 'Día de pago: —'; return; }
+      const d = new Date(v + 'T00:00:00');
+      hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
+    });
+    total?.addEventListener('input', recalc);
+
+    renderRows(Math.max(1, parseInt(nro.value || '1', 10)));
+  })();
+
+  /* ================== Utilidades generales de la vista ================== */
+
+  // Tooltips
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{ new bootstrap.Tooltip(el); });
+
+  // Copiar DNI
+  document.getElementById('btnCopyDni')?.addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(String(@json($dni))); alert('DNI copiado.'); }catch(e){ alert('No se pudo copiar.'); }
+  });
+
+  // Copiar tabla (sin CSV)
+  function copyTableToClipboard(tableId, cols){
+    const t = document.getElementById(tableId); if(!t) return;
+    const head = [...t.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0, cols ?? undefined);
+    const body = [...t.querySelectorAll('tbody tr')].map(tr=>{
+      const tds = tr.querySelectorAll('td'); const arr=[];
+      for(let i=0;i<(cols ?? tds.length);i++){ arr.push((tds[i]?.innerText ?? '').trim()); }
+      return arr.join('\t');
+    });
+    const txt = [head.join('\t'), ...body].join('\n');
+    return navigator.clipboard.writeText(txt);
+  }
+  document.getElementById('btnCopyCtas')?.addEventListener('click', async ()=>{
+    try{ await copyTableToClipboard('tblCuentas'); alert('Cuentas copiadas.'); }catch(e){ alert('No se pudo copiar.'); }
+  });
+  document.getElementById('btnCopyPag')?.addEventListener('click', async ()=>{
+    try{ await copyTableToClipboard('tblPagos'); alert('Pagos copiados.'); }catch(e){ alert('No se pudo copiar.'); }
+  });
+
+  // Modal Nota — soporta data-nota y data-nota-json
+  (function(){
+    const modal = document.getElementById('modalNota');
+    if (!modal) return;
+
+    modal.addEventListener('show.bs.modal', (ev) => {
+      const btn = ev.relatedTarget;
+      let txt = '';
+      if (!btn) return;
+
+      if (btn.hasAttribute('data-nota-json')) {
+        try { txt = JSON.parse(btn.getAttribute('data-nota-json') || '""') || ''; }
+        catch { txt = ''; }
+      } else if (btn.hasAttribute('data-nota')) {
+        txt = btn.getAttribute('data-nota') || '';
+      }
+
+      const tgt = modal.querySelector('#notaFull');
+      if (tgt) tgt.textContent = String(txt);
+    });
+  })();
+
+  // ===== Selección de cuentas (para el modal de propuesta)
+  const chkAll   = document.getElementById('chkAll');
+  const chks     = Array.from(document.querySelectorAll('.chkOp'));
+  const btnProp  = document.getElementById('btnPropuesta');
+  const selCount = document.getElementById('selCount');
+
+  function refreshSelection(){
+    const selected = chks.filter(c => c.checked && !c.disabled).map(c => c.value).filter(Boolean);
+    selCount.textContent = String(selected.length);
+    btnProp.disabled = selected.length === 0;
+    return selected;
+  }
+  chkAll?.addEventListener('change', () => {
+    chks.forEach(c => { if(!c.disabled) c.checked = chkAll.checked; });
+    refreshSelection();
+  });
+  chks.forEach(c => c.addEventListener('change', () => {
+    const enabled = chks.filter(x => !x.disabled).length;
+    const checked = chks.filter(x => x.checked && !x.disabled).length;
+    if (enabled) chkAll.checked = (checked === enabled);
+    refreshSelection();
+  }));
+
+  // ===== Modal Propuesta
+  const modalProp = document.getElementById('modalPropuesta');
+  const opsResumen = document.getElementById('opsResumen');
+  const opsHidden  = document.getElementById('opsHidden');
+
+  modalProp?.addEventListener('show.bs.modal', () => {
+    const ops = refreshSelection();
+
+    opsResumen.innerHTML = ops.length
+      ? ops.map(o => `<span class="badge rounded-pill text-bg-light border me-1">${o}</span>`).join('')
+      : '<span class="text-secondary">Ninguna</span>';
+
+    opsHidden.innerHTML = '';
+    ops.forEach(op => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'operaciones[]'; i.value = String(op);
+      opsHidden.appendChild(i);
+    });
+
+    document.getElementById('cvTotal')?.dispatchEvent(new Event('input'));
+  });
+
+  // ===== Alternar bloques por tipo
+  const tipo = document.getElementById('tipoPropuesta');
+  const fCon = document.getElementById('formConvenio');
+  const fCan = document.getElementById('formCancelacion');
+
+  function setEnabled(container, enabled){
+    if (!container) return;
+    container.querySelectorAll('input,select,textarea,button').forEach(el=>{
+      if (enabled) el.removeAttribute('disabled');
+      else el.setAttribute('disabled','disabled');
+    });
+    if (!enabled){
+      container.querySelectorAll('input:not([type="hidden"]),textarea').forEach(el=>{ el.value=''; });
+    }
+  }
+  function req(el, on){
+    if (!el) return;
+    if (on) el.setAttribute('required','required'); else el.removeAttribute('required');
+  }
+  function toggleTipo(){
+    const t = tipo.value;
+    fCon.classList.toggle('d-none', t !== 'convenio');
+    fCan.classList.toggle('d-none', t !== 'cancelacion');
+
+    setEnabled(fCon, t === 'convenio');
+    setEnabled(fCan, t === 'cancelacion');
+
+    const fields = {
+      convenio: ['nro_cuotas','monto_convenio'],
+      cancelacion: ['fecha_pago_cancel','monto_cancel']
+    };
+    [...fields.convenio, ...fields.cancelacion]
+      .forEach(n => req(document.querySelector(`[name="${n}"]`), false));
+    (fields[t] || []).forEach(n => req(document.querySelector(`[name="${n}"]`), true));
+  }
+  tipo?.addEventListener('change', toggleTipo);
+  toggleTipo();
+
+  // Hint opcional
+  const fechaPagoConvenio = document.getElementById('fechaPagoConvenio') || document.querySelector('[name="fecha_pago"]');
+  const hintDiaMes = document.getElementById('hintDiaMes');
+  function actualizarHint(){
+    const v = fechaPagoConvenio?.value || '';
+    if (!hintDiaMes) return;
+    if (!v) { hintDiaMes.textContent = 'Día de pago: —'; return; }
+    const d = new Date(v + 'T00:00:00');
+    if (isNaN(d)) { hintDiaMes.textContent = 'Día de pago: —'; return; }
+    const dia = d.getDate();
+    hintDiaMes.textContent = `Día de pago: ${dia} de cada mes (si el mes no tiene ese día, se ajusta al último)`;
+  }
+  fechaPagoConvenio?.addEventListener('change', actualizarHint);
+  actualizarHint();
+
+  /* ====== Selección de cuentas (para propuesta clásica) ====== */
+  (function(){
     const chkAll   = document.getElementById('chkAll');
     const chks     = Array.from(document.querySelectorAll('.chkOp'));
     const btnProp  = document.getElementById('btnPropuesta');
@@ -936,8 +1011,8 @@
 
     function refreshSelection(){
       const selected = chks.filter(c => c.checked && !c.disabled).map(c => c.value).filter(Boolean);
-      selCount.textContent = String(selected.length);
-      btnProp.disabled = selected.length === 0;
+      if (selCount) selCount.textContent = String(selected.length);
+      if (btnProp)  btnProp.disabled     = selected.length === 0;
       return selected;
     }
     chkAll?.addEventListener('change', () => {
@@ -950,115 +1025,81 @@
       if (enabled) chkAll.checked = (checked === enabled);
       refreshSelection();
     }));
+    refreshSelection();
+  })();
 
-    // ===== Modal Propuesta
-    const modalProp = document.getElementById('modalPropuesta');
-    const opsResumen = document.getElementById('opsResumen');
-    const opsHidden  = document.getElementById('opsHidden');
+  /* ====== Generar CNA (por martillo) ====== */
+  (function(){
+    const modal     = document.getElementById('modalCna');
+    const opsHidden = document.getElementById('cnaOpsHidden');
+    const opsList   = document.getElementById('cnaOpsList');
+    const inCuenta  = document.getElementById('cnaCuentaInput');
+    const lblCuenta = document.getElementById('cnaCuenta');
+    const lblCosech = document.getElementById('cnaCosecha');
+    const lblPlant  = document.getElementById('cnaPlantilla');
 
-    modalProp?.addEventListener('show.bs.modal', () => {
-      const ops = refreshSelection();
+    // mapping cosecha -> origen/serie (UI informativa, el backend decide realmente)
+    function origenFromCosecha(c){
+      c = (c||'').toUpperCase().trim();
+      const FAA  = new Set(['BBVA3','BBVA4','BBVA5','BBVA6','CAJAAQP3']);
+      const FAA2 = new Set(['BBVA7','BBVA8','CONFIANZA_5']);
+      const KPI  = new Set([
+        'BBVA1','BBVA2','CAJAAQP1','CAJAAQP2','COMPARTAMOS_1','CONFIANZA','CONFIANZA_2','CONFIANZA_3',
+        'CONFIANZA_4','CONFIANZA_6','CONFIANZA_7','CONFIANZA_8','CONFIANZA_9','CONFIANZA_10',
+        'CONFIANZA_11','CONFIANZA_12','SEMBRANDO'
+      ]);
+      if (FAA.has(c))  return {origen:'FONDO ACREENCIA AREQUIPA', serie:'F',  plantilla:'cna_fondo_acreencia_arequipa.docx'};
+      if (FAA2.has(c)) return {origen:'ACREENCIA II',            serie:'F2', plantilla:'cna_fondo_acreencia_arequipa2.docx'};
+      if (KPI.has(c))  return {origen:'KP INVEST SAC',           serie:'KPI',plantilla:'cna_kpinvest.docx'};
+      return {origen:'(no reconocido)', serie:'—', plantilla:'—'};
+    }
 
-      opsResumen.innerHTML = ops.length
-        ? ops.map(o => `<span class="badge rounded-pill text-bg-light border me-1">${o}</span>`).join('')
-        : '<span class="text-secondary">Ninguna</span>';
+    modal?.addEventListener('show.bs.modal', (ev) =>{
+      const btn = ev.relatedTarget;
+      if(!btn) return;
 
+      const oper    = btn.getAttribute('data-oper') || '';
+      const cosecha = btn.getAttribute('data-cosecha') || '';
+      const entidad = btn.getAttribute('data-entidad') || '';
+
+      // Cuenta base
+      inCuenta.value   = oper;
+      lblCuenta.textContent = oper || '—';
+      lblCosech.textContent = cosecha || '—';
+
+      // Origen/Plantilla (preview)
+      const info = origenFromCosecha(cosecha);
+      lblPlant.textContent = `${info.origen} · Serie ${info.serie} · ${info.plantilla}`;
+
+      // Armar operaciones a incluir:
+      // Regla: todas las filas con la MISMA operación (cuenta) — si hay varias, se incluirán;
+      // si en tu data hay suboperaciones, igualmente quedarán listadas. (El backend valida cosecha única).
+      const rows = Array.from(document.querySelectorAll('#tblCuentas tbody tr'));
+      const ops  = rows
+        .filter(tr => (tr.getAttribute('data-oper') || '') === oper)
+        .map(tr => tr.getAttribute('data-oper'))
+        .filter(Boolean);
+
+      // Si sólo encuentra 1, al menos incluimos esa.
+      const uniq = Array.from(new Set(ops.length ? ops : [oper].filter(Boolean)));
+
+      // Pintar chips
+      opsList.innerHTML = '';
+      uniq.forEach(op => {
+        const b = document.createElement('span');
+        b.className = 'badge rounded-pill text-bg-light border';
+        b.textContent = op;
+        opsList.appendChild(b);
+      });
+
+      // Hidden inputs
       opsHidden.innerHTML = '';
-      ops.forEach(op => {
+      uniq.forEach(op => {
         const i = document.createElement('input');
-        i.type = 'hidden'; i.name = 'operaciones[]'; i.value = String(op);
+        i.type = 'hidden'; i.name = 'operaciones[]'; i.value = op;
         opsHidden.appendChild(i);
       });
-
-      document.getElementById('cvTotal')?.dispatchEvent(new Event('input'));
     });
-
-    // ===== Alternar bloques por tipo
-    const tipo = document.getElementById('tipoPropuesta');
-    const fCon = document.getElementById('formConvenio');
-    const fCan = document.getElementById('formCancelacion');
-
-    function setEnabled(container, enabled){
-      if (!container) return;
-      container.querySelectorAll('input,select,textarea,button').forEach(el=>{
-        if (enabled) el.removeAttribute('disabled');
-        else el.setAttribute('disabled','disabled');
-      });
-      if (!enabled){
-        container.querySelectorAll('input:not([type="hidden"]),textarea').forEach(el=>{ el.value=''; });
-      }
-    }
-    function req(el, on){
-      if (!el) return;
-      if (on) el.setAttribute('required','required'); else el.removeAttribute('required');
-    }
-    function toggleTipo(){
-      const t = tipo.value;
-      fCon.classList.toggle('d-none', t !== 'convenio');
-      fCan.classList.toggle('d-none', t !== 'cancelacion');
-
-      setEnabled(fCon, t === 'convenio');
-      setEnabled(fCan, t === 'cancelacion');
-
-      const fields = {
-        convenio: ['nro_cuotas','monto_convenio'],
-        cancelacion: ['fecha_pago_cancel','monto_cancel']
-      };
-      [...fields.convenio, ...fields.cancelacion]
-        .forEach(n => req(document.querySelector(`[name="${n}"]`), false));
-      (fields[t] || []).forEach(n => req(document.querySelector(`[name="${n}"]`), true));
-    }
-    tipo?.addEventListener('change', toggleTipo);
-    toggleTipo();
-
-    // Hint opcional
-    const fechaPagoConvenio = document.getElementById('fechaPagoConvenio') || document.querySelector('[name="fecha_pago"]');
-    const hintDiaMes = document.getElementById('hintDiaMes');
-    function actualizarHint(){
-      const v = fechaPagoConvenio?.value || '';
-      if (!hintDiaMes) return;
-      if (!v) { hintDiaMes.textContent = 'Día de pago: —'; return; }
-      const d = new Date(v + 'T00:00:00');
-      if (isNaN(d)) { hintDiaMes.textContent = 'Día de pago: —'; return; }
-      const dia = d.getDate();
-      hintDiaMes.textContent = `Día de pago: ${dia} de cada mes (si el mes no tiene ese día, se ajusta al último)`;
-    }
-    fechaPagoConvenio?.addEventListener('change', actualizarHint);
-    actualizarHint();
-
-  // ====== Selección de operaciones para CNA ======
-  const cnaBtn      = document.getElementById('btnSolicitarCna');
-  const cnaSelCount = document.getElementById('cnaSelCount');
-  const cnaOpsHidden= document.getElementById('cnaOpsHidden');
-
-  const chkOps = Array.from(document.querySelectorAll('.chkOp'));
-
-  function getOpsSeleccionadas() {
-    return chkOps.filter(c => c.checked && !c.disabled)
-                 .map(c => String(c.value))
-                 .filter(Boolean);
-  }
-
-  function refreshUI() {
-    const ops = getOpsSeleccionadas();
-    if (cnaSelCount) cnaSelCount.textContent = String(ops.length);
-    if (cnaBtn)      cnaBtn.disabled = (ops.length === 0);
-  }
-
-  chkOps.forEach(c => c.addEventListener('change', refreshUI));
-  document.getElementById('chkAll')?.addEventListener('change', refreshUI);
-  refreshUI();
-
-  document.getElementById('modalCna')?.addEventListener('show.bs.modal', () => {
-    const ops = getOpsSeleccionadas();
-    cnaOpsHidden.innerHTML = '';
-    ops.forEach(op => {
-      const i = document.createElement('input');
-      i.type = 'hidden';
-      i.name = 'operaciones[]';
-      i.value = op;
-      cnaOpsHidden.appendChild(i);
-    });
-  });
+  })();
 </script>
 @endpush
