@@ -14,7 +14,6 @@ use App\Models\PromesaCuota;
 use App\Models\PagoPropia as Pago;
 
 use App\Models\ClienteCuenta;
-use App\Models\CnaSolicitud;
 
 class ClientsControllers extends Controller
 {
@@ -46,7 +45,7 @@ class ClientsControllers extends Controller
     public function show(string $dni)
     {
         try {
-            /* ===== CUENTAS (clientes_cuentas) ===== */
+            /* ===== CUENTAS (nuevo esquema) ===== */
             $cuentas = ClienteCuenta::query()
                 ->where('numdoc', $dni)
                 ->orderByDesc('updated_at')
@@ -65,7 +64,7 @@ class ClientsControllers extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
 
-            /* ===== PAGOS (pagos_propias) ===== */
+            /* ===== PAGOS (nuevo esquema) ===== */
             $pagos = Pago::query()
                 ->where('dni', $dni)
                 ->orderByDesc('fecha')
@@ -73,25 +72,17 @@ class ClientsControllers extends Controller
                     'fecha',
                     'dni',
                     'operacion',
+                    'entidad',
                     'nombre_cliente',
                     'monto_pagado',
                     'gestor',
                     'cosecha',
                     'cuenta_recaudo',
-                    'entidad',
                 ]);
 
             $totPagos = (float) $pagos->sum('monto_pagado');
 
-            /* ===== PROMESAS (si aplica) ===== */
-            $promesas = PromesaPago::query()
-                ->where('dni', $dni)
-                ->when(method_exists(PromesaPago::class, 'scopeWithDecisionRefs'), fn($q) => $q->withDecisionRefs())
-                ->with('operaciones')
-                ->orderByDesc('fecha_promesa')
-                ->get();
-
-            /* ===== CCD opcional (sigue igual para tu columna en la tabla) ===== */
+            /* ===== CCD opcional ===== */
             $ccd         = collect();
             $ccdByCodigo = collect();
             if (Schema::hasTable('ccd_clientes')) {
@@ -112,15 +103,21 @@ class ClientsControllers extends Controller
                 }
             }
 
-            /* ===== Métricas de pagos por operación (desde pagos_propias ya cargado) ===== */
+            /* ===== Mapa operación -> cuenta (desde pagos.cuenta_recaudo) ===== */
+            // Si una operación tiene varias cuentas en pagos, quedamos con la más frecuente (no nula).
+            $op2cta = $pagos->groupBy('operacion')->map(function ($grp) {
+                $freq = $grp->pluck('cuenta_recaudo')->filter()->countBy();
+                return $freq->isEmpty() ? null : $freq->sortDesc()->keys()->first();
+            });
+
+            /* ===== Pagos agrupados por operación para métricas por cuenta ===== */
             $pagosGrouped = $pagos->groupBy('operacion');
 
-            // inyecta props a cada cuenta para el colapsable "Ver detalle"
-            $cuentas = $cuentas->map(function ($c) use ($pagosGrouped) {
+            // Inyectar props útiles a cada cuenta (y derivar cta para el botón martillo)
+            $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta) {
                 $grupo = $pagosGrouped->get($c->operacion) ?? collect();
                 $c->pagos_count = $grupo->count();
                 $c->pagos_sum   = (float) $grupo->sum('monto_pagado');
-                // adapta al formato esperado por la vista (fecha, monto, fuente)
                 $c->pagos_list  = $grupo->sortByDesc('fecha')->take(10)->map(function ($r) {
                     return (object)[
                         'fecha'  => $r->fecha,
@@ -128,11 +125,22 @@ class ClientsControllers extends Controller
                         'fuente' => 'PAGO',
                     ];
                 })->values();
+
+                // ← clave para agrupar/generar CNA por CUENTA
+                $c->cuenta = (string)($op2cta[$c->operacion] ?? $c->operacion);
                 return $c;
             });
 
-            /* ===== CNAs por operación (igual que tenías, defensivo) ===== */
-            $cnasByOperacion = collect();
+            /* ===== PROMESAS (si aplica) ===== */
+            $promesas = PromesaPago::query()
+                ->where('dni', $dni)
+                ->when(method_exists(PromesaPago::class, 'scopeWithDecisionRefs'), fn($q) => $q->withDecisionRefs())
+                ->with('operaciones')
+                ->orderByDesc('fecha_promesa')
+                ->get();
+
+            /* ===== CNAs por CUENTA (no por operación) ===== */
+            $cnasByCuenta = collect();
             if (Schema::hasTable('cna_solicitudes')) {
                 $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 $want    = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
@@ -140,7 +148,7 @@ class ClientsControllers extends Controller
 
                 $cnas = DB::table('cna_solicitudes')
                     ->select($selCna)
-                    ->where('dni',$dni)
+                    ->where('dni', $dni)
                     ->orderByDesc('created_at')
                     ->get();
 
@@ -151,10 +159,16 @@ class ClientsControllers extends Controller
                     if (!is_array($opsArr)) {
                         $opsArr = array_filter(array_map('trim', explode(',', (string)$opsRaw)));
                     }
-                    foreach ($opsArr as $op) {
-                        if (!$op) continue;
-                        $map[$op] = $map[$op] ?? collect();
-                        $map[$op]->push((object)[
+
+                    // Derivar las cuentas cubiertas por esa CNA usando el mapa operación->cuenta
+                    $cuentasCna = collect($opsArr)
+                        ->map(fn($op) => (string)($op2cta[$op] ?? $op))
+                        ->filter()
+                        ->unique();
+
+                    foreach ($cuentasCna as $cta) {
+                        $map[$cta] = $map[$cta] ?? collect();
+                        $map[$cta]->push((object)[
                             'id'              => $row->id,
                             'nro_carta'       => $row->nro_carta ?? $row->id,
                             'workflow_estado' => $row->workflow_estado ?? 'pendiente',
@@ -164,30 +178,28 @@ class ClientsControllers extends Controller
                         ]);
                     }
                 }
-                $cnasByOperacion = collect($map);
+                $cnasByCuenta = collect($map);
             }
 
-            /* ===== Próximo N.º de carta (si aplica) ===== */
+            /* ===== Próximo N.º de carta (simple correlativo global; la serie ya la resuelve CnaController) ===== */
             $nextNroCarta = null;
             if (Schema::hasTable('cna_solicitudes')) {
                 $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
                 $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT);
             }
 
-            return view('clientes.show', compact(
-                'dni',
-                'titular',
-                'cuentas',
-                'pagos',
-                'promesas',
-                'ccd',
-                'totPagos'
-            ) + [
-                'ccdByCodigo'     => $ccdByCodigo,
-                'cnasByOperacion' => $cnasByOperacion,
-                'nextNroCarta'    => $nextNroCarta,
-                // si tu vista aún referencia esta variable, le pasamos el agrupado
-                'pagosPorOperacion' => $pagosGrouped,
+            return view('clientes.show', [
+                'dni'               => $dni,
+                'titular'           => $titular,
+                'cuentas'           => $cuentas,
+                'pagos'             => $pagos,
+                'promesas'          => $promesas,
+                'ccd'               => $ccd,
+                'totPagos'          => $totPagos,
+                'ccdByCodigo'       => $ccdByCodigo,
+                'cnasByCuenta'      => $cnasByCuenta,   // ← usa esto en la vista
+                'pagosPorOperacion' => $pagosGrouped,   // si la vista aún lo necesita
+                'nextNroCarta'      => $nextNroCarta,
             ]);
 
         } catch (\Throwable $e) {
@@ -200,6 +212,7 @@ class ClientsControllers extends Controller
             return back()->withErrors('Ocurrió un error cargando el cliente. Revisa los logs.');
         }
     }
+
     public function storePromesa(string $dni, Request $r)
     {
         $r->merge(['dni' => $dni]);
