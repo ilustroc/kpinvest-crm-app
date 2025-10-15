@@ -12,11 +12,13 @@ use App\Models\PromesaPago;
 use App\Models\PromesaOperacion;
 use App\Models\PromesaCuota;
 use App\Models\PagoPropia as Pago;
-
 use App\Models\ClienteCuenta;
 
 class ClientsControllers extends Controller
 {
+    /* ==========================
+     * Listado
+     * ========================== */
     public function index(Request $r)
     {
         $q  = trim((string)$r->query('q',''));
@@ -32,8 +34,8 @@ class ClientsControllers extends Controller
             ])
             ->when($q !== '', function ($w) use ($q) {
                 $w->where('numdoc',   'like', "%{$q}%")
-                ->orWhere('operacion','like', "%{$q}%")
-                ->orWhere('nombre',  'like', "%{$q}%");
+                  ->orWhere('operacion','like', "%{$q}%")
+                  ->orWhere('nombre',  'like', "%{$q}%");
             })
             ->orderByDesc('updated_at')
             ->paginate($pp)
@@ -42,10 +44,13 @@ class ClientsControllers extends Controller
         return view('clientes.index', compact('clientes','q'));
     }
 
+    /* ==========================
+     * Ficha del cliente
+     * ========================== */
     public function show(string $dni)
     {
         try {
-            /* ===== CUENTAS (nuevo esquema) ===== */
+            /* ===== CUENTAS (usa numdoc) ===== */
             $cuentas = ClienteCuenta::query()
                 ->where('numdoc', $dni)
                 ->orderByDesc('updated_at')
@@ -65,7 +70,7 @@ class ClientsControllers extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
 
-            /* ===== PAGOS (nuevo esquema) ===== */
+            /* ===== PAGOS ===== */
             $pagos = Pago::query()
                 ->where('dni', $dni)
                 ->orderByDesc('fecha')
@@ -83,7 +88,7 @@ class ClientsControllers extends Controller
 
             $totPagos = (float) $pagos->sum('monto_pagado');
 
-            /* ===== CCD opcional ===== */
+            /* ===== CCD opcional (esta tabla sí usa campo dni) ===== */
             $ccd         = collect();
             $ccdByCodigo = collect();
             if (Schema::hasTable('ccd_clientes')) {
@@ -105,13 +110,13 @@ class ClientsControllers extends Controller
             }
 
             /* ===== Mapa operación -> cuenta (desde pagos.cuenta_recaudo) ===== */
-            // Si una operación tiene varias cuentas en pagos, quedamos con la más frecuente (no nula).
+            // Si una operación tiene varias cuentas en pagos, quedarse con la más frecuente no nula.
             $op2cta = $pagos->groupBy('operacion')->map(function ($grp) {
                 $freq = $grp->pluck('cuenta_recaudo')->filter()->countBy();
                 return $freq->isEmpty() ? null : $freq->sortDesc()->keys()->first();
             });
 
-            /* ===== Pagos agrupados por operación para métricas por cuenta ===== */
+            /* ===== Pagos agrupados por operación para métricas en la vista ===== */
             $pagosGrouped = $pagos->groupBy('operacion');
 
             // Inyectar props útiles a cada cuenta (y derivar cta para el botón martillo)
@@ -127,8 +132,8 @@ class ClientsControllers extends Controller
                     ];
                 })->values();
 
-                // ← clave para agrupar/generar CNA por CUENTA
-                $c->cta_grupo = (string)($op2cta[$c->operacion] ?? $c->cuenta);
+                // Clave para agrupar/generar CNA por CUENTA
+                $c->cuenta = (string)($op2cta[$c->operacion] ?? $c->operacion);
                 return $c;
             });
 
@@ -182,7 +187,7 @@ class ClientsControllers extends Controller
                 $cnasByCuenta = collect($map);
             }
 
-            /* ===== Próximo N.º de carta (simple correlativo global; la serie ya la resuelve CnaController) ===== */
+            /* ===== Próximo N.º de carta (simple correlativo global; sólo display) ===== */
             $nextNroCarta = null;
             if (Schema::hasTable('cna_solicitudes')) {
                 $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
@@ -198,7 +203,7 @@ class ClientsControllers extends Controller
                 'ccd'               => $ccd,
                 'totPagos'          => $totPagos,
                 'ccdByCodigo'       => $ccdByCodigo,
-                'cnasByCuenta'      => $cnasByCuenta,   // ← usa esto en la vista
+                'cnasByCuenta'      => $cnasByCuenta,   // ← usar esto en la vista para chips CCD/CNA por cuenta
                 'pagosPorOperacion' => $pagosGrouped,   // si la vista aún lo necesita
                 'nextNroCarta'      => $nextNroCarta,
             ]);
@@ -214,6 +219,9 @@ class ClientsControllers extends Controller
         }
     }
 
+    /* ==========================
+     * Guardar Promesa (conv./cancel.)
+     * ========================== */
     public function storePromesa(string $dni, Request $r)
     {
         $r->merge(['dni' => $dni]);
@@ -316,7 +324,7 @@ class ClientsControllers extends Controller
             /** @var \App\Models\PromesaPago $promesa */
             $promesa = PromesaPago::create($data);
 
-            // --- Operaciones (limpias, únicas) ---
+            // Operaciones
             $ops = collect($r->input('operaciones', []))
                 ->map(fn($op)=>trim((string)$op))
                 ->filter()
@@ -324,11 +332,11 @@ class ClientsControllers extends Controller
                 ->values()
                 ->all();
 
-            // Legacy: guarda TODAS en cadena "op1, op2"
+            // Legacy concat
             $promesa->operacion = implode(', ', $ops);
             $promesa->save();
 
-            // Detalle: una fila por operación (sin 'cartera')
+            // Detalle
             $now = now();
             $rows = [];
             foreach ($ops as $op) {
@@ -368,6 +376,9 @@ class ClientsControllers extends Controller
         }
     }
 
+    /* ==========================
+     * Helpers
+     * ========================== */
     /** Normaliza fechas a formato ISO (YYYY-MM-DD). */
     private function toIsoDate(?string $v): ?string
     {
