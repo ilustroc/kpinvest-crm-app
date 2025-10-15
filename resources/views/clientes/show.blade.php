@@ -243,7 +243,8 @@
                       data-entidad="{{ $c->entidad }}"
                       data-bs-toggle="modal"
                       data-bs-target="#modalCna">
-                <i class="bi bi-gavel"></i>
+                <i class="bi bi-hammer" aria-hidden="true"></i>
+                <span class="visually-hidden">Generar CNA</span>
               </button>
             </td>
             {{-- === /CELDA CNA === --}}

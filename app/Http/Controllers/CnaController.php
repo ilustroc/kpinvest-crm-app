@@ -15,9 +15,7 @@ use PhpOffice\PhpWord\TemplateProcessor;
 
 class CnaController extends Controller
 {
-    // =========================================================
-    // CREAR SOLICITUD
-    // =========================================================
+    // ======= CREAR SOLICITUD =======
     public function store(Request $request, string $dni)
     {
         $data = $request->validate([
@@ -85,9 +83,7 @@ class CnaController extends Controller
         return back()->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
     }
 
-    // =========================================================
-    // FLUJO (SUPERVISOR)
-    // =========================================================
+    // ======= FLUJO (SUPERVISOR) =======
     public function preaprobar(CnaSolicitud $cna)
     {
         $this->authorizeRole('supervisor');
@@ -126,9 +122,7 @@ class CnaController extends Controller
         return back()->with('ok', 'CNA rechazada por supervisor.');
     }
 
-    // =========================================================
-    // FLUJO (ADMIN)
-    // =========================================================
+    // ======= FLUJO (ADMIN) =======
     public function aprobar(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('administrador');
@@ -161,9 +155,7 @@ class CnaController extends Controller
         return back()->with('ok', 'CNA rechazada por administrador.');
     }
 
-    // =========================================================
-    // DESCARGAS
-    // =========================================================
+    // ======= DESCARGAS =======
     /** GET /cna/{id}/pdf */
     public function pdf(int $id)
     {
@@ -180,9 +172,7 @@ class CnaController extends Controller
         return $this->downloadPreferred($cna, 'docx');
     }
 
-    // =========================================================
-    // HELPERS (SEGURIDAD / ARCHIVOS / PLANTILLAS / CORRELATIVO)
-    // =========================================================
+    // ======= HELPERS (SEGURIDAD / ARCHIVOS / PLANTILLAS / CORRELATIVO) =======
     private function authorizeRole(string $role): void
     {
         $user = Auth::user();
