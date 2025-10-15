@@ -24,15 +24,21 @@ class ClientsControllers extends Controller
         $pp = (int)($r->query('pp', 20)) ?: 20;
 
         $clientes = ClienteCuenta::query()
-            ->select('dni','operacion','titular','updated_at')   // ← sin 'cartera'
+            ->select([
+                'numdoc as dni',   // DNI
+                'operacion',
+                'nombre',
+                'cosecha',
+                'updated_at',
+            ])
             ->when($q !== '', function ($w) use ($q) {
-                $w->where('dni','like',"%{$q}%")
-                  ->orWhere('operacion','like',"%{$q}%")
-                  ->orWhere('titular','like',"%{$q}%");
-                  // quitado: orWhere('cartera','like', ...)
+                $w->where('numdoc',   'like', "%{$q}%")
+                ->orWhere('operacion','like', "%{$q}%")
+                ->orWhere('nombre',  'like', "%{$q}%");
             })
             ->orderByDesc('updated_at')
-            ->paginate($pp)->withQueryString();
+            ->paginate($pp)
+            ->withQueryString();
 
         return view('clientes.index', compact('clientes','q'));
     }

@@ -4,46 +4,26 @@
 
 @push('head')
 <style>
-  /* ====== Marca KP: verde primario + azul acento ====== */
   :root{
-    --brand:#00a81c;        /* verde KP */
-    --brand-ink:#008517;    /* hover/ink */
-    --accent:#0b4ea2;       /* azul KP */
-    --accent-ink:#093f82;
-
-    /* estos vienen del layout; los declaramos por si el cache de CSS tarda */
+    --brand:#00a81c; --brand-ink:#008517;
+    --accent:#0b4ea2; --accent-ink:#093f82;
     --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
     --ink:#151a23; --muted:#6d7b8a;
   }
 
-  /* ========= Filtros / toolbar ========= */
-  .cli-filters .form-control,
-  .cli-filters .form-select{
-    background:var(--surface);
-    border-color:var(--border);
-  }
+  .cli-filters .form-control,.cli-filters .form-select{ background:var(--surface); border-color:var(--border) }
   .cli-filters .form-control::placeholder{ color:var(--muted) }
-  .cli-filters .input-group-text{
-    background:var(--surface);
-    border-color:var(--border);
-    color:var(--muted);
-  }
+  .cli-filters .input-group-text{ background:var(--surface); border-color:var(--border); color:var(--muted) }
 
-  /* Chips de estado */
   .cli-toolbar .chip{ min-height:auto; padding:.45rem .65rem }
   .cli-toolbar .chip .t{ gap:.45rem; font-weight:600; font-size:.9rem }
   .cli-toolbar .chip .s{ font-size:.85rem; color:var(--ink) }
 
-  /* Acciones (copiar / export) */
   .cli-actions .btn{ height:36px }
   .cli-actions .btn-outline-primary{ color:var(--brand); border-color:var(--brand) }
-  .cli-actions .btn-outline-primary:hover{
-    color:#fff; border-color:var(--brand-ink);
-    background:var(--brand-ink);
-  }
+  .cli-actions .btn-outline-primary:hover{ color:#fff; border-color:var(--brand-ink); background:var(--brand-ink) }
 
-  /* ========= Tabla ========= */
-  .cli-table.table> :not(caption)>*>*{ padding:.55rem .75rem } /* compacto */
+  .cli-table.table> :not(caption)>*>*{ padding:.55rem .75rem }
 
   .cli-table thead th{
     position: sticky; top: 0; z-index: 2;
@@ -51,76 +31,45 @@
     color: var(--ink);
     text-transform: uppercase; font-size:.82rem; letter-spacing:.3px;
     border-bottom:1px solid var(--border);
-    box-shadow: 0 3px 8px rgba(15,23,42,.06); /* leve sombra al fijarse */
+    box-shadow: 0 3px 8px rgba(15,23,42,.06);
   }
 
   .cli-table tbody td{ color: var(--ink) }
-  .cli-table tbody tr:nth-child(even){
-    background: color-mix(in oklab, var(--surface-2) 16%, transparent);
-  }
-  .cli-table tbody tr:hover{
-    /* mezcla un toque de azul para contraste con el verde primario */
-    background: color-mix(in oklab, var(--accent) 10%, var(--brand) 4%);
-    transition: background .15s ease;
-  }
+  .cli-table tbody tr:nth-child(even){ background: color-mix(in oklab, var(--surface-2) 16%, transparent) }
+  .cli-table tbody tr:hover{ background: color-mix(in oklab, var(--accent) 10%, var(--brand) 4%); transition: background .15s ease }
 
-  /* Fila clicable (además del botón Ver) */
   .cli-row{ cursor:pointer }
-  .cli-row:focus-visible{
-    outline:3px solid color-mix(in oklab, var(--accent) 40%, transparent);
-    outline-offset:-3px; border-radius:4px
-  }
+  .cli-row:focus-visible{ outline:3px solid color-mix(in oklab, var(--accent) 40%, transparent); outline-offset:-3px; border-radius:4px }
 
-  /* Anchos útiles: DNI / Operación fijos, Titular elipsis */
-  .cli-table tbody td:nth-child(2){ width: 9rem }   /* DNI */
-  .cli-table tbody td:nth-child(3){ width: 10rem }  /* Operación */
-  .cli-table tbody td:nth-child(4){
-    max-width: 38rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; /* Titular */
+  /* Anchos útiles tras quitar "Cartera" */
+  .cli-table tbody td:nth-child(1){ width: 9rem }   /* DNI */
+  .cli-table tbody td:nth-child(2){ width: 10rem }  /* Operación */
+  .cli-table tbody td:nth-child(3){
+    max-width: 38rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; /* Nombre */
   }
-  @media (max-width: 1200px){ .cli-table tbody td:nth-child(4){ max-width: 26rem } }
-  @media (max-width: 992px) { .cli-table tbody td:nth-child(4){ max-width: 18rem } }
-  @media (max-width: 576px) { .cli-table tbody td:nth-child(4){ max-width: 12rem } }
+  @media (max-width:1200px){ .cli-table tbody td:nth-child(3){ max-width:26rem } }
+  @media (max-width:992px){ .cli-table tbody td:nth-child(3){ max-width:18rem } }
+  @media (max-width:576px){ .cli-table tbody td:nth-child(3){ max-width:12rem } }
 
-  /* ========= Paginación (pills + marca) ========= */
   .cli-pager .pagination{ margin-bottom:0; gap:.25rem }
   .cli-pager .page-item .page-link{
-    border-color: var(--border);
-    background: var(--surface);
-    color: var(--ink);
-    border-radius: 999px;
-    padding:.42rem .75rem;
+    border-color: var(--border); background: var(--surface); color: var(--ink);
+    border-radius: 999px; padding:.42rem .75rem;
   }
   .cli-pager .page-item .page-link:hover{
     background: color-mix(in oklab, var(--accent) 14%, transparent);
     border-color: color-mix(in oklab, var(--accent) 30%, transparent);
     color: var(--ink);
   }
-  .cli-pager .page-item.active .page-link{
-    background: var(--brand);
-    border-color: var(--brand);
-    color: #fff;
-  }
-  .cli-pager .page-item.disabled .page-link{
-    color: var(--muted);
-    background: var(--surface);
-  }
-  .cli-pager .page-link:focus{
-    box-shadow:0 0 0 .25rem color-mix(in oklab, var(--accent) 22%, transparent);
-  }
+  .cli-pager .page-item.active .page-link{ background: var(--brand); border-color: var(--brand); color:#fff }
+  .cli-pager .page-item.disabled .page-link{ color: var(--muted); background: var(--surface) }
+  .cli-pager .page-link:focus{ box-shadow:0 0 0 .25rem color-mix(in oklab, var(--accent) 22%, transparent) }
 
-  /* ========= Resaltado de coincidencias ========= */
-  mark.cli-hit{
-    background: color-mix(in oklab, var(--brand) 22%, transparent);
-    color: inherit; padding:0 .15em; border-radius:.25rem
-  }
+  mark.cli-hit{ background: color-mix(in oklab, var(--brand) 22%, transparent); color: inherit; padding:0 .15em; border-radius:.25rem }
 
-  /* Scrollbar del contenedor de tabla */
   .table-responsive::-webkit-scrollbar{ height:10px }
-  .table-responsive::-webkit-scrollbar-thumb{
-    background: color-mix(in oklab, var(--accent) 24%, transparent); border-radius:10px
-  }
+  .table-responsive::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--accent) 24%, transparent); border-radius:10px }
 
-  /* Coherencia primario (fallback si layout cachea) */
   .btn-primary{ background:var(--brand); border-color:var(--brand) }
   .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
 </style>
@@ -138,8 +87,8 @@
         <input name="q"
                value="{{ $q ?? request('q') }}"
                class="form-control"
-               placeholder="DNI / Operación / Titular / Cartera"
-               aria-label="Buscar por DNI, Operación, Titular o Cartera">
+               placeholder="DNI / Operación / Nombre"
+               aria-label="Buscar por DNI, Operación o Nombre">
         <button class="btn btn-primary" title="Buscar">
           <i class="bi bi-arrow-right-short"></i>
         </button>
@@ -198,10 +147,10 @@
     <table class="table align-middle cli-table" id="cliTable">
       <thead>
         <tr>
-          <th>Cartera</th>
           <th>DNI</th>
           <th>Operación</th>
-          <th>Titular</th>
+          <th>Nombre</th>
+          <th>Cosecha</th>
           <th></th>
         </tr>
       </thead>
@@ -209,14 +158,12 @@
         @forelse($clientes as $c)
           @php($href = route('clientes.show',$c->dni))
           <tr class="cli-row" tabindex="0" data-href="{{ $href }}">
-            <td class="text-nowrap">{{ $c->cartera }}</td>
             <td class="text-nowrap">{{ $c->dni }}</td>
             <td class="text-nowrap">{{ $c->operacion }}</td>
-            <td>{{ $c->titular }}</td>
+            <td>{{ $c->nombre }}</td>
+            <td class="text-nowrap">{{ $c->cosecha }}</td>
             <td class="text-end">
-              <a class="btn btn-sm btn-outline-primary" href="{{ $href }}" title="Ver detalle del cliente">
-                Ver
-              </a>
+              <a class="btn btn-sm btn-outline-primary" href="{{ $href }}" title="Ver detalle del cliente">Ver</a>
             </td>
           </tr>
         @empty
@@ -245,7 +192,6 @@
 
 @push('scripts')
 <script>
-  // ======= Fila clicable (enter/click) =======
   (function attachRowHandlers(){
     document.querySelectorAll('.cli-row').forEach(tr=>{
       const href = tr.dataset.href;
@@ -260,7 +206,6 @@
     });
   })();
 
-  // ======= Resaltado de coincidencias (múltiples palabras) =======
   (function highlightMatches(){
     const body = document.getElementById('cliBody');
     if(!body) return;
@@ -280,7 +225,6 @@
     });
   })();
 
-  // ======= Copiar tabla al portapapeles =======
   document.getElementById('btnCopy')?.addEventListener('click', async ()=>{
     try{
       const table = document.getElementById('cliTable');
@@ -297,7 +241,6 @@
     }catch(e){ alert('No se pudo copiar.'); }
   });
 
-  // ======= Descargar CSV (esta hoja) =======
   document.getElementById('btnCsv')?.addEventListener('click', ()=>{
     const table = document.getElementById('cliTable');
     const rows = [...table.querySelectorAll('tbody tr')];
