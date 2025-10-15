@@ -120,24 +120,29 @@
   <div class="card pad cli-head mb-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div>
-        <h1 class="h5 mb-1 d-flex align-items-center gap-2"><i class="bi bi-person-badge"></i><span>{{ $titular }}</span></h1>
+        <h1 class="h5 mb-1 d-flex align-items-center gap-2">
+          <i class="bi bi-person-badge"></i><span>{{ $titular }}</span>
+        </h1>
         <div class="meta">
           <div class="d-flex align-items-center gap-1">
             <span class="dni-pill"><i class="bi bi-credit-card-2-front"></i> DNI {{ $dni }}</span>
-            <button class="btn btn-outline-secondary btn-sm ms-1" id="btnCopyDni" type="button" title="Copiar DNI" data-bs-toggle="tooltip"><i class="bi bi-clipboard"></i></button>
+            <button class="btn btn-outline-secondary btn-sm ms-1" id="btnCopyDni" type="button" title="Copiar DNI" data-bs-toggle="tooltip">
+              <i class="bi bi-clipboard"></i>
+            </button>
           </div>
           @if(isset($cuentas) && count($cuentas)) <div><i class="bi bi-wallet2 me-1"></i>{{ count($cuentas) }} cuenta(s)</div>@endif
-          @if(isset($pagos)) <div><i class="bi bi-receipt me-1"></i>{{ count($pagos) }} pago(s)</div>@endif
-          @if(isset($promesas)) <div><i class="bi bi-flag me-1"></i>{{ count($promesas) }} promesa(s)</div>@endif
+          @if(isset($pagos))   <div><i class="bi bi-receipt me-1"></i>{{ count($pagos) }} pago(s)</div>@endif
+          @if(isset($promesas))<div><i class="bi bi-flag me-1"></i>{{ count($promesas) }} promesa(s)</div>@endif
         </div>
       </div>
       @php
-        $totSaldo = (float)($cuentas->sum('saldo_capital') ?? 0);
-        $totDeuda = (float)($cuentas->sum('deuda_total') ?? 0);
-        $totPagos = (float)($pagos->sum('monto') ?? 0);
+        // Campos nuevos: deuda_capital / interes / deuda_total
+        $totCapital = (float) $cuentas->sum(fn($x)=>(float)($x->deuda_capital ?? $x->saldo_capital ?? 0));
+        $totDeuda   = (float) $cuentas->sum(fn($x)=>(float)($x->deuda_total   ?? 0));
+        $totPagos   = (float) $pagos->sum(fn($p)=>(float)($p->monto_pagado ?? $p->monto ?? 0));
       @endphp
       <div class="d-flex flex-wrap gap-2">
-        <div class="kpi-mini text-end"><div class="label">Saldo capital</div><div class="value">S/ {{ number_format($totSaldo,2) }}</div></div>
+        <div class="kpi-mini text-end"><div class="label">Deuda capital</div><div class="value">S/ {{ number_format($totCapital,2) }}</div></div>
         <div class="kpi-mini text-end"><div class="label">Deuda total</div><div class="value">S/ {{ number_format($totDeuda,2) }}</div></div>
         <div class="kpi-mini text-end"><div class="label">Pagos registrados</div><div class="value">S/ {{ number_format($totPagos,2) }}</div></div>
       </div>
@@ -151,7 +156,6 @@
         <i class="bi bi-wallet2"></i><span>Cuentas</span>
       </h2>
 
-      {{-- Botones (arriba de la tabla) --}}
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-outline-secondary btn-sm" id="btnCopyCtas" type="button" title="Copiar cuentas" data-bs-toggle="tooltip">
           <i class="bi bi-clipboard"></i> Copiar
@@ -176,19 +180,15 @@
         <thead>
           <tr>
             <th class="text-center" style="width:36px"><input type="checkbox" id="chkAll"></th>
-            <th>Cartera</th>
             <th class="text-nowrap">Operación</th>
             <th>Entidad</th>
             <th>Producto</th>
-            <th class="text-end text-nowrap">Saldo Capital</th>
-            <th class="text-end text-nowrap">Deuda Total</th>
-
-            {{-- NUEVA COLUMNA CNA --}}
+            <th>Cosecha</th>
+            <th class="text-end text-nowrap">Deuda capital</th>
+            <th class="text-end text-nowrap">Interés</th>
+            <th class="text-end text-nowrap">Deuda total</th>
             <th class="text-nowrap">CNA(s)</th>
-
-            {{-- COLUMNA CCD --}}
             <th class="text-nowrap">CCD</th>
-
             <th class="text-nowrap">
               Pagos
               <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Conteo y total de pagos aplicados a esta operación."></i>
@@ -205,19 +205,16 @@
               (is_array($c->pagos_list) && count($c->pagos_list))
             );
 
-            // CCDs precargados
             $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
-
-            // CNAs por operación
-            $cnas = collect($cnasByOperacion[$c->operacion] ?? []);
+            $cnas    = collect($cnasByOperacion[$c->operacion] ?? []);
 
             $badgeFor = function($estado) {
               $e = strtolower((string)$estado);
               return match (true) {
-                str_contains($e,'aprob')       => 'success',
-                str_contains($e,'pre')         => 'primary',
-                str_contains($e,'rechaz')      => 'danger',
-                default                        => 'secondary',
+                str_contains($e,'aprob')  => 'success',
+                str_contains($e,'pre')    => 'primary',
+                str_contains($e,'rechaz') => 'danger',
+                default                   => 'secondary',
               };
             };
           @endphp
@@ -226,31 +223,22 @@
             <td class="text-center">
               <input type="checkbox" class="chkOp" value="{{ $c->operacion }}" {{ empty($c->operacion) ? 'disabled' : '' }}>
             </td>
-            <td class="text-nowrap">{{ $c->cartera ?? '—' }}</td>
             <td class="text-nowrap">{{ $c->operacion ?? '—' }}</td>
-            <td>{{ $c->entidad ?? '—' }}</td>
-            <td>{{ $c->producto ?? '—' }}</td>
-            <td class="text-end text-nowrap">{{ number_format((float)($c->saldo_capital ?? 0), 2) }}</td>
+            <td>{{ $c->entidad   ?? '—' }}</td>
+            <td>{{ $c->producto  ?? '—' }}</td>
+            <td>{{ $c->cosecha   ?? '—' }}</td>
+            <td class="text-end text-nowrap">{{ number_format((float)($c->deuda_capital ?? $c->saldo_capital ?? 0), 2) }}</td>
+            <td class="text-end text-nowrap">{{ number_format((float)($c->interes ?? 0), 2) }}</td>
             <td class="text-end text-nowrap">{{ number_format((float)($c->deuda_total ?? 0), 2) }}</td>
 
-            {{-- === CELDA CNA (solo muestra "PDF") === --}}
+            {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
-              @php
-                $items = collect($cnasByOperacion[$c->operacion] ?? []);
-                $badgeFor = function($estado){
-                  $e = strtolower((string)$estado);
-                  return str_contains($e,'aprob') ? 'success'
-                      : (str_contains($e,'pre') ? 'primary'
-                      : (str_contains($e,'rechaz') ? 'danger' : 'secondary'));
-                };
-              @endphp
-
+              @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
               @if($items->count() === 1)
                 @php
                   $x      = $items->first();
                   $estado = strtolower($x->estado ?? $x->workflow_estado ?? 'pendiente');
                 @endphp
-
                 @if($estado === 'aprobada')
                   <a href="{{ route('cna.pdf', $x->id) }}" target="_blank" class="btn btn-sm btn-outline-success">
                     <i class="bi bi-filetype-pdf me-1"></i> PDF
@@ -258,7 +246,6 @@
                 @else
                   <span class="badge rounded-pill text-bg-{{ $badgeFor($estado) }}">{{ ucfirst($estado) }}</span>
                 @endif
-
               @elseif($items->count() > 1)
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
@@ -266,9 +253,7 @@
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end">
                     @foreach($items as $x)
-                      @php
-                        $estado = strtolower($x->estado ?? $x->workflow_estado ?? 'pendiente');
-                      @endphp
+                      @php $estado = strtolower($x->estado ?? $x->workflow_estado ?? 'pendiente'); @endphp
                       <li class="px-3 py-1 d-flex align-items-center justify-content-between">
                         @if($estado === 'aprobada')
                           <a href="{{ route('cna.pdf', $x->id) }}" class="btn btn-sm btn-link" target="_blank">PDF</a>
@@ -295,8 +280,7 @@
                   $href = \Illuminate\Support\Str::startsWith((string)$path, ['http://','https://','/']) ? $path : ($path ? url($path) : null);
                 @endphp
                 @if($href)
-                  <a href="{{ $href }}" target="_blank" download
-                    class="btn btn-sm btn-outline-primary" title="Descargar CCD">
+                  <a href="{{ $href }}" target="_blank" download class="btn btn-sm btn-outline-primary" title="Descargar CCD">
                     <i class="bi bi-filetype-pdf me-1"></i> CCD
                   </a>
                 @else
@@ -386,37 +370,43 @@
         <table class="table table-sm align-middle tbl-compact" id="tblPagos">
           <thead class="position-sticky top-0 bg-body">
             <tr>
-              <th class="text-nowrap">Operación/Pagaré</th>
               <th class="text-nowrap">Fecha</th>
+              <th class="text-nowrap">DNI</th>
+              <th class="text-nowrap">Operación</th>
+              <th>Nombre</th>
               <th class="text-end text-nowrap">Monto (S/)</th>
-              <th class="text-nowrap">Gestor</th>
-              <th class="text-nowrap">Estado</th>
+              <th class="text-nowrap">Agente</th>
+              <th class="text-nowrap">Cosecha</th>
+              <th class="text-nowrap">Cuenta Recaudo</th>
+              <th class="text-nowrap">Entidad Financiera</th>
             </tr>
           </thead>
           <tbody>
             @forelse($pagos as $p)
               @php
-                $oper = $p->oper ?? $p['oper'] ?? '-';
-                $fec  = $p->fecha ?? $p['fecha'] ?? null;
-                $mon  = $p->monto ?? $p['monto'] ?? 0;
-                $gest = $p->gestor ?? $p['gestor'] ?? '-';
-                $st   = strtoupper($p->estado ?? $p['estado'] ?? '-');
-
-                $cls = 'bg-secondary-subtle text-secondary border';
-                if (str_contains($st,'CANCEL')) $cls = 'bg-success-subtle text-success border';
-                elseif (str_contains($st,'PEND')) $cls = 'bg-warning-subtle text-warning border';
-                elseif (preg_match('/CUOTA|ABONO|PARCIAL/', $st)) $cls = 'bg-danger-subtle text-danger border';
-                elseif (preg_match('/RECHAZ|ANUL/', $st)) $cls = 'bg-danger-subtle text-danger border';
+                $dni     = $p->dni ?? $p['dni'] ?? '-';
+                $oper    = $p->operacion ?? $p['operacion'] ?? '-';
+                $entidad = $p->entidad ?? $p['entidad'] ?? '-';
+                $nombre  = $p->nombre_cliente ?? $p['nombre_cliente'] ?? '-';
+                $monto   = $p->monto_pagado ?? $p['monto_pagado'] ?? 0;
+                $fecha   = $p->fecha ?? $p['fecha'] ?? null;
+                $gestor  = $p->gestor ?? $p['gestor'] ?? '-';
+                $cosecha = $p->cosecha ?? $p['cosecha'] ?? '-';
+                $cuenta  = $p->cuenta_recaudo ?? $p['cuenta_recaudo'] ?? '-';
               @endphp
               <tr>
+                <td class="text-nowrap">{{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '' }}</td>
+                <td class="text-nowrap">{{ $dni }}</td>
                 <td class="text-nowrap">{{ $oper }}</td>
-                <td class="text-nowrap">{{ $fec ? \Carbon\Carbon::parse($fec)->format('d/m/Y') : '' }}</td>
-                <td class="text-end text-nowrap">{{ number_format((float)$mon, 2, '.', ',') }}</td>
-                <td class="text-nowrap">{{ $gest }}</td>
-                <td class="text-nowrap"><span class="badge {{ $cls }}">{{ $st }}</span></td>
+                <td>{{ $nombre }}</td>
+                <td class="text-end text-nowrap">{{ number_format((float)$monto, 2, '.', ',') }}</td>
+                <td class="text-nowrap">{{ $gestor }}</td>
+                <td class="text-nowrap">{{ $cosecha }}</td>
+                <td class="text-nowrap">{{ $cuenta }}</td>
+                <td class="text-nowrap">{{ $entidad }}</td>
               </tr>
             @empty
-              <tr><td colspan="5" class="text-secondary">Sin pagos</td></tr>
+              <tr><td colspan="9" class="text-secondary">Sin pagos</td></tr>
             @endforelse
           </tbody>
         </table>

@@ -54,16 +54,10 @@ class ClientsControllers extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->titular;
 
-            // ===== A) Pagos (UNIFICADO)
-            $pagos = Pago::where('dni',$dni)->select(
-                    DB::raw('DATE(fecha_de_pago) as fecha'),
-                    DB::raw('pagado_en_soles as monto'),
-                    'operacion as oper',
-                    DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
-                    DB::raw("UPPER(COALESCE(status, '-')) as estado"),
-                    DB::raw("'PAGOS' as fuente")
-                )
-                ->orderByDesc('fecha_de_pago')
+            // ===== A) Pagos
+            $pagos = Pago::where('dni', $dni)
+                ->selectRaw('DATE(fecha) as fecha, dni, operacion, nombre_cliente, monto_pagado, COALESCE(gestor,"-") as gestor, cosecha, cuenta_recaudo, entidad')
+                ->orderByDesc('fecha')
                 ->get();
 
             $totPagos = (float) $pagos->sum('monto');
