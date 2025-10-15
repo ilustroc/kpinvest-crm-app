@@ -13,28 +13,30 @@ class PlaceholdersPagosController extends Controller
     // GET /integracion/pagos
     public function index()
     {
-        // Último lote del flujo único (antes "propia")
-        $ultimoLotePropia = PagoLote::where('tipo', 'propia')->latest('id')->first();
+        $ultimoLotePropia = PagoLote::where('tipo','propia')->latest('id')->first();
 
         $pagosPropia = collect();
         if ($ultimoLotePropia) {
             $pagosPropia = PagoPropia::where('lote_id', $ultimoLotePropia->id)
-                ->latest('id')
-                ->take(25)
-                ->get();
+                ->latest('id')->take(25)->get();
         }
 
-        // Vista unificada
-        return view('placeholders.integracion-pagos', compact('ultimoLotePropia', 'pagosPropia'));
+        return view('placeholders.integracion-pagos', compact('ultimoLotePropia','pagosPropia'));
     }
 
-    // ======= Plantilla CSV (flujo único) =======
+    // ===== Plantilla CSV (encabezados sin variaciones) =====
     public function template()
     {
         $headers = [
-            'DNI','OPERACION','ENTIDAD','EQUIPOS','NOMBRE_CLIENTE',
-            'PRODUCTO','MONEDA','FECHA_DE_PAGO','MONTO_PAGADO','CONCATENAR',
-            'FECHA','PAGADO_EN_SOLES','GESTOR','STATUS'
+            'Fecha',
+            'DNI',
+            'Nombre',
+            'Operación',
+            'Monto',
+            'Agente',
+            'Cosecha',
+            'Cuenta_Recaudo',
+            'Entidad Financiera',
         ];
 
         $csv = implode(',', $headers) . "\n";
@@ -44,7 +46,7 @@ class PlaceholdersPagosController extends Controller
         ]);
     }
 
-    // ======= Importación CSV (flujo único) =======
+    // ===== Importación CSV =====
     public function import(Request $r)
     {
         $r->validate(['archivo' => ['required','file','mimes:csv,txt','max:20480']]);
@@ -52,7 +54,6 @@ class PlaceholdersPagosController extends Controller
         $file = $r->file('archivo');
         $path = $file->storeAs('integracion/pagos', time().'_'.$file->getClientOriginalName());
 
-        // Por compatibilidad dejamos tipo='propia' (lo renombramos cuando migremos a la tabla única)
         $lote = PagoLote::create([
             'tipo'            => 'propia',
             'archivo'         => $path,
@@ -69,24 +70,10 @@ class PlaceholdersPagosController extends Controller
             ->with('warn', implode("\n", array_slice($errores, 0, 5)));
     }
 
-    // ================== HELPERS ==================
+    /* ================== Helpers ================== */
+
     private function detectDelimiter(string $firstLine): string {
         return (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
-    }
-
-    private function norm(string $h): string {
-        $h = preg_replace('/^\xEF\xBB\xBF/u', '', $h); // BOM
-        $h = str_replace("\xC2\xA0", ' ', $h);         // NBSP
-        $h = strtoupper(trim($h));
-        $h = str_replace(
-            [' ', '-', 'Á','É','Í','Ó','Ú','Ü','Ñ','º','°','.'],
-            ['_','_','A','E','I','O','U','U','N','','',''],
-            $h
-        );
-        $h = preg_replace('/[^A-Z0-9_]/', '_', $h);
-        $h = trim($h, '_');
-        if ($h === 'N') $h = 'NRO';
-        return $h;
     }
 
     private function parseDate(?string $v): ?string {
@@ -122,38 +109,38 @@ class PlaceholdersPagosController extends Controller
         return preg_replace('/[\x00-\x1F\x7F]/u', '', $s);
     }
 
-    // ======= Import CSV (antes "propia", ahora flujo único) =======
+    // ===== Import real con encabezados EXACTOS =====
     private function importCsvPropia(string $filepath, int $loteId): array
     {
         $fh = fopen($filepath, 'r');
-        if (!$fh) return [0, 0, ['No se pudo abrir el archivo']];
+        if (!$fh) return [0,0,['No se pudo abrir el archivo']];
 
         $first = fgets($fh);
-        if ($first === false) { fclose($fh); return [0, 0, ['Archivo vacío']]; }
+        if ($first === false) { fclose($fh); return [0,0,['Archivo vacío']]; }
         $del = $this->detectDelimiter($first);
         rewind($fh);
 
         $headers = fgetcsv($fh, 0, $del);
-        if (!$headers) { fclose($fh); return [0, 0, ['No se pudieron leer los encabezados']]; }
+        if (!$headers) { fclose($fh); return [0,0,['No se pudieron leer los encabezados']]; }
 
-        $map = [];
-        foreach ($headers as $i => $h) $map[$i] = $this->norm($h);
+        // Índices por encabezado EXACTO (recorta espacios y limpia BOM)
+        $idx = [];
+        foreach ($headers as $i => $h) {
+            $h = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$h); // BOM
+            $idx[trim($h)] = $i;
+        }
 
-        $expect = [
-            'DNI'               => 'dni',
-            'OPERACION'         => 'operacion',
-            'ENTIDAD'           => 'entidad',
-            'EQUIPOS'           => 'equipos',
-            'NOMBRE_CLIENTE'    => 'nombre_cliente',
-            'PRODUCTO'          => 'producto',
-            'MONEDA'            => 'moneda',
-            'FECHA_DE_PAGO'     => 'fecha_de_pago',
-            'MONTO_PAGADO'      => 'monto_pagado',
-            'CONCATENAR'        => 'concatenar',
-            'FECHA'             => 'fecha',
-            'PAGADO_EN_SOLES'   => 'pagado_en_soles',
-            'GESTOR'            => 'gestor',
-            'STATUS'            => 'status',
+        // Mapa encabezado -> columna BD
+        $map = [
+            'Fecha'              => 'fecha',
+            'DNI'                => 'dni',
+            'Nombre'             => 'nombre_cliente',
+            'Operación'          => 'operacion',
+            'Monto'              => 'monto_pagado',
+            'Agente'             => 'gestor',
+            'Cosecha'            => 'cosecha',
+            'Cuenta_Recaudo'     => 'cuenta_recaudo',
+            'Entidad Financiera' => 'entidad',
         ];
 
         $ok=0; $skip=0; $err=[]; $rowNum=1;
@@ -162,25 +149,26 @@ class PlaceholdersPagosController extends Controller
             $rowNum++;
             $data = ['lote_id' => $loteId];
 
-            foreach ($row as $i => $val) {
-                $key = $map[$i] ?? null;
-                if (!$key || !isset($expect[$key])) continue;
+            foreach ($map as $header => $col) {
+                if (!array_key_exists($header, $idx)) continue; // si falta, se deja null
+                $val = $this->toUtf8($row[$idx[$header]] ?? null);
 
-                $attr = $expect[$key];
-                $val  = $this->toUtf8((string)$val);
-
-                if (in_array($key, ['FECHA_DE_PAGO','FECHA'])) {
-                    $data[$attr] = $this->parseDate($val);
-                } elseif (in_array($key, ['MONTO_PAGADO','PAGADO_EN_SOLES'])) {
-                    $data[$attr] = $this->parseNumber($val);
-                } else {
-                    $data[$attr] = ($val !== '') ? $val : null;
+                switch ($header) {
+                    case 'Fecha':
+                        $data[$col] = $this->parseDate($val);
+                        break;
+                    case 'Monto':
+                        $data[$col] = $this->parseNumber($val);
+                        break;
+                    default:
+                        $data[$col] = ($val !== '') ? $val : null;
+                        break;
                 }
             }
 
-            // Claves mínimas
+            // Validación mínima
             if (empty($data['dni']) && empty($data['operacion']) && empty($data['nombre_cliente'])) {
-                $skip++; $err[] = "Fila {$rowNum}: sin claves mínimas (DNI/OPERACION/NOMBRE_CLIENTE)."; continue;
+                $skip++; $err[] = "Fila {$rowNum}: sin claves mínimas (DNI/Operación/Nombre)."; continue;
             }
 
             try { PagoPropia::create($data); $ok++; }
@@ -188,6 +176,6 @@ class PlaceholdersPagosController extends Controller
         }
 
         fclose($fh);
-        return [$ok, $skip, $err];
+        return [$ok,$skip,$err];
     }
 }

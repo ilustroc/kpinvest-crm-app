@@ -5,7 +5,6 @@
 
 @push('head')
 <style>
-  /* ====== Compacto + paleta de marca ====== */
   .ui-compact .card.pad{ padding:14px 16px; border-radius:14px }
   .ui-compact .form-control,
   .ui-compact .form-select{ font-size:.92rem; padding:.4rem .6rem; height:auto; background:var(--surface); border-color:var(--border) }
@@ -15,33 +14,13 @@
   .ui-compact .btn-primary{ background:var(--brand); border-color:var(--brand) }
   .ui-compact .btn-primary:hover{ background:color-mix(in oklab, var(--brand) 85%, black); border-color:color-mix(in oklab, var(--brand) 85%, black) }
 
-  /* Vínculos con marca */
   .upload-card a{ color:var(--brand) } .upload-card a:hover{ color:color-mix(in oklab, var(--brand) 85%, black) }
 
-  /* Pastillas y microtexto */
   .pill{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--border);background:var(--surface);
         border-radius:999px;padding:.18rem .6rem;font-size:.8rem}
   .mini{font-size:.9rem;color:var(--muted)}
   .ok{color:#0a7a3d} .err{color:#b42318} .warn{color:#8a6a00}
 
-  /* Tabla compacta + encabezado con sutil acento */
-  .table> :not(caption)>*>*{ padding:.52rem .65rem }
-  .spec .table thead th{
-    color:var(--ink);
-    background:color-mix(in oklab, var(--brand) 9%, #fff);
-    border-bottom:1px solid var(--border);
-    text-transform:uppercase; letter-spacing:.3px; font-size:.8rem;
-  }
-  .spec .table tbody td{ color:var(--ink) }
-
-  /* Etiquetas <code> con acento */
-  .spec code{
-    background:color-mix(in oklab, var(--accent) 12%, transparent);
-    color:color-mix(in oklab, var(--accent) 80%, black);
-    padding:.05rem .35rem; border-radius:6px
-  }
-
-  /* Caja de pre-check */
   #precheckBoxPagos{ background:color-mix(in oklab, var(--surface-2) 35%, transparent); border:1px dashed var(--border); border-radius:12px; padding:.6rem .75rem }
 </style>
 @endpush
@@ -59,7 +38,6 @@
   @endif
 
   @php
-    // Compatibilidad: acepta variables antiguas de la vista "propia"
     $ultimoLote = $ultimoLote ?? ($ultimoLotePropia ?? null);
     $pagos      = $pagos ?? ($pagosPropia ?? collect());
   @endphp
@@ -80,20 +58,15 @@
           <input type="file" name="archivo" id="csvFilePagos" class="form-control" accept=".csv,text/csv" required>
           <div class="form-text">
             Encabezados esperados:
-            <span class="pill"><i class="bi bi-card-checklist"></i> DNI</span>
-            <span class="pill">OPERACION</span>
-            <span class="pill">ENTIDAD</span>
-            <span class="pill">EQUIPOS</span>
-            <span class="pill">NOMBRE_CLIENTE</span>
-            <span class="pill">PRODUCTO</span>
-            <span class="pill">MONEDA</span>
-            <span class="pill">FECHA_DE_PAGO</span>
-            <span class="pill">MONTO_PAGADO</span>
-            <span class="pill">CONCATENAR</span>
-            <span class="pill">FECHA</span>
-            <span class="pill">PAGADO_EN_SOLES</span>
-            <span class="pill">GESTOR</span>
-            <span class="pill">STATUS</span>
+            <span class="pill"><i class="bi bi-card-checklist"></i> Fecha</span>
+            <span class="pill">DNI</span>
+            <span class="pill">Nombre</span>
+            <span class="pill">Operación</span>
+            <span class="pill">Monto</span>
+            <span class="pill">Agente</span>
+            <span class="pill">Cosecha</span>
+            <span class="pill">Cuenta_Recaudo</span>
+            <span class="pill">Entidad Financiera</span>
           </div>
         </div>
         <div class="col-lg-3">
@@ -119,34 +92,6 @@
       </form>
     </div>
 
-    {{-- Guía rápida --}}
-    <div class="card pad mb-3">
-      <details>
-        <summary class="fw-semibold d-flex align-items-center gap-2"><i class="bi bi-journal-text"></i> Guía rápida de columnas (tipos y ejemplos)</summary>
-        <div class="table-responsive mt-2 spec">
-          <table class="table align-middle">
-            <thead><tr><th>Columna</th><th>Tipo</th><th>Obligatoria</th><th>Ejemplo</th><th>Notas</th></tr></thead>
-            <tbody>
-              <tr><td><code>DNI</code></td><td>Texto</td><td>No</td><td>"00123456"</td><td>Guardar como <strong>texto</strong> para no perder ceros a la izquierda.</td></tr>
-              <tr><td><code>OPERACION</code></td><td>Texto</td><td>No</td><td>OP-77890</td><td>Alfanumérico permitido.</td></tr>
-              <tr><td><code>ENTIDAD</code></td><td>Texto</td><td>No</td><td>BCP</td><td>Nombre corto.</td></tr>
-              <tr><td><code>EQUIPOS</code></td><td>Texto</td><td>No</td><td>Plan A</td><td>Libre.</td></tr>
-              <tr><td><code>NOMBRE_CLIENTE</code></td><td>Texto</td><td>No</td><td>Juan Pérez</td><td>Libre.</td></tr>
-              <tr><td><code>PRODUCTO</code></td><td>Texto</td><td>No</td><td>Crédito</td><td>Libre.</td></tr>
-              <tr><td><code>MONEDA</code></td><td>Texto</td><td>No</td><td>PEN</td><td>PEN/USD; se acepta <code>S/</code> o <code>$</code>.</td></tr>
-              <tr><td><code>FECHA_DE_PAGO</code></td><td>Fecha</td><td>No</td><td>2025-01-31</td><td>YYYY-MM-DD o DD/MM/YYYY.</td></tr>
-              <tr><td><code>MONTO_PAGADO</code></td><td>Número</td><td>No</td><td>1234.56</td><td>Separador decimal punto (<code>.</code>).</td></tr>
-              <tr><td><code>CONCATENAR</code></td><td>Texto</td><td>No</td><td>ABC-001</td><td>Libre.</td></tr>
-              <tr><td><code>FECHA</code></td><td>Fecha</td><td>No</td><td>2025-01-31</td><td>Igual a <code>FECHA_DE_PAGO</code>.</td></tr>
-              <tr><td><code>PAGADO_EN_SOLES</code></td><td>Número</td><td>No</td><td>1234.56</td><td>Convertido a PEN si aplica.</td></tr>
-              <tr><td><code>GESTOR</code></td><td>Texto</td><td>No</td><td>Ana</td><td>Libre.</td></tr>
-              <tr><td><code>STATUS</code></td><td>Texto</td><td>No</td><td>APLICADO</td><td>Libre.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </div>
-
     {{-- Último lote --}}
     <div class="card pad">
       <div class="d-flex justify-content-between align-items-center mb-2">
@@ -164,31 +109,34 @@
         <div class="table-responsive">
           <table class="table align-middle">
             <thead>
-            <tr>
-              <th>DNI</th><th>Operación</th><th>Entidad</th><th>Equipos</th><th>Cliente</th>
-              <th>Producto</th><th>Moneda</th><th>F. Pago</th>
-              <th class="text-end">Monto Pagado</th><th class="text-end">Pagado en S/</th><th>Gestor</th><th>Status</th>
-            </tr>
+              <tr>
+                <th>Fecha</th>
+                <th>DNI</th>
+                <th>Operación</th>
+                <th>Nombre</th>
+                <th>Entidad Financiera</th>
+                <th class="text-end">Monto</th>
+                <th>Agente</th>
+                <th>Cosecha</th>
+                <th>Cuenta_Recaudo</th>
+              </tr>
             </thead>
             <tbody>
-            @forelse($pagos as $p)
-              <tr>
-                <td class="text-nowrap">{{ $p->dni }}</td>
-                <td class="text-nowrap">{{ $p->operacion }}</td>
-                <td>{{ $p->entidad }}</td>
-                <td>{{ $p->equipos }}</td>
-                <td>{{ $p->nombre_cliente }}</td>
-                <td>{{ $p->producto }}</td>
-                <td>{{ $p->moneda }}</td>
-                <td class="text-nowrap">{{ optional($p->fecha_de_pago)->format('Y-m-d') }}</td>
-                <td class="text-end">{{ number_format((float)$p->monto_pagado, 2) }}</td>
-                <td class="text-end">{{ number_format((float)$p->pagado_en_soles, 2) }}</td>
-                <td>{{ $p->gestor }}</td>
-                <td>{{ $p->status }}</td>
-              </tr>
-            @empty
-              <tr><td colspan="12" class="text-secondary">Sin datos para mostrar.</td></tr>
-            @endforelse
+              @forelse($pagos as $p)
+                <tr>
+                  <td class="text-nowrap">{{ optional($p->fecha)->format('Y-m-d') }}</td>
+                  <td class="text-nowrap">{{ $p->dni }}</td>
+                  <td class="text-nowrap">{{ $p->operacion }}</td>
+                  <td>{{ $p->nombre_cliente }}</td>
+                  <td>{{ $p->entidad }}</td>
+                  <td class="text-end">{{ number_format((float)$p->monto_pagado, 2) }}</td>
+                  <td>{{ $p->gestor }}</td>
+                  <td>{{ $p->cosecha }}</td>
+                  <td>{{ $p->cuenta_recaudo }}</td>
+                </tr>
+              @empty
+                <tr><td colspan="9" class="text-secondary">Sin datos para mostrar.</td></tr>
+              @endforelse
             </tbody>
           </table>
         </div>
@@ -200,7 +148,9 @@
 @push('scripts')
 <script>
 (function(){
-  const HEADERS = ["DNI","OPERACION","ENTIDAD","EQUIPOS","NOMBRE_CLIENTE","PRODUCTO","MONEDA","FECHA_DE_PAGO","MONTO_PAGADO","CONCATENAR","FECHA","PAGADO_EN_SOLES","GESTOR","STATUS"];
+  // Encabezados EXACTOS
+  const HEADERS = ["Fecha","DNI","Nombre","Operación","Monto","Agente","Cosecha","Cuenta_Recaudo","Entidad Financiera"];
+
   const $file = document.getElementById('csvFilePagos');
   const $btn  = document.getElementById('btnImportPagos');
   const $box  = document.getElementById('precheckBoxPagos');
@@ -252,9 +202,8 @@
         const row=rows[r]; if(!row||!row.length) continue; sampled++;
         HEADERS.forEach((h,idx)=>{
           const val=(row[idx]??'').trim(); let ok=true, detail='';
-          if(h==='FECHA_DE_PAGO' || h==='FECHA'){ ok=isDate(val); if(!ok) detail='Fecha inválida. Use YYYY-MM-DD o DD/MM/YYYY' }
-          else if(h==='MONTO_PAGADO' || h==='PAGADO_EN_SOLES'){ ok=isNumber(val); if(!ok) detail='Número inválido' }
-          else if(h==='MONEDA'){ ok=!val || ['PEN','USD','S/','$'].includes((val+'').toUpperCase()); if(!ok) detail='Use PEN, USD, S/ o $' }
+          if(h==='Fecha'){ ok=isDate(val); if(!ok) detail='Fecha inválida. Use YYYY-MM-DD o DD/MM/YYYY' }
+          else if(h==='Monto'){ ok=isNumber(val); if(!ok) detail='Número inválido' }
           if(!ok){ issues.push({r:r+1,col:h,val,detail}) }
         });
       }
@@ -264,7 +213,7 @@
         $wrap.classList.remove('d-none');
         $body.innerHTML = issues.slice(0,80).map(it=>`<tr><td>${it.r}</td><td>${it.col}</td><td>${(it.val||'').replace(/</g,'&lt;')}</td><td>${it.detail}</td></tr>`).join('');
       }
-      $btn.disabled = !headerOk; // Cambia a (!headerOk || issues.length>0) si deseas bloquear por tipos.
+      $btn.disabled = !headerOk;
     };
     reader.readAsText(file,'UTF-8');
   });
