@@ -384,12 +384,10 @@
             @forelse($pagos as $p)
               @php
                 $oper    = $p->operacion ?? $p['operacion'] ?? '-';
-                $entidad = $p->entidad ?? $p['entidad'] ?? '-';
                 $nombre  = $p->nombre_cliente ?? $p['nombre_cliente'] ?? '-';
                 $monto   = $p->monto_pagado ?? $p['monto_pagado'] ?? 0;
                 $fecha   = $p->fecha ?? $p['fecha'] ?? null;
                 $gestor  = $p->gestor ?? $p['gestor'] ?? '-';
-                $cosecha = $p->cosecha ?? $p['cosecha'] ?? '-';
                 $cuenta  = $p->cuenta_recaudo ?? $p['cuenta_recaudo'] ?? '-';
               @endphp
               <tr>
@@ -398,9 +396,7 @@
                 <td>{{ $nombre }}</td>
                 <td class="text-end text-nowrap">{{ number_format((float)$monto, 2, '.', ',') }}</td>
                 <td class="text-nowrap">{{ $gestor }}</td>
-                <td class="text-nowrap">{{ $cosecha }}</td>
                 <td class="text-nowrap">{{ $cuenta }}</td>
-                <td class="text-nowrap">{{ $entidad }}</td>
               </tr>
             @empty
               <tr><td colspan="9" class="text-secondary">Sin pagos</td></tr>
