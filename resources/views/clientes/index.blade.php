@@ -131,15 +131,6 @@
         </div>
       @endif
     </div>
-
-    <div class="cli-actions d-flex flex-wrap gap-2">
-      <button class="btn btn-outline-secondary btn-sm" id="btnCopy" type="button" title="Copiar tabla al portapapeles">
-        <i class="bi bi-clipboard me-1"></i> Copiar tabla
-      </button>
-      <button class="btn btn-outline-primary btn-sm" id="btnCsv" type="button" title="Descargar CSV con las filas de esta página">
-        <i class="bi bi-file-earmark-spreadsheet me-1"></i> CSV (esta hoja)
-      </button>
-    </div>
   </div>
 
   {{-- Tabla --}}
@@ -225,39 +216,5 @@
     });
   })();
 
-  document.getElementById('btnCopy')?.addEventListener('click', async ()=>{
-    try{
-      const table = document.getElementById('cliTable');
-      const rows = [...table.querySelectorAll('tbody tr')];
-      if(!rows.length) return;
-      const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4);
-      const data = rows.map(r => {
-        const tds = r.querySelectorAll('td');
-        return [tds[0]?.innerText.trim(), tds[1]?.innerText.trim(), tds[2]?.innerText.trim(), tds[3]?.innerText.trim()];
-      });
-      const lines = [head.join('\t'), ...data.map(arr=>arr.join('\t'))].join('\n');
-      await navigator.clipboard.writeText(lines);
-      alert('Tabla copiada al portapapeles.');
-    }catch(e){ alert('No se pudo copiar.'); }
-  });
-
-  document.getElementById('btnCsv')?.addEventListener('click', ()=>{
-    const table = document.getElementById('cliTable');
-    const rows = [...table.querySelectorAll('tbody tr')];
-    if(!rows.length) return;
-    const head = [...table.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0,4);
-    const csvEsc = v => `"${(v??'').toString().replace(/"/g,'""')}"`;
-    const data = rows.map(r => {
-      const tds = r.querySelectorAll('td');
-      return [tds[0]?.innerText, tds[1]?.innerText, tds[2]?.innerText, tds[3]?.innerText].map(csvEsc).join(',');
-    });
-    const csv = head.map(csvEsc).join(',') + '\n' + data.join('\n');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'clientes_hoja.csv';
-    document.body.appendChild(a); a.click();
-    a.remove(); URL.revokeObjectURL(url);
-  });
 </script>
 @endpush
