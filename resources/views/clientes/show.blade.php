@@ -198,22 +198,21 @@
               ($c->pagos_list instanceof \Illuminate\Support\Collection && $c->pagos_list->count()) ||
               (is_array($c->pagos_list) && count($c->pagos_list))
             );
-
             $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
             $cnas    = collect($cnasByOperacion[$c->operacion] ?? []);
-
-            $badgeFor = function($estado) {
-              $e = strtolower((string)$estado);
-              return match (true) {
-                str_contains($e,'aprob')  => 'success',
-                str_contains($e,'pre')    => 'primary',
-                str_contains($e,'rechaz') => 'danger',
-                default                   => 'secondary',
-              };
+            $badgeFor = fn($estado) => match (true) {
+              str_contains(strtolower((string)$estado),'aprob')  => 'success',
+              str_contains(strtolower((string)$estado),'pre')    => 'primary',
+              str_contains(strtolower((string)$estado),'rechaz') => 'danger',
+              default                                            => 'secondary',
             };
           @endphp
 
-          <tr data-oper="{{ $c->operacion }}" data-cosecha="{{ $c->cosecha }}" data-entidad="{{ $c->entidad }}">
+          {{-- Marcamos también la CUENTA para poder agrupar operaciones por cuenta --}}
+          <tr data-cuenta="{{ $c->cuenta }}"
+              data-oper="{{ $c->operacion }}"
+              data-cosecha="{{ $c->cosecha }}"
+              data-entidad="{{ $c->entidad }}">
             <td class="text-center">
               <input type="checkbox" class="chkOp" value="{{ $c->operacion }}" {{ empty($c->operacion) ? 'disabled' : '' }}>
             </td>
@@ -227,13 +226,11 @@
 
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
-              {{-- Histórico (si existe) --}}
               @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
               @if($items->count())
                 <span class="badge text-bg-secondary me-2">{{ $items->count() }} reg.</span>
               @endif
 
-              {{-- Generar CNA (martillo) --}}
               <button type="button"
                       class="btn btn-sm btn-outline-success genCnaBtn"
                       title="Generar CNA para esta cuenta"
@@ -707,7 +704,7 @@
             <div class="mt-1">El correlativo se asignará por <b>serie</b> (KPI, F, F2) al guardar.</div>
           </div>
 
-          {{-- Fecha de pago y monto pagado --}}
+          {{-- Campos principales --}}
           <div class="row g-2">
             <div class="col-md-6">
               <label class="form-label">Fecha de pago realizado <span class="text-danger">*</span></label>
@@ -724,7 +721,7 @@
             <textarea name="observacion" class="form-control" rows="3" placeholder="Algún comentario contextual"></textarea>
           </div>
 
-          {{-- Hidden con operación base (cuenta) y operaciones[] --}}
+          {{-- Hidden: cuenta y operaciones[] --}}
           <input type="hidden" name="cuenta" id="cnaCuentaInput">
           <div id="cnaOpsHidden"></div>
         </div>
@@ -1030,39 +1027,75 @@
     refreshSelection();
   })();
 
-  modal?.addEventListener('show.bs.modal', (ev) => {
+  /* ====== Generar CNA (por martillo) — AGRUPAR POR CUENTA ====== */
+
+  // Refs del modal CNA
+  const modalCna  = document.getElementById('modalCna');
+  const opsHidden = document.getElementById('cnaOpsHidden');
+  const opsList   = document.getElementById('cnaOpsList');
+  const inCuenta  = document.getElementById('cnaCuentaInput');
+  const lblCuenta = document.getElementById('cnaCuenta');
+  const lblCosech = document.getElementById('cnaCosecha');
+  const lblPlant  = document.getElementById('cnaPlantilla');
+
+  // Mapa cosecha -> origen/serie/plantilla (UI)
+  function origenFromCosecha(c){
+    c = (c||'').toUpperCase().trim();
+    const FAA  = new Set(['BBVA3','BBVA4','BBVA5','BBVA6','CAJAAQP3']);
+    const FAA2 = new Set(['BBVA7','BBVA8','CONFIANZA_5']);
+    const KPI  = new Set([
+      'BBVA1','BBVA2','CAJAAQP1','CAJAAQP2','COMPARTAMOS_1','CONFIANZA','CONFIANZA_2','CONFIANZA_3',
+      'CONFIANZA_4','CONFIANZA_6','CONFIANZA_7','CONFIANZA_8','CONFIANZA_9','CONFIANZA_10',
+      'CONFIANZA_11','CONFIANZA_12','SEMBRANDO'
+    ]);
+    if (FAA.has(c))  return {origen:'FONDO ACREENCIA AREQUIPA', serie:'F',  plantilla:'cna_fondo_acreencia_arequipa.docx'};
+    if (FAA2.has(c)) return {origen:'ACREENCIA II',            serie:'F2', plantilla:'cna_fondo_acreencia_arequipa2.docx'};
+    if (KPI.has(c))  return {origen:'KP INVEST SAC',           serie:'KPI',plantilla:'cna_kpinvest.docx'};
+    return {origen:'(no reconocido)', serie:'—', plantilla:'—'};
+  }
+
+  modalCna?.addEventListener('show.bs.modal', (ev) => {
     const btn = ev.relatedTarget;
     if (!btn) return;
 
-    const oper    = btn.getAttribute('data-oper') || '';
-    const cuenta  = btn.getAttribute('data-cuenta') || btn.closest('tr')?.getAttribute('data-cuenta') || '';
+    const oper    = btn.getAttribute('data-oper')    || '';
+    let   cuenta  = btn.getAttribute('data-cuenta')  || btn.closest('tr')?.getAttribute('data-cuenta') || '';
     const cosecha = btn.getAttribute('data-cosecha') || '';
     const entidad = btn.getAttribute('data-entidad') || '';
 
-    // Cuenta base (preview)
-    inCuenta.value = oper;
-    lblCuenta.textContent = oper || '—';
+    // Fallback si la fila no trae data-cuenta: leerla del botón de esa misma fila
+    if (!cuenta) {
+      const tr = document.querySelector(`#tblCuentas tbody tr[data-oper="${oper}"]`);
+      cuenta = tr?.querySelector('.genCnaBtn')?.getAttribute('data-cuenta') || tr?.getAttribute('data-cuenta') || '';
+    }
+
+    // UI modal (ahora usamos la CUENTA real, no la operación)
+    inCuenta.value        = cuenta;
+    lblCuenta.textContent = cuenta || '—';
     lblCosech.textContent = cosecha || '—';
-
-    // Origen/Plantilla (preview informativa)
     const info = origenFromCosecha(cosecha);
-    lblPlant.textContent = `${info.origen} · Serie ${info.serie} · ${info.plantilla}`;
+    lblPlant.textContent  = `${info.origen} · Serie ${info.serie} · ${info.plantilla}`;
 
-    // === Operaciones incluidas: TODAS las filas con la MISMA CUENTA ===
+    // Operaciones incluidas: todas las filas con la MISMA CUENTA
     const rows = Array.from(document.querySelectorAll('#tblCuentas tbody tr'));
-    const ops = rows
-      .filter(tr => (tr.getAttribute('data-cuenta') || '') === cuenta)
-      .map(tr => tr.getAttribute('data-oper'))
+    const ops  = rows
+      .filter(tr => {
+        const rowCuenta = tr.getAttribute('data-cuenta')
+          || tr.querySelector('.genCnaBtn')?.getAttribute('data-cuenta')
+          || '';
+        return rowCuenta === cuenta;
+      })
+      .map(tr => tr.getAttribute('data-oper') || tr.querySelector('.genCnaBtn')?.getAttribute('data-oper') || '')
       .filter(Boolean);
 
-    const uniq = Array.from(new Set(ops.length ? ops : [oper].filter(Boolean)));
+    const uniq = [...new Set(ops.length ? ops : [oper].filter(Boolean))];
 
-    // Pintar chips
+    // Chips UI
     opsList.innerHTML = uniq.map(op =>
       `<span class="badge rounded-pill text-bg-light border me-1">${op}</span>`
     ).join('');
 
-    // Hidden inputs
+    // Hidden inputs operaciones[]
     opsHidden.innerHTML = '';
     uniq.forEach(op => {
       const i = document.createElement('input');
