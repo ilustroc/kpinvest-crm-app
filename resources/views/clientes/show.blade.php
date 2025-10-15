@@ -54,7 +54,7 @@
     font-weight:700; border-top:1px solid var(--border);
   }
 
-  /* ====== Promesas: look de fila destacada por estado (azul preaprobada, verde aprobada) ====== */
+  /* ====== Promesas ====== */
   .promesas .table>tbody>tr{ transition:box-shadow .2s ease, transform .05s ease }
   .promesas .table>tbody>tr:hover{ box-shadow:0 1px 0 rgba(15,23,42,.06) inset, 0 2px 10px rgba(15,23,42,.06) }
 
@@ -102,9 +102,8 @@
   .decision-box.is-preaprobada{ border-left-color:var(--accent); background:color-mix(in oklab, var(--accent) 20%, transparent) }
   .decision-box.is-aprobada{ border-left-color:var(--brand); background:color-mix(in oklab, var(--brand) 20%, transparent) }
   .decision-box.is-rechazada{ border-left-color:#e38074; background:color-mix(in oklab,#e38074 20%, transparent) }
-  .decision-box.is-pendiente{ border-left-color:#cfd7e1; background:color-mix(in oklab,#cfd7e1 20%, transparent) }
 
-  /* ====== Botones coherentes (primario verde, outline primario azul acento en esta vista) ====== */
+  /* ====== Botones ====== */
   .btn-primary{ background:var(--brand); border-color:var(--brand) }
   .btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
 
@@ -205,7 +204,6 @@
               ($c->pagos_list instanceof \Illuminate\Support\Collection && $c->pagos_list->count()) ||
               (is_array($c->pagos_list) && count($c->pagos_list))
             );
-            $collapseId = 'pagos-'.$loop->index;
 
             // CCDs precargados
             $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
@@ -220,16 +218,6 @@
                 str_contains($e,'pre')         => 'primary',
                 str_contains($e,'rechaz')      => 'danger',
                 default                        => 'secondary',
-              };
-            };
-            $estadoText = function($estado) {
-              $e = strtolower((string)$estado);
-              return match (true) {
-                str_contains($e,'aprob')       => 'Aprobada',
-                str_contains($e,'pre')         => 'Pre-aprobada',
-                str_contains($e,'rechaz_sup')  => 'Rechazada (Sup)',
-                str_contains($e,'rechaz')      => 'Rechazada',
-                default                        => 'Pendiente',
               };
             };
           @endphp
@@ -299,9 +287,10 @@
 
             {{-- === CELDA CCD === --}}
             <td class="text-nowrap">
-              @if($docsCcd->count() === 1)
+              @php $docs = $docsCcd; @endphp
+              @if($docs->count() === 1)
                 @php
-                  $d    = $docsCcd->first();
+                  $d    = $docs->first();
                   $path = $d->pdf ?? $d->archivo ?? $d->ruta ?? $d->url ?? null;
                   $href = \Illuminate\Support\Str::startsWith((string)$path, ['http://','https://','/']) ? $path : ($path ? url($path) : null);
                 @endphp
@@ -313,13 +302,13 @@
                 @else
                   <span class="text-secondary">—</span>
                 @endif
-              @elseif($docsCcd->count() > 1)
+              @elseif($docs->count() > 1)
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-filetype-pdf me-1"></i> CCD ({{ $docsCcd->count() }})
+                    <i class="bi bi-filetype-pdf me-1"></i> CCD ({{ $docs->count() }})
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end">
-                    @foreach($docsCcd as $d)
+                    @foreach($docs as $d)
                       @php
                         $path = $d->pdf ?? $d->archivo ?? $d->ruta ?? $d->url ?? null;
                         $href = \Illuminate\Support\Str::startsWith((string)$path, ['http://','https://','/']) ? $path : ($path ? url($path) : null);
@@ -344,6 +333,7 @@
               @endif
 
               @if($hasList)
+                @php $collapseId = 'pagos-'.$loop->index; @endphp
                 <button class="btn btn-sm btn-outline-secondary ms-2" type="button"
                         data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}"
                         aria-expanded="false" aria-controls="{{ $collapseId }}">
@@ -792,63 +782,6 @@
       </form>
     </div>
   </div>
-
-  {{-- GESTIONES --}}
-  <div class="card pad mt-3">
-    <h2 class="h6 mb-2 d-flex align-items-center gap-2"><i class="bi bi-chat-dots"></i> Gestiones</h2>
-    <div class="alert alert-info py-2 d-flex align-items-center mb-0"><i class="bi bi-info-circle me-2"></i> Aún no hay gestiones cargadas.</div>
-  </div>
-
-  {{-- DOCUMENTOS CCD --}}
-  @if($ccd->count())
-    <div class="card pad mt-3">
-      <h2 class="h6 mb-2 d-flex align-items-center gap-2">
-        <i class="bi bi-journal-text"></i> Documentos CCD
-      </h2>
-      <div class="table-responsive max-h-260">
-        <table class="table table-sm align-middle tbl-compact" id="tblCCD">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Archivo</th>
-              <th>Fecha</th>
-              <th class="text-end">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            @foreach($ccd as $d)
-              @php
-                $path = $d->pdf ?? $d->archivo ?? $d->ruta ?? $d->url ?? null;
-                $href = $path ? (\Illuminate\Support\Str::startsWith($path, ['http://','https://','/']) ? $path : url($path)) : null;
-                $name = $d->nombre ?? $d->documento ?? '-';
-              @endphp
-              <tr>
-                <td>{{ $d->id }}</td>
-                <td class="text-nowrap">{{ $d->codigo ?? '—' }}</td>
-                <td class="text-truncate" style="max-width:260px">{{ $name }}</td>
-                <td class="text-truncate" style="max-width:360px"><code class="small">{{ $path ?: '-' }}</code></td>
-                <td class="text-nowrap">
-                  {{ isset($d->created_at) ? \Carbon\Carbon::parse($d->created_at)->format('d/m/Y H:i') : '' }}
-                </td>
-                <td class="text-end">
-                  @if($href)
-                    <a href="{{ $href }}" target="_blank" download
-                      class="btn btn-sm btn-outline-primary">
-                      <i class="bi bi-download me-1"></i> Descargar
-                    </a>
-                  @else
-                    <span class="text-secondary">—</span>
-                  @endif
-                </td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-    </div>
-  @endif
 
 @endsection
 
