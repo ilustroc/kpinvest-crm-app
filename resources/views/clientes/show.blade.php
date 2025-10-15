@@ -375,9 +375,7 @@
               <th>Nombre</th>
               <th class="text-end text-nowrap">Monto (S/)</th>
               <th class="text-nowrap">Agente</th>
-              <th class="text-nowrap">Cosecha</th>
               <th class="text-nowrap">Cuenta Recaudo</th>
-              <th class="text-nowrap">Entidad Financiera</th>
             </tr>
           </thead>
           <tbody>
