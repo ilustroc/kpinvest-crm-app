@@ -226,9 +226,7 @@
 
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
-              @php
               @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
-              @endphp
 
               @if($items->count())
                 <span class="badge text-bg-secondary me-2">{{ $items->count() }} reg.</span>
