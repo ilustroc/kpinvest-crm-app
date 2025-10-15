@@ -25,7 +25,7 @@ class ClientsControllers extends Controller
 
         $clientes = ClienteCuenta::query()
             ->select([
-                'numdoc as dni',   // DNI
+                'numdoc as dni',
                 'operacion',
                 'nombre',
                 'cosecha',

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.app') 
 @section('title','Buscar Cliente')
 @section('crumb','Buscar Cliente')
 
@@ -10,7 +10,6 @@
     --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
     --ink:#151a23; --muted:#6d7b8a;
   }
-
   .cli-filters .form-control,.cli-filters .form-select{ background:var(--surface); border-color:var(--border) }
   .cli-filters .form-control::placeholder{ color:var(--muted) }
   .cli-filters .input-group-text{ background:var(--surface); border-color:var(--border); color:var(--muted) }
@@ -41,7 +40,6 @@
   .cli-row{ cursor:pointer }
   .cli-row:focus-visible{ outline:3px solid color-mix(in oklab, var(--accent) 40%, transparent); outline-offset:-3px; border-radius:4px }
 
-  /* Anchos útiles tras quitar "Cartera" */
   .cli-table tbody td:nth-child(1){ width: 9rem }   /* DNI */
   .cli-table tbody td:nth-child(2){ width: 10rem }  /* Operación */
   .cli-table tbody td:nth-child(3){
@@ -80,7 +78,7 @@
 
   {{-- Filtros --}}
   <form method="GET" action="{{ route('clientes.index') }}" class="row g-2 align-items-end cli-filters" id="cliForm">
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-8">
       <label class="form-label">Buscar</label>
       <div class="input-group">
         <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -96,34 +94,18 @@
       <div class="form-text">Pulsa Enter para buscar. Coincide en cualquiera de las columnas visibles.</div>
     </div>
 
-    <div class="col-6 col-md-3 col-lg-2">
-      <label class="form-label">Por página</label>
-      <select name="pp" class="form-select" aria-label="Registros por página">
-        @foreach([10,20,50,100] as $n)
-          <option value="{{ $n }}" {{ request('pp',20)==$n?'selected':'' }}>{{ $n }}</option>
-        @endforeach
-      </select>
-    </div>
+    {{-- (Quitado) Selector "Por página" --}}
+    {{-- <div class="col-6 col-md-3 col-lg-2"> ... </div> --}}
 
-    <div class="col-6 col-md-3 col-lg-2 d-grid">
+    <div class="col-12 col-md-4 col-lg-2 d-grid">
       <label class="form-label d-none d-md-block">&nbsp;</label>
-      <a class="btn btn-outline-secondary" href="{{ route('clientes.index') }}">
-        Limpiar
-      </a>
+      <a class="btn btn-outline-secondary" href="{{ route('clientes.index') }}">Limpiar</a>
     </div>
   </form>
 
-  {{-- Toolbar de estado + Acciones --}}
+  {{-- Toolbar: solo chip de búsqueda (quitados Resultados y Página) --}}
   <div class="d-flex flex-wrap justify-content-between gap-2 mt-2">
     <div class="cli-toolbar d-flex flex-wrap gap-2">
-      <div class="chip">
-        <div class="t"><i class="bi bi-people"></i><span>Resultados</span></div>
-        <div class="s" id="cliCount">{{ number_format($clientes->total()) }}</div>
-      </div>
-      <div class="chip">
-        <div class="t"><i class="bi bi-list-ol"></i><span>Página</span></div>
-        <div class="s">{{ $clientes->currentPage() }} / {{ max($clientes->lastPage(),1) }}</div>
-      </div>
       @if(($q ?? request('q')))
         <div class="chip">
           <div class="t"><i class="bi bi-funnel"></i><span>Búsqueda</span></div>
@@ -215,6 +197,5 @@
       td.innerHTML = txt.replace(rx, '<mark class="cli-hit">$1</mark>');
     });
   })();
-
 </script>
 @endpush
