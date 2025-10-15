@@ -372,7 +372,6 @@
             <tr>
               <th class="text-nowrap">Fecha</th>
               <th class="text-nowrap">Operación</th>
-              <th>Nombre</th>
               <th class="text-end text-nowrap">Monto (S/)</th>
               <th class="text-nowrap">Agente</th>
               <th class="text-nowrap">Cuenta Recaudo</th>
@@ -382,7 +381,6 @@
             @forelse($pagos as $p)
               @php
                 $oper    = $p->operacion ?? $p['operacion'] ?? '-';
-                $nombre  = $p->nombre_cliente ?? $p['nombre_cliente'] ?? '-';
                 $monto   = $p->monto_pagado ?? $p['monto_pagado'] ?? 0;
                 $fecha   = $p->fecha ?? $p['fecha'] ?? null;
                 $gestor  = $p->gestor ?? $p['gestor'] ?? '-';
@@ -391,7 +389,6 @@
               <tr>
                 <td class="text-nowrap">{{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '' }}</td>
                 <td class="text-nowrap">{{ $oper }}</td>
-                <td>{{ $nombre }}</td>
                 <td class="text-end text-nowrap">{{ number_format((float)$monto, 2, '.', ',') }}</td>
                 <td class="text-nowrap">{{ $gestor }}</td>
                 <td class="text-nowrap">{{ $cuenta }}</td>
