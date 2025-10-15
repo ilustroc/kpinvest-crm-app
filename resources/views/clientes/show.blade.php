@@ -238,6 +238,7 @@
                       class="btn btn-sm btn-outline-success genCnaBtn"
                       title="Generar CNA para esta cuenta"
                       data-dni="{{ $dni }}"
+                      data-cuenta="{{ $c->cuenta }}"
                       data-oper="{{ $c->operacion }}"
                       data-cosecha="{{ $c->cosecha }}"
                       data-entidad="{{ $c->entidad }}"
@@ -1029,78 +1030,45 @@
     refreshSelection();
   })();
 
-  /* ====== Generar CNA (por martillo) ====== */
-  (function(){
-    const modal     = document.getElementById('modalCna');
-    const opsHidden = document.getElementById('cnaOpsHidden');
-    const opsList   = document.getElementById('cnaOpsList');
-    const inCuenta  = document.getElementById('cnaCuentaInput');
-    const lblCuenta = document.getElementById('cnaCuenta');
-    const lblCosech = document.getElementById('cnaCosecha');
-    const lblPlant  = document.getElementById('cnaPlantilla');
+  modal?.addEventListener('show.bs.modal', (ev) => {
+    const btn = ev.relatedTarget;
+    if (!btn) return;
 
-    // mapping cosecha -> origen/serie (UI informativa, el backend decide realmente)
-    function origenFromCosecha(c){
-      c = (c||'').toUpperCase().trim();
-      const FAA  = new Set(['BBVA3','BBVA4','BBVA5','BBVA6','CAJAAQP3']);
-      const FAA2 = new Set(['BBVA7','BBVA8','CONFIANZA_5']);
-      const KPI  = new Set([
-        'BBVA1','BBVA2','CAJAAQP1','CAJAAQP2','COMPARTAMOS_1','CONFIANZA','CONFIANZA_2','CONFIANZA_3',
-        'CONFIANZA_4','CONFIANZA_6','CONFIANZA_7','CONFIANZA_8','CONFIANZA_9','CONFIANZA_10',
-        'CONFIANZA_11','CONFIANZA_12','SEMBRANDO'
-      ]);
-      if (FAA.has(c))  return {origen:'FONDO ACREENCIA AREQUIPA', serie:'F',  plantilla:'cna_fondo_acreencia_arequipa.docx'};
-      if (FAA2.has(c)) return {origen:'ACREENCIA II',            serie:'F2', plantilla:'cna_fondo_acreencia_arequipa2.docx'};
-      if (KPI.has(c))  return {origen:'KP INVEST SAC',           serie:'KPI',plantilla:'cna_kpinvest.docx'};
-      return {origen:'(no reconocido)', serie:'—', plantilla:'—'};
-    }
+    const oper    = btn.getAttribute('data-oper') || '';
+    const cuenta  = btn.getAttribute('data-cuenta') || btn.closest('tr')?.getAttribute('data-cuenta') || '';
+    const cosecha = btn.getAttribute('data-cosecha') || '';
+    const entidad = btn.getAttribute('data-entidad') || '';
 
-    modal?.addEventListener('show.bs.modal', (ev) =>{
-      const btn = ev.relatedTarget;
-      if(!btn) return;
+    // Cuenta base (preview)
+    inCuenta.value = oper;
+    lblCuenta.textContent = oper || '—';
+    lblCosech.textContent = cosecha || '—';
 
-      const oper    = btn.getAttribute('data-oper') || '';
-      const cosecha = btn.getAttribute('data-cosecha') || '';
-      const entidad = btn.getAttribute('data-entidad') || '';
+    // Origen/Plantilla (preview informativa)
+    const info = origenFromCosecha(cosecha);
+    lblPlant.textContent = `${info.origen} · Serie ${info.serie} · ${info.plantilla}`;
 
-      // Cuenta base
-      inCuenta.value   = oper;
-      lblCuenta.textContent = oper || '—';
-      lblCosech.textContent = cosecha || '—';
+    // === Operaciones incluidas: TODAS las filas con la MISMA CUENTA ===
+    const rows = Array.from(document.querySelectorAll('#tblCuentas tbody tr'));
+    const ops = rows
+      .filter(tr => (tr.getAttribute('data-cuenta') || '') === cuenta)
+      .map(tr => tr.getAttribute('data-oper'))
+      .filter(Boolean);
 
-      // Origen/Plantilla (preview)
-      const info = origenFromCosecha(cosecha);
-      lblPlant.textContent = `${info.origen} · Serie ${info.serie} · ${info.plantilla}`;
+    const uniq = Array.from(new Set(ops.length ? ops : [oper].filter(Boolean)));
 
-      // Armar operaciones a incluir:
-      // Regla: todas las filas con la MISMA operación (cuenta) — si hay varias, se incluirán;
-      // si en tu data hay suboperaciones, igualmente quedarán listadas. (El backend valida cosecha única).
-      const rows = Array.from(document.querySelectorAll('#tblCuentas tbody tr'));
-      const ops  = rows
-        .filter(tr => (tr.getAttribute('data-oper') || '') === oper)
-        .map(tr => tr.getAttribute('data-oper'))
-        .filter(Boolean);
+    // Pintar chips
+    opsList.innerHTML = uniq.map(op =>
+      `<span class="badge rounded-pill text-bg-light border me-1">${op}</span>`
+    ).join('');
 
-      // Si sólo encuentra 1, al menos incluimos esa.
-      const uniq = Array.from(new Set(ops.length ? ops : [oper].filter(Boolean)));
-
-      // Pintar chips
-      opsList.innerHTML = '';
-      uniq.forEach(op => {
-        const b = document.createElement('span');
-        b.className = 'badge rounded-pill text-bg-light border';
-        b.textContent = op;
-        opsList.appendChild(b);
-      });
-
-      // Hidden inputs
-      opsHidden.innerHTML = '';
-      uniq.forEach(op => {
-        const i = document.createElement('input');
-        i.type = 'hidden'; i.name = 'operaciones[]'; i.value = op;
-        opsHidden.appendChild(i);
-      });
+    // Hidden inputs
+    opsHidden.innerHTML = '';
+    uniq.forEach(op => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'operaciones[]'; i.value = op;
+      opsHidden.appendChild(i);
     });
-  })();
+  });
 </script>
 @endpush

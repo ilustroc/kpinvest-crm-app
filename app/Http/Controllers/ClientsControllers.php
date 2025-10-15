@@ -52,6 +52,7 @@ class ClientsControllers extends Controller
                 ->get([
                     'numdoc',
                     'nombre',
+                    'cuenta',
                     'operacion',
                     'entidad',
                     'producto',
