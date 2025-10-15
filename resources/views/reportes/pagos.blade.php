@@ -11,7 +11,6 @@
   .tiny{ font-size:.9rem; color:var(--muted) }
   .skeleton{ border:1px dashed var(--border); border-radius:var(--radius); padding:1rem; color:var(--muted); text-align:center }
 
-  /* chips de rango rápido */
   .quick-range .btn{
     border:1px solid var(--border); background:var(--surface);
     border-radius:999px; padding:.25rem .6rem
@@ -55,7 +54,7 @@
       <input type="date" name="to" class="form-control" value="{{ $to }}">
     </div>
 
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-4">
       <label class="form-label d-flex align-items-center justify-content-between">
         <span>Gestor</span>
         <span class="quick-range d-none d-md-inline-flex gap-1">
@@ -67,15 +66,10 @@
       <input type="text" name="gestor" class="form-control" placeholder="Nombre/alias" value="{{ $gestor }}">
     </div>
 
-    <div class="col-6 col-md-2">
-      <label class="form-label">Status</label>
-      <input type="text" name="status" class="form-control" placeholder="ej. APLICADO" value="{{ $status }}">
-    </div>
-
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-4">
       <label class="form-label">Buscar</label>
       <div class="input-group">
-        <input type="text" name="q" class="form-control" placeholder="DNI / Operación / Cliente" value="{{ $q }}">
+        <input type="text" name="q" class="form-control" placeholder="DNI / Operación / Cliente / Entidad / Cosecha / Cuenta" value="{{ $q }}">
         <button class="btn btn-outline-secondary" id="btnBuscar"><i class="bi bi-search"></i></button>
       </div>
     </div>
@@ -101,34 +95,32 @@
         <table class="table align-middle">
           <thead>
             <tr>
+              <th>Fecha</th>
               <th>DNI</th>
+              <th>Nombre</th>
               <th>Operación</th>
-              <th>Entidad</th>
-              <th>Equipos</th>
-              <th>Cliente</th>
-              <th>Producto</th>
-              <th>Moneda</th>
-              <th>F. Pago</th>
-              <th class="text-end">Monto Pagado</th>
-              <th>Gestor</th>
+              <th class="text-end">Monto</th>
+              <th>Agente</th>
+              <th>Cosecha</th>
+              <th>Cuenta Recaudo</th>
+              <th>Entidad Financiera</th>
             </tr>
           </thead>
           <tbody>
             @forelse($rows as $r)
               <tr>
+                <td class="text-nowrap">{{ optional($r->fecha)->format('Y-m-d') }}</td>
                 <td class="text-nowrap">{{ $r->dni }}</td>
-                <td class="text-nowrap">{{ $r->operacion }}</td>
-                <td>{{ $r->entidad }}</td>
-                <td>{{ $r->equipos }}</td>
                 <td>{{ $r->nombre_cliente }}</td>
-                <td>{{ $r->producto }}</td>
-                <td>{{ $r->moneda }}</td>
-                <td class="text-nowrap">{{ optional($r->fecha_de_pago)->format('Y-m-d') }}</td>
-                <td class="text-end">{{ number_format((float)$r->pagado_en_soles, 2) }}</td>
+                <td class="text-nowrap">{{ $r->operacion }}</td>
+                <td class="text-end">{{ number_format((float)$r->monto_pagado, 2) }}</td>
                 <td>{{ $r->gestor }}</td>
+                <td>{{ $r->cosecha }}</td>
+                <td>{{ $r->cuenta_recaudo }}</td>
+                <td>{{ $r->entidad }}</td>
               </tr>
             @empty
-              <tr><td colspan="10" class="text-secondary">Sin resultados.</td></tr>
+              <tr><td colspan="9" class="text-secondary">Sin resultados.</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -181,7 +173,6 @@
       if(!url){ url = baseUrl + '?' + buildQuery(); }
       $tabla.innerHTML = '<div class="skeleton">Cargando…</div>';
 
-      // Traemos la página completa y extraemos #tablaPagos (igual que en PDP)
       const text = await fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}}).then(r=>r.text());
       const doc  = new DOMParser().parseFromString(text, 'text/html');
       const frag = doc.querySelector('#tablaPagos');

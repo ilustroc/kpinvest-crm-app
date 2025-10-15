@@ -18,16 +18,14 @@ class ReportePagosController extends Controller
         $from   = $r->query('from');
         $to     = $r->query('to');
         $gestor = $r->query('gestor');
-        $status = $r->query('status');
         $q      = $r->query('q');
 
-        $rows = $this->buildQuery($from, $to, $gestor, $status, $q)
-            ->orderByDesc('fecha_de_pago')
+        $rows = $this->buildQuery($from, $to, $gestor, $q)
+            ->orderByDesc('fecha')
             ->paginate(10)
             ->withQueryString();
 
-        // Render completo; el JS extrae #tablaPagos para “parciales”
-        return view('reportes.pagos', compact('rows','from','to','gestor','status','q'));
+        return view('reportes.pagos', compact('rows','from','to','gestor','q'));
     }
 
     public function export(Request $r)
@@ -35,20 +33,18 @@ class ReportePagosController extends Controller
         $from   = $r->query('from');
         $to     = $r->query('to');
         $gestor = $r->query('gestor');
-        $status = $r->query('status');
         $q      = $r->query('q');
 
-        $query    = $this->buildQuery($from, $to, $gestor, $status, $q);
+        $query    = $this->buildQuery($from, $to, $gestor, $q);
         $filename = 'pagos_'.now()->format('Ymd_His').'.xlsx';
 
         $xlsx  = new Spreadsheet();
         $sheet = $xlsx->getActiveSheet();
         $row   = 1;
 
-        // Encabezados unificados (ajusta si tu tabla tiene más/menos columnas)
+        // Encabezados nuevos
         $headers = [
-            'DNI','OPERACION','ENTIDAD','EQUIPOS','CLIENTE','PRODUCTO',
-            'MONEDA','FECHA_DE_PAGO','PAGADO_EN_SOLES','GESTOR','STATUS'
+            'Fecha','DNI','Nombre','Operacion','Monto','Agente','Cosecha','Cuenta_Recaudo','Entidad Financiera'
         ];
         $sheet->fromArray($headers, null, "A{$row}");
         $row++;
@@ -62,22 +58,20 @@ class ReportePagosController extends Controller
         (clone $query)->orderBy('id')->chunkById(1000, function ($items) use (&$row, $sheet, $fmtDate) {
             foreach ($items as $r) {
                 $sheet->fromArray([
+                    $fmtDate($r->fecha),
                     (string)$r->dni,
-                    (string)$r->operacion,
-                    $r->entidad,
-                    $r->equipos,
                     $r->nombre_cliente,
-                    $r->producto,
-                    $r->moneda,
-                    $fmtDate($r->fecha_de_pago),
-                    (float)$r->pagado_en_soles,
+                    (string)$r->operacion,
+                    (float)$r->monto_pagado,
                     $r->gestor,
-                    $r->status,
+                    $r->cosecha,
+                    $r->cuenta_recaudo,
+                    $r->entidad,
                 ], null, "A{$row}");
 
-                // Forzar texto donde podría haber ceros a la izquierda
-                $sheet->setCellValueExplicit("A{$row}", (string)$r->dni,       DataType::TYPE_STRING);
-                $sheet->setCellValueExplicit("B{$row}", (string)$r->operacion, DataType::TYPE_STRING);
+                // Forzar texto en DNI y Operacion
+                $sheet->setCellValueExplicit("B{$row}", (string)$r->dni,       DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit("D{$row}", (string)$r->operacion, DataType::TYPE_STRING);
                 $row++;
             }
         }, 'id');
@@ -99,9 +93,9 @@ class ReportePagosController extends Controller
     }
 
     /**
-     * Filtros para el reporte unificado
+     * Filtros para el reporte (campos nuevos)
      */
-    private function buildQuery(?string $from, ?string $to, ?string $gestor, ?string $status, ?string $q)
+    private function buildQuery(?string $from, ?string $to, ?string $gestor, ?string $q)
     {
         $qb = Pago::query();
 
@@ -111,14 +105,14 @@ class ReportePagosController extends Controller
                    ->orWhere('operacion','like',"%{$q}%")
                    ->orWhere('nombre_cliente','like',"%{$q}%")
                    ->orWhere('entidad','like',"%{$q}%")
-                   ->orWhere('producto','like',"%{$q}%");
+                   ->orWhere('cosecha','like',"%{$q}%")
+                   ->orWhere('cuenta_recaudo','like',"%{$q}%");
             });
         }
 
-        if ($from)   $qb->whereDate('fecha_de_pago','>=',$from);
-        if ($to)     $qb->whereDate('fecha_de_pago','<=',$to);
+        if ($from)   $qb->whereDate('fecha','>=',$from);
+        if ($to)     $qb->whereDate('fecha','<=',$to);
         if ($gestor) $qb->where('gestor','like',"%{$gestor}%");
-        if ($status) $qb->where('status','like',"%{$status}%");
 
         return $qb;
     }
