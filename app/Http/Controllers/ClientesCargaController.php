@@ -11,7 +11,7 @@ class ClientesCargaController extends Controller
     public function templateClientesMaster()
     {
         $headers = [
-            'NUMDOC','OPERACION','NOMBRE','PRODUCTO',
+            'NUMDOC','CUENTA','OPERACION','NOMBRE','PRODUCTO',
             'DPTO','PROVINCIA','DISTRITO','DIRECCION',
             'ENTIDAD','COSECHA','FECHA_COMPRA','FECHA_CASTIGO',
             'DEUDA_CAPITAL','INTERES','DEUDA_TOTAL',
@@ -66,8 +66,6 @@ class ClientesCargaController extends Controller
 
         // Permite pequeñas variaciones de naming/acentos
         $alias = [
-            'OPERACIÓN'         => 'OPERACION',
-            'DIRECCIÓN'         => 'DIRECCION',
             'ENTIDAD_FINANCIERA'=> 'ENTIDAD',
         ];
 
@@ -109,6 +107,7 @@ class ClientesCargaController extends Controller
                 switch ($k) {
                     case 'NUMDOC':         $data['numdoc']        = $val; break;
                     case 'OPERACION':      $data['operacion']      = $val; break;
+                    case 'CUENTA':         $data['cuenta']         = $val; break;
                     case 'NOMBRE':         $data['nombre']         = $val; break;
                     case 'PRODUCTO':       $data['producto']       = $val; break;
                     case 'DPTO':           $data['dpto']           = $val; break;
