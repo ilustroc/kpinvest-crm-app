@@ -132,12 +132,8 @@
                   data-dni="{{ $p->dni }}"
                   data-operacion="{{ $p->operacion ?? '' }}"
                   data-fecha="{{ $fechaDmy }}"
-                  data-cartera="{{ $p->cartera ?? '—' }}"
-                  data-asesor="{{ $p->asesor_nombre ?? '—' }}"
-                  data-agente="{{ $p->creador_nombre ?? '—' }}"
+                  data-asesor="{{ $p->asesor_nombre ?: $p->creador_nombre ?: '—' }}"
                   data-titular="{{ $p->titular ?? '—' }}"
-                  data-trabaja="{{ ($p->trabajo ?? '') === 'SI' ? 'SI' : 'NO' }}"
-                  data-clasificacion="{{ $p->clasificacion ?? '—' }}"
                   data-deuda="{{ number_format((float)($p->deuda_total ?? 0),2) }}"
                   data-capital-raw="{{ (float)($p->saldo_capital ?? 0) }}"
                   data-negociado="{{ number_format($montoMostrar, 2) }}"
@@ -249,13 +245,9 @@
           <table class="table table-sm">
             <tbody>
               <tr><th style="width:220px">Tipo</th><td id="t_tipo">—</td></tr>
-              <tr><th>Cartera</th><td id="t_cartera">—</td></tr>
-              <tr><th>Equipo</th><td id="t_asesor">—</td></tr>
-              <tr><th>Asesor (quien creó)</th><td id="t_agente">—</td></tr>
+              <tr><th>Asesor</th><td id="t_asesor">—</td></tr>
               <tr><th>Cliente</th><td id="t_titular">—</td></tr>
-              <tr><th>Trabajo</th><td id="t_trab">—</td></tr>
-              <tr><th>Calificación SBS</th><td id="t_clasificacion">—</td></tr>
-              <tr><th>Suma Deuda Total</th><td id="t_deuda">—</td></tr>
+              <tr><th>Deuda Total</th><td id="t_deuda">—</td></tr>
               <tr><th>Monto Negociado</th><td id="t_neg">—</td></tr>
             </tbody>
           </table>
@@ -456,7 +448,7 @@
 
 @push('scripts')
 <script>
-  // =================== Modal de NOTA (Pre-aprobar / Aprobar) ===================
+  // ============== Modal de NOTA (Pre-aprobar / Aprobar) ==============
   (function () {
     const frm   = document.getElementById('formNotaEstado');
     const title = document.getElementById('modalNotaEstadoTitulo');
@@ -480,7 +472,7 @@
     });
   })();
 
-  // ============================ Rechazo (modal) ================================
+  // =========================== Rechazo (modal) =========================
   document.querySelectorAll('.js-open-rechazo').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       document.getElementById('formRechazo').setAttribute('action', btn.dataset.action);
@@ -488,34 +480,33 @@
     });
   });
 
-  // ========================== Helpers de formato ==============================
+  // ========================= Helpers de formato ========================
   const fmt = (n)=> (Math.round((Number(n)||0)*100)/100).toFixed(2);
-  const pct = (v)=> (v===null || v===undefined || v==='') ? '—' : ((Number(v)||0)*100).toFixed(0)+'%';
 
-  // ============================= Ver FICHA ====================================
+  // ============================ Ver FICHA ==============================
   document.querySelectorAll('.js-ver-ficha').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const tipo = (btn.dataset.tipo || '').toLowerCase();
 
       // Encabezado
-      document.getElementById('f_dni').textContent   = btn.dataset.dni || '—';
-      document.getElementById('t_fecha').textContent = btn.dataset.fecha || '—';
+      const setRaw = (id, v)=>{ const el = document.getElementById(id); if(el) el.textContent = v || '—'; };
+      setRaw('f_dni',  btn.dataset.dni || '—');
+      setRaw('t_fecha',btn.dataset.fecha || '—');
 
-      // Datos generales
-      const set = (id, v)=> (document.getElementById('t_'+id).textContent = (v||'—'));
-      set('tipo', tipo ? (tipo==='cancelacion' ? 'Cancelación' : 'Convenio') : '—');
-      set('cartera', btn.dataset.cartera);
-      set('asesor',  btn.dataset.asesor);
-      set('agente',  btn.dataset.agente);
-      set('titular', btn.dataset.titular);
-      set('trab',    btn.dataset.trabaja);
-      set('clasificacion', btn.dataset.clasificacion);
-      set('deuda',   btn.dataset.deuda);
-      set('neg',     btn.dataset.negociado);
+      // Datos generales (solo los vigentes)
+      const set = (id, v)=>{ const el = document.getElementById('t_'+id); if(el) el.textContent = v || '—'; };
+      set('tipo',   tipo ? (tipo==='cancelacion' ? 'Cancelación' : 'Convenio') : '—');
+      set('asesor', btn.dataset.asesor);
+      set('titular',btn.dataset.titular);
+      set('deuda',  btn.dataset.deuda);
+      set('neg',    btn.dataset.negociado);
 
-      // Notas
-      const notaGen = (btn.dataset.detalle || '').trim();
-      const notaSup = (btn.dataset.notaSup || '').trim();
+      // Notas (robusto con fallbacks)
+      const notaGen = [btn.dataset.notaGen, btn.dataset.detalle, btn.dataset.nota]
+        .map(v => (v||'').trim()).find(Boolean) || '';
+      const notaSup = [btn.dataset.notaSup, btn.dataset.notaPreaprobacion]
+        .map(v => (v||'').trim()).find(Boolean) || '';
+
       const ngWrap = document.getElementById('nota_general_wrap');
       const nsWrap = document.getElementById('nota_sup_wrap');
       if (ngWrap) {
@@ -537,22 +528,23 @@
           cuentas = raw ? JSON.parse(raw) : [];
         } catch(e) { cuentas = []; }
 
-        document.getElementById('f_op').textContent = cuentas.length
+        setRaw('f_op', cuentas.length
           ? cuentas.map(c=>c.operacion).join(', ')
-          : (btn.dataset.operacion || '—');
+          : (btn.dataset.operacion || '—'));
 
         if (!cuentas.length) {
           acc.innerHTML = '<div class="text-secondary small">No se encontraron cuentas asociadas.</div>';
         } else {
           cuentas.forEach((c, idx)=>{
             const id = 'accItem_'+idx;
+            const anioCastigo = c && c.fecha_castigo ? String(c.fecha_castigo).slice(0,4) : '—';
             const html = `
               <div class="accordion-item">
                 <h2 class="accordion-header" id="${id}_h">
                   <button class="accordion-button ${idx>0?'collapsed':''}" type="button"
                           data-bs-toggle="collapse" data-bs-target="#${id}_c"
                           aria-expanded="${idx===0?'true':'false'}" aria-controls="${id}_c">
-                    Operación ${c.operacion || '—'} · ${c.entidad || '—'} · ${c.producto || '—'}
+                    Operación ${c?.operacion || '—'} · ${c?.entidad || '—'} · ${c?.producto || '—'}
                   </button>
                 </h2>
                 <div id="${id}_c" class="accordion-collapse collapse ${idx===0?'show':''}"
@@ -560,14 +552,12 @@
                   <div class="accordion-body p-2">
                     <table class="table table-sm mb-0">
                       <tbody>
-                        <tr><th style="width:220px">Número de Operación</th><td>${c.operacion || '—'}</td></tr>
-                        <tr><th>Año Castigo</th><td>${c.anio_castigo ?? '—'}</td></tr>
-                        <tr><th>Entidad</th><td>${c.entidad || '—'}</td></tr>
-                        <tr><th>Producto</th><td>${c.producto || '—'}</td></tr>
-                        <tr><th>Capital</th><td>S/ ${fmt(c.saldo_capital)}</td></tr>
-                        <tr><th>Deuda Total</th><td>S/ ${fmt(c.deuda_total)}</td></tr>
-                        <tr><th>Campaña</th><td>S/ ${fmt(c.capital_descuento)}</td></tr>
-                        <tr><th>% de descuento</th><td>${pct(c.hasta)}</td></tr>
+                        <tr><th style="width:220px">Número de Operación</th><td>${c?.operacion || '—'}</td></tr>
+                        <tr><th>Año Castigo</th><td>${anioCastigo}</td></tr>
+                        <tr><th>Entidad</th><td>${c?.entidad || '—'}</td></tr>
+                        <tr><th>Producto</th><td>${c?.producto || '—'}</td></tr>
+                        <tr><th>Capital</th><td>S/ ${fmt(c?.saldo_capital)}</td></tr>
+                        <tr><th>Deuda Total</th><td>S/ ${fmt(c?.deuda_total)}</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -589,9 +579,12 @@
       let crono = [];
       try { crono = JSON.parse(btn.getAttribute('data-crono') || '[]'); } catch(_) { crono = []; }
 
-      if ((btn.dataset.tipo || '').toLowerCase() === 'cancelacion') { cronoWrap.classList.add('d-none'); return; }
+      if (tipo === 'cancelacion') { cronoWrap.classList.add('d-none'); return; }
 
-      const hasBalon = (btn.dataset.hasbalon === '1') || crono.some(r => !!r.es_balon);
+      // Detecta balón SOLO si fue seleccionado o existe una cuota marcada como balón
+      const hasBalon = (btn.dataset.hasbalon === '1') ||
+                       crono.some(r => r?.es_balon === true || r?.es_balon === 1 || r?.es_balon === '1');
+
       titulo.textContent = hasBalon ? 'Cronograma de cuotas (con balón)' : 'Cronograma de cuotas';
 
       cronoBody.innerHTML = '';
@@ -603,17 +596,19 @@
           <td class="text-center">${String(r.nro ?? '').padStart(2,'0')}</td>
           <td class="text-center">${r.fecha || '—'}</td>
           <td class="text-end">${fmt(r.monto)}</td>
-          <td class="text-center">${r.es_balon ? 'BALÓN' : ''}</td>
+          <td class="text-center">${(r.es_balon ? 'BALÓN' : '')}</td>
         `;
         cronoBody.appendChild(tr);
       });
       cronoTotal.textContent = fmt(sum);
       cronoWrap.classList.remove('d-none');
 
+      // “Cuota balón (Capital – Convenio)” SOLO si hasBalon === true
       const capitalRaw  = parseFloat(btn.dataset.capitalRaw || '0');
       const convenioRaw = parseFloat(btn.dataset.totalconvenioRaw || String(sum));
       const balon = Math.max(capitalRaw - convenioRaw, 0);
-      if (hasBalon || balon > 0.009) {
+
+      if (hasBalon) {
         filaBalon.classList.remove('d-none');
         cronoBalon.textContent = fmt(balon);
       } else {
@@ -623,7 +618,7 @@
     });
   });
 
-  // ============================== Ver PAGOS ===================================
+  // ============================ Ver PAGOS ==============================
   (function(){
     const modalEl = document.getElementById('modalPagos');
     if (!modalEl) return;
@@ -631,10 +626,10 @@
     const spanDni = document.getElementById('pagos_dni');
     const tbody   = document.getElementById('pagos_tbody');
 
-    // Ruta: debe devolver { pagos: [{ operacion, fecha, monto_pagado, gestor, entidad, cosecha, cuenta_recaudo, nombre_cliente? }] }
+    // Ruta: { pagos: [{ operacion, fecha, monto_pagado, gestor, entidad, cosecha, cuenta_recaudo, nombre_cliente? }] }
     const RUTA_PAGOS = @json(route('autorizacion.pagos', '__DNI__')); // placeholder
 
-    const fmt = (v)=> Number(v ?? 0).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const money = (v)=> Number(v ?? 0).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
 
     function setRowsLoading(){
       tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Cargando…</td></tr>';
@@ -650,13 +645,13 @@
       const entidad  = p.entidad ?? '—';
       const cosecha  = p.cosecha ?? '—';
       const cuenta   = p.cuenta_recaudo ?? p.cuenta ?? '—';
-      const cliente  = p.nombre_cliente ?? ''; // opcional: lo mostramos como title
+      const cliente  = p.nombre_cliente ?? ''; // opcional
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="text-nowrap" title="${cliente}">${oper}</td>
         <td class="text-nowrap">${fechaStr}</td>
-        <td class="text-end text-nowrap">${fmt(monto)}</td>
+        <td class="text-end text-nowrap">${money(monto)}</td>
         <td class="text-nowrap">${gestor}</td>
         <td class="text-nowrap">${entidad}</td>
         <td class="text-nowrap">${cosecha}</td>

@@ -50,14 +50,14 @@ class ClientsControllers extends Controller
     public function show(string $dni)
     {
         try {
-            /* ===== CUENTAS (usa numdoc) ===== */
+            /* ===== CUENTAS (usa numdoc / nombre / cuenta) ===== */
             $cuentas = ClienteCuenta::query()
                 ->where('numdoc', $dni)
                 ->orderByDesc('updated_at')
                 ->get([
                     'numdoc',
                     'nombre',
-                    'cuenta',
+                    'cuenta',            // NUEVO: existe en el esquema actual
                     'operacion',
                     'entidad',
                     'producto',
@@ -70,7 +70,7 @@ class ClientsControllers extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
 
-            /* ===== PAGOS ===== */
+            /* ===== PAGOS (pagos_propia nuevo) ===== */
             $pagos = Pago::query()
                 ->where('dni', $dni)
                 ->orderByDesc('fecha')
@@ -88,7 +88,7 @@ class ClientsControllers extends Controller
 
             $totPagos = (float) $pagos->sum('monto_pagado');
 
-            /* ===== CCD opcional (esta tabla sí usa campo dni) ===== */
+            /* ===== CCD (esta tabla mantiene dni) ===== */
             $ccd         = collect();
             $ccdByCodigo = collect();
             if (Schema::hasTable('ccd_clientes')) {
@@ -110,16 +110,15 @@ class ClientsControllers extends Controller
             }
 
             /* ===== Mapa operación -> cuenta (desde pagos.cuenta_recaudo) ===== */
-            // Si una operación tiene varias cuentas en pagos, quedarse con la más frecuente no nula.
             $op2cta = $pagos->groupBy('operacion')->map(function ($grp) {
                 $freq = $grp->pluck('cuenta_recaudo')->filter()->countBy();
                 return $freq->isEmpty() ? null : $freq->sortDesc()->keys()->first();
             });
 
-            /* ===== Pagos agrupados por operación para métricas en la vista ===== */
+            /* ===== Pagos agrupados por operación (para métricas en la vista) ===== */
             $pagosGrouped = $pagos->groupBy('operacion');
 
-            // Inyectar props útiles y **no sobrescribir** la cuenta de BD
+            // Inyecta props útiles y fija $c->cuenta con prioridad: BD -> pagos -> operacion
             $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta) {
                 $grupo = $pagosGrouped->get($c->operacion) ?? collect();
                 $c->pagos_count = $grupo->count();
@@ -132,17 +131,13 @@ class ClientsControllers extends Controller
                     ];
                 })->values();
 
-                // Clave para agrupar/generar CNA por CUENTA:
-                // 1) usa la cuenta de BD si existe
-                // 2) si no, usa el mapeo por pagos
-                // 3) si tampoco hay, cae a la propia operación
                 $ctaDb  = trim((string)($c->cuenta ?? ''));
                 $ctaMap = trim((string)($op2cta[$c->operacion] ?? ''));
                 $c->cuenta = $ctaDb !== '' ? $ctaDb : ($ctaMap !== '' ? $ctaMap : $c->operacion);
                 return $c;
             });
 
-            /* ===== PROMESAS (si aplica) ===== */
+            /* ===== PROMESAS ===== */
             $promesas = PromesaPago::query()
                 ->where('dni', $dni)
                 ->when(method_exists(PromesaPago::class, 'scopeWithDecisionRefs'), fn($q) => $q->withDecisionRefs())
@@ -187,7 +182,7 @@ class ClientsControllers extends Controller
                             'docx_path'       => $row->docx_path  ?? null,
                         ]);
 
-                        // Por cuenta (usa cuenta de BD si existe, si no el mapeo)
+                        // Por cuenta (usa la cuenta ya calculada para la operación)
                         $ctaDb = optional($cuentas->firstWhere('operacion', $op))->cuenta;
                         $cta   = (string)($ctaDb ?: ($op2cta[$op] ?? $op));
                         $mapCta[$cta] = $mapCta[$cta] ?? collect();
@@ -223,7 +218,7 @@ class ClientsControllers extends Controller
                 'totPagos'          => $totPagos,
                 'ccdByCodigo'       => $ccdByCodigo,
                 'cnasByCuenta'      => $cnasByCuenta,
-                'cnasByOperacion'   => $cnasByOperacion, // por compatibilidad con la vista
+                'cnasByOperacion'   => $cnasByOperacion,
                 'pagosPorOperacion' => $pagosGrouped,
                 'nextNroCarta'      => $nextNroCarta,
             ]);
@@ -255,6 +250,7 @@ class ClientsControllers extends Controller
             'dni'           => 'required|string|max:30',
             'tipo'          => 'required|in:convenio,cancelacion',
             'nota'          => 'nullable|string|max:500',
+            'telefono'      => 'required|string|max:30',
 
             // Lista de operaciones obligatoria
             'operaciones'   => 'required|array|min:1',
@@ -310,10 +306,12 @@ class ClientsControllers extends Controller
         // ===== PERSISTENCIA
         DB::beginTransaction();
         try {
+            $telefono = preg_replace('/[^0-9\+]/', '', (string)$r->input('telefono', ''));
             $base = [
                 'dni'                 => $dni,
                 'nota'                => $r->input('nota'),
                 'tipo'                => $r->input('tipo'),
+                'telefono'            => $telefono,
                 'workflow_estado'     => 'pendiente',
                 'cumplimiento_estado' => 'pendiente',
                 'user_id'             => $r->user()->id ?? null,

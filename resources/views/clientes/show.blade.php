@@ -440,19 +440,25 @@
                 $state    = $pp->workflow_estado ?? 'pendiente';
                 $rowClass = 'pp-state-'.str_replace(['pre-aprobada',' '], ['preaprobada',''], strtolower($state));
               @endphp
+
               <tr class="{{ $rowClass }}">
+                {{-- Fecha --}}
                 <td class="text-nowrap">{{ optional($pp->fecha_promesa)->format('d/m/Y') ?? '—' }}</td>
 
+                {{-- Tipo --}}
                 <td>
                   <span class="badge badge-pill {{ $pp->tipo_badge_class }}">
                     {{ $pp->tipo_label }}
                   </span>
                 </td>
 
+                {{-- Monto --}}
                 <td class="text-end text-nowrap">
-                  S/ {{ number_format((float)(($pp->monto ?? 0) > 0 ? $pp->monto : ($pp->monto_convenio ?? 0)), 2) }}
+                  @php $m = (float)(($pp->monto ?? 0) > 0 ? $pp->monto : ($pp->monto_convenio ?? 0)); @endphp
+                  S/ {{ number_format($m, 2) }}
                 </td>
 
+                {{-- Operaciones --}}
                 <td class="text-nowrap">
                   @php
                     $ops = $pp->relationLoaded('operaciones') ? $pp->operaciones->pluck('operacion')->all() : [];
@@ -467,6 +473,7 @@
                   @endif
                 </td>
 
+                {{-- Plan --}}
                 <td class="small">
                   @if($pp->tipo === 'convenio')
                     {{ (int)($pp->nro_cuotas ?? 0) }} cuota(s)
@@ -478,6 +485,7 @@
                   @endif
                 </td>
 
+                {{-- Compromiso --}}
                 <td class="small">
                   @if($pp->fecha_pago)
                     <div>{{ optional($pp->fecha_pago)->format('d/m/Y') }}</div>
@@ -490,6 +498,7 @@
                   @endif
                 </td>
 
+                {{-- Decisión / Nota --}}
                 <td class="decision-cell">
                   <div class="d-flex flex-column gap-2">
                     <span class="badge badge-pill {{ $pp->workflow_badge_class }}">
@@ -497,6 +506,7 @@
                     </span>
 
                     @if($notaDec)
+                      {{-- Hay decisión (pre-aprobada/aprobada/rechazada) --}}
                       <div class="decision-box {{ $pp->decision_css_class }}">
                         <div class="small text-secondary nota-clamp" title="{{ $notaDec }}">{{ $notaDec }}</div>
                         <div class="meta mt-1">
@@ -506,37 +516,47 @@
                         </div>
                       </div>
                       <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modalNota" data-nota="{{ e($notaDec) }}">
+                        <button class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                data-bs-toggle="modal" data-bs-target="#modalNota"
+                                data-nota-json='@json($notaDec)'>
                           <i class="bi bi-journal-text me-1"></i> Ver nota
                         </button>
                         @if(($pp->nota ?? null) && trim($pp->nota) !== '')
                           <button class="btn btn-sm btn-outline-secondary"
                                   type="button"
                                   data-bs-toggle="modal" data-bs-target="#modalNota"
-                                 data-nota-json='@json($pp->nota)'>
-                               Ver propuesta
+                                  data-nota-json='@json($pp->nota)'>
+                            Ver propuesta
                           </button>
                         @endif
                       </div>
                     @else
-                      <span class="text-secondary small">—</span>
-
-                      @if(($pp->nota ?? null) && trim($pp->nota) !== '')
+                      {{-- Sin decisión aún (pendiente) --}}
+                      @php $notaProp = trim((string)($pp->nota ?? '')); @endphp
+                      @if($notaProp !== '')
                         <div class="small mt-1">
                           <span class="badge rounded-pill text-bg-light border me-1">Propuesta</span>
-                          <span class="text-secondary nota-clamp">{{ $pp->nota }}</span>
-                          <button class="btn btn-sm btn-link p-0 ms-1" type="button"
-                                  data-bs-toggle="modal" data-bs-target="#modalNota"
-                                  data-nota='@js($pp->nota)'>Ver</button>
+                          <span class="text-secondary nota-clamp">{{ $notaProp }}</span>
                         </div>
+                        <div class="mt-1">
+                          <button class="btn btn-sm btn-outline-secondary"
+                                  type="button"
+                                  data-bs-toggle="modal" data-bs-target="#modalNota"
+                                  data-nota-json='@json($notaProp)'>
+                            <i class="bi bi-eye me-1"></i> Ver nota
+                          </button>
+                        </div>
+                      @else
+                        <span class="text-secondary small">—</span>
                       @endif
                     @endif
                   </div>
                 </td>
 
+                {{-- Acciones --}}
                 <td class="text-end">
                   @php $estado = strtolower($pp->workflow_estado ?? ''); @endphp
-
                   @if($estado === 'aprobada')
                     <a class="btn btn-outline-primary btn-sm"
                       href="{{ route('promesas.acuerdo', $pp) }}"
@@ -592,9 +612,9 @@
               <div id="opsHidden"></div>
             </div>
 
-            {{-- Tipo de propuesta --}}
+            {{-- Tipo de propuesta + Teléfono + Observación --}}
             <div class="row g-2 mb-2">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label class="form-label">Tipo de propuesta</label>
                 <select name="tipo" id="tipoPropuesta" class="form-select" required>
                   <optgroup label="Convenios">
@@ -607,7 +627,23 @@
                 </select>
                 <input type="hidden" name="force_balon" id="forceBalon" value="0">
               </div>
-              <div class="col-md-6">
+
+              <div class="col-md-4">
+                <label class="form-label">Teléfono de contacto</label>
+                <input
+                  name="telefono"
+                  id="telefonoPropuesta"
+                  class="form-control"
+                  placeholder="+51 9XXXXXXXX"
+                  maxlength="30"
+                  inputmode="tel"
+                  pattern="^\+?\d[\d\s\-]{5,}$"
+                  title="Ingresa un teléfono válido"
+                  required>
+                <div class="form-text">Será el teléfono principal de contacto para esta propuesta.</div>
+              </div>
+
+              <div class="col-md-4">
                 <label class="form-label">Observación (opcional)</label>
                 <input name="nota" class="form-control" maxlength="500" placeholder="Detalle (máx. 500)">
               </div>

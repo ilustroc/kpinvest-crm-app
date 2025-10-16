@@ -17,8 +17,7 @@ class PromesaPago extends Model
     protected $table = 'promesas_pago';
 
     protected $fillable = [
-        'dni','operacion','fecha_promesa','monto','nota','user_id',
-
+        'dni','operacion','fecha_promesa','monto','nota','user_id','telefono',
         // Estados
         'workflow_estado',        // pendiente|preaprobada|aprobada|rechazada|rechazada_sup
         'cumplimiento_estado',    // pendiente|cumplida|caida
