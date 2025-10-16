@@ -168,21 +168,37 @@ class PromesaPdfController extends Controller
                 }
             }
 
-            // ---- Guardar como Conv_{dni}.*
-            $tmpDir = storage_path('app/tmp');
-            if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
-
+            // Guardar DOCX (ya lo tienes)
             $docxOut = $tmpDir . "/Conv_{$promesa->dni}.docx";
             $pdfOut  = $tmpDir . "/Conv_{$promesa->dni}.pdf";
-
             $doc->saveAs($docxOut);
 
-            // Si aún usas PHPWord->mPDF para convertir:
-            \PhpOffice\PhpWord\Settings::setPdfRendererName(\PhpOffice\PhpWord\Settings::PDF_RENDERER_MPDF);
-            \PhpOffice\PhpWord\Settings::setPdfRendererPath(base_path('vendor/mpdf/mpdf'));
-            $phpWord = \PhpOffice\PhpWord\IOFactory::load($docxOut);
-            \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'PDF')->save($pdfOut);
+            // === CONVERTIR DOCX -> PDF con iLovePDF ===
+            try {
+                $public = config('services.ilovepdf.public');
+                $secret = config('services.ilovepdf.secret');
 
+                if (!$public || !$secret) {
+                    throw new \RuntimeException('Llaves iLovePDF no configuradas');
+                }
+
+                $ilovepdf = new \Ilovepdf\Ilovepdf($public, $secret);
+                $task = $ilovepdf->newTask('officepdf');           // convierte DOCX/XLSX/PPTX a PDF
+                $task->setOutputFilename("Conv_{$promesa->dni}");  // nombre del PDF resultante
+                $task->addFile($docxOut);
+                $task->execute();
+                $task->download($tmpDir);                          // guarda Conv_{dni}.pdf en $tmpDir
+
+                if (!is_file($pdfOut)) {
+                    throw new \RuntimeException('iLovePDF no devolvió el archivo esperado');
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('iLovePDF falló, entregando DOCX', ['msg' => $e->getMessage()]);
+                // Si falla iLovePDF, entrega el DOCX para no bloquear al usuario.
+                return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
+            }
+
+            // Responder el PDF
             return response()->file($pdfOut, [
                 'Content-Type'  => 'application/pdf',
                 'Cache-Control' => 'private, max-age=0, no-store, no-cache, must-revalidate',
