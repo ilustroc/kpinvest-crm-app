@@ -6,6 +6,7 @@ use App\Models\PromesaPago;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpWord\TemplateProcessor;
+use Ilovepdf\Ilovepdf;
 use Carbon\Carbon;
 use Throwable;
 
@@ -124,8 +125,8 @@ class PromesaPdfController extends Controller
             $creador = DB::table('users')->where('id',$promesa->user_id)->value('name');
             $doc->setValue('name', (string)($creador ?? ''));  // por si tu plantilla lo usa
 
-            $doc->setValue('id',            str_pad((string)$promesa->id, 4, '0', STR_PAD_LEFT));
-            $doc->setValue('fecha_promesa', $promesa->fecha_promesa ? $fmtDate($promesa->fecha_promesa) : '');
+            $doc->setValue('id',            str_pad(string: (string)$promesa->id, 4, '0', STR_PAD_LEFT));
+            $doc->setValue('created_at', $promesa->created_at ? $fmtDate($promesa->created_at) : '');
             $doc->setValue('nombre',        $nombre);
             $doc->setValue('numdoc',        $numdoc);
             $doc->setValue('telefono',      (string)($promesa->telefono ?? ''));
@@ -168,6 +169,12 @@ class PromesaPdfController extends Controller
                 }
             }
 
+            // Directorio temporal (¡crear si no existe!)
+            $tmpDir = storage_path('app/tmp');
+            if (!is_dir($tmpDir)) {
+                @mkdir($tmpDir, 0775, true);
+            }
+
             // Guardar DOCX (ya lo tienes)
             $docxOut = $tmpDir . "/Conv_{$promesa->dni}.docx";
             $pdfOut  = $tmpDir . "/Conv_{$promesa->dni}.pdf";
@@ -177,24 +184,25 @@ class PromesaPdfController extends Controller
             try {
                 $public = config('services.ilovepdf.public');
                 $secret = config('services.ilovepdf.secret');
-
                 if (!$public || !$secret) {
                     throw new \RuntimeException('Llaves iLovePDF no configuradas');
                 }
 
                 $ilovepdf = new \Ilovepdf\Ilovepdf($public, $secret);
-                $task = $ilovepdf->newTask('officepdf');           // convierte DOCX/XLSX/PPTX a PDF
-                $task->setOutputFilename("Conv_{$promesa->dni}");  // nombre del PDF resultante
+                $task = $ilovepdf->newTask('officepdf');
+                $task->setOutputFilename("Conv_{$promesa->dni}");
                 $task->addFile($docxOut);
                 $task->execute();
-                $task->download($tmpDir);                          // guarda Conv_{dni}.pdf en $tmpDir
+                $task->download($tmpDir);
 
-                if (!is_file($pdfOut)) {
-                    throw new \RuntimeException('iLovePDF no devolvió el archivo esperado');
+                // A veces el nombre puede variar; busca el PDF generado
+                $cands = glob($tmpDir . "/Conv_{$promesa->dni}*.pdf");
+                if (!$cands) {
+                    throw new \RuntimeException('iLovePDF no devolvió un PDF en el directorio de salida');
                 }
+                $pdfOut = $cands[0];
             } catch (\Throwable $e) {
                 \Log::warning('iLovePDF falló, entregando DOCX', ['msg' => $e->getMessage()]);
-                // Si falla iLovePDF, entrega el DOCX para no bloquear al usuario.
                 return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
             }
 
