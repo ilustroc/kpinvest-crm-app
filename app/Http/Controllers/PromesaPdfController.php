@@ -126,7 +126,7 @@ class PromesaPdfController extends Controller
             $doc->setValue('name', (string)($creador ?? ''));  // por si tu plantilla lo usa
 
             $doc->setValue('id',            str_pad(string: (string)$promesa->id, 4, '0', STR_PAD_LEFT));
-            $doc->setValue('created_at', $promesa->created_at ? $fmtDate($promesa->created_at) : '');
+            $doc->setValue('fecha_promesa', $promesa->created_at ? $fmtDate($promesa->fecha_promesa) : '');
             $doc->setValue('nombre',        $nombre);
             $doc->setValue('numdoc',        $numdoc);
             $doc->setValue('telefono',      (string)($promesa->telefono ?? ''));
