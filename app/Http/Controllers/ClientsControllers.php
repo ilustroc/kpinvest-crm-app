@@ -119,7 +119,7 @@ class ClientsControllers extends Controller
             /* ===== Pagos agrupados por operación para métricas en la vista ===== */
             $pagosGrouped = $pagos->groupBy('operacion');
 
-            // Inyectar props útiles a cada cuenta (y derivar cta para el botón martillo)
+            // Inyectar props útiles y **no sobrescribir** la cuenta de BD
             $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta) {
                 $grupo = $pagosGrouped->get($c->operacion) ?? collect();
                 $c->pagos_count = $grupo->count();
@@ -132,8 +132,13 @@ class ClientsControllers extends Controller
                     ];
                 })->values();
 
-                // Clave para agrupar/generar CNA por CUENTA
-                $c->cuenta = (string)($op2cta[$c->operacion] ?? $c->operacion);
+                // Clave para agrupar/generar CNA por CUENTA:
+                // 1) usa la cuenta de BD si existe
+                // 2) si no, usa el mapeo por pagos
+                // 3) si tampoco hay, cae a la propia operación
+                $ctaDb  = trim((string)($c->cuenta ?? ''));
+                $ctaMap = trim((string)($op2cta[$c->operacion] ?? ''));
+                $c->cuenta = $ctaDb !== '' ? $ctaDb : ($ctaMap !== '' ? $ctaMap : $c->operacion);
                 return $c;
             });
 
@@ -145,8 +150,10 @@ class ClientsControllers extends Controller
                 ->orderByDesc('fecha_promesa')
                 ->get();
 
-            /* ===== CNAs por CUENTA (no por operación) ===== */
-            $cnasByCuenta = collect();
+            /* ===== CNAs por CUENTA y por OPERACIÓN ===== */
+            $cnasByCuenta     = collect();
+            $cnasByOperacion  = collect();
+
             if (Schema::hasTable('cna_solicitudes')) {
                 $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 $want    = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
@@ -158,7 +165,9 @@ class ClientsControllers extends Controller
                     ->orderByDesc('created_at')
                     ->get();
 
-                $map = [];
+                $mapCta = [];
+                $mapOp  = [];
+
                 foreach ($cnas as $row) {
                     $opsRaw = $row->operaciones ?? '[]';
                     $opsArr = is_array($opsRaw) ? $opsRaw : (json_decode($opsRaw, true) ?: []);
@@ -166,15 +175,23 @@ class ClientsControllers extends Controller
                         $opsArr = array_filter(array_map('trim', explode(',', (string)$opsRaw)));
                     }
 
-                    // Derivar las cuentas cubiertas por esa CNA usando el mapa operación->cuenta
-                    $cuentasCna = collect($opsArr)
-                        ->map(fn($op) => (string)($op2cta[$op] ?? $op))
-                        ->filter()
-                        ->unique();
+                    foreach ($opsArr as $op) {
+                        // Por operación
+                        $mapOp[$op] = $mapOp[$op] ?? collect();
+                        $mapOp[$op]->push((object)[
+                            'id'              => $row->id,
+                            'nro_carta'       => $row->nro_carta ?? $row->id,
+                            'workflow_estado' => $row->workflow_estado ?? 'pendiente',
+                            'created_at'      => $row->created_at,
+                            'pdf_path'        => $row->pdf_path   ?? null,
+                            'docx_path'       => $row->docx_path  ?? null,
+                        ]);
 
-                    foreach ($cuentasCna as $cta) {
-                        $map[$cta] = $map[$cta] ?? collect();
-                        $map[$cta]->push((object)[
+                        // Por cuenta (usa cuenta de BD si existe, si no el mapeo)
+                        $ctaDb = optional($cuentas->firstWhere('operacion', $op))->cuenta;
+                        $cta   = (string)($ctaDb ?: ($op2cta[$op] ?? $op));
+                        $mapCta[$cta] = $mapCta[$cta] ?? collect();
+                        $mapCta[$cta]->push((object)[
                             'id'              => $row->id,
                             'nro_carta'       => $row->nro_carta ?? $row->id,
                             'workflow_estado' => $row->workflow_estado ?? 'pendiente',
@@ -184,10 +201,12 @@ class ClientsControllers extends Controller
                         ]);
                     }
                 }
-                $cnasByCuenta = collect($map);
+
+                $cnasByCuenta    = collect($mapCta);
+                $cnasByOperacion = collect($mapOp);
             }
 
-            /* ===== Próximo N.º de carta (simple correlativo global; sólo display) ===== */
+            /* ===== Próximo N.º de carta (display) ===== */
             $nextNroCarta = null;
             if (Schema::hasTable('cna_solicitudes')) {
                 $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
@@ -203,8 +222,9 @@ class ClientsControllers extends Controller
                 'ccd'               => $ccd,
                 'totPagos'          => $totPagos,
                 'ccdByCodigo'       => $ccdByCodigo,
-                'cnasByCuenta'      => $cnasByCuenta,   // ← usar esto en la vista para chips CCD/CNA por cuenta
-                'pagosPorOperacion' => $pagosGrouped,   // si la vista aún lo necesita
+                'cnasByCuenta'      => $cnasByCuenta,
+                'cnasByOperacion'   => $cnasByOperacion, // por compatibilidad con la vista
+                'pagosPorOperacion' => $pagosGrouped,
                 'nextNroCarta'      => $nextNroCarta,
             ]);
 

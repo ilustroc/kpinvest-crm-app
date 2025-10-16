@@ -304,25 +304,48 @@ class AutorizacionController extends Controller
     // ===== LISTA PAGOS POR DNI (unificada)
     public function pagosDni(string $dni)
     {
-        $rows = Pago::where('dni',$dni)->select(
-                DB::raw('DATE(fecha_de_pago) as fecha'),
-                DB::raw('pagado_en_soles as monto'),
-                'operacion as oper',
-                DB::raw("UPPER(COALESCE(gestor, equipos, '-')) as gestor"),
-                DB::raw("UPPER(COALESCE(status, '-')) as estado")
-            )
-            ->orderByDesc('fecha_de_pago')
-            ->get()
-            ->map(function($r){
-                return [
-                    'oper'   => (string)($r->oper ?? ''),
-                    'fecha'  => (string)($r->fecha ?? ''),
-                    'monto'  => (float) ($r->monto ?? 0),
-                    'gestor' => (string)($r->gestor ?? ''),
-                    'estado' => strtoupper((string)($r->estado ?? '')),
-                ];
-            });
+        try {
+            $dni = trim($dni);
 
-        return response()->json(['dni'=>$dni,'pagos'=>$rows], 200);
+            $rows = Pago::query()
+                ->where('dni', $dni)
+                // prioriza lote más reciente y fecha más reciente
+                ->orderByDesc('lote_id')
+                ->orderByDesc('fecha')
+                ->get([
+                    'operacion',
+                    'fecha',
+                    'monto_pagado',
+                    'gestor',
+                    'entidad',
+                    'cosecha',
+                    'cuenta_recaudo',
+                    'nombre_cliente',
+                ])
+                ->map(function ($r) {
+                    return [
+                        'operacion'      => (string) ($r->operacion ?? ''),
+                        'fecha'          => $r->fecha ? (string) $r->fecha : null,
+                        'monto_pagado'   => (float) ($r->monto_pagado ?? 0),
+                        'gestor'         => (string) ($r->gestor ?? ''),
+                        'entidad'        => (string) ($r->entidad ?? ''),
+                        'cosecha'        => (string) ($r->cosecha ?? ''),
+                        'cuenta_recaudo' => (string) ($r->cuenta_recaudo ?? ''),
+                        'nombre_cliente' => (string) ($r->nombre_cliente ?? ''),
+                    ];
+                });
+
+            return response()->json([
+                'dni'   => $dni,
+                'pagos' => $rows,
+            ], 200);
+        } catch (\Throwable $e) {
+            \Log::error('pagosDni error', ['dni' => $dni, 'msg' => $e->getMessage()]);
+            return response()->json([
+                'dni'   => $dni,
+                'pagos' => [],
+                'error' => 'No se pudo obtener los pagos',
+            ], 500);
+        }
     }
 }

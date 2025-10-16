@@ -199,7 +199,10 @@
               (is_array($c->pagos_list) && count($c->pagos_list))
             );
             $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
-            $cnas    = collect($cnasByOperacion[$c->operacion] ?? []);
+
+            // AHORA: CNAs agrupadas por CUENTA (no por operación)
+            $cnas = collect($cnasByCuenta[$c->cuenta] ?? []);
+
             $badgeFor = fn($estado) => match (true) {
               str_contains(strtolower((string)$estado),'aprob')  => 'success',
               str_contains(strtolower((string)$estado),'pre')    => 'primary',
@@ -208,7 +211,7 @@
             };
           @endphp
 
-          {{-- Marcamos también la CUENTA para poder agrupar operaciones por cuenta --}}
+          {{-- Importante: data-cuenta para poder agrupar por cuenta en el modal --}}
           <tr data-cuenta="{{ $c->cuenta }}"
               data-oper="{{ $c->operacion }}"
               data-cosecha="{{ $c->cosecha }}"
@@ -226,25 +229,47 @@
 
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
-              @php $items = collect($cnasByOperacion[$c->operacion] ?? []); @endphp
+              @php
+                // CNAs agrupadas por CUENTA
+                $cnas = collect($cnasByCuenta[$c->cuenta] ?? []);
+                // Última por fecha
+                $last = $cnas->sortByDesc(fn($x) => $x->created_at)->first();
+                $estado = strtolower((string)($last->workflow_estado ?? ''));
+              @endphp
 
-              @if($items->count())
-                <span class="badge text-bg-secondary me-2">{{ $items->count() }} reg.</span>
+              @if($last && str_contains($estado,'aprob')) 
+                {{-- Aprobada: descarga (pdf con fallback a docx) --}}
+                <a href="{{ route('cna.pdf', $last->id) }}" 
+                  class="btn btn-sm btn-outline-danger" 
+                  title="Descargar CNA aprobada (PDF)">
+                  <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                  <span class="visually-hidden">Descargar CNA</span>
+                </a>
+
+              @elseif($last && (str_contains($estado,'pend') || str_contains($estado,'pre')))
+                {{-- En proceso: spinner y deshabilitado --}}
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled
+                        title="CNA en proceso de aprobación">
+                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                  <span class="d-none d-md-inline">En proceso</span>
+                </button>
+
+              @else
+                {{-- Sin CNA o última rechazada: martillo para generar --}}
+                <button type="button"
+                        class="btn btn-sm btn-outline-success genCnaBtn"
+                        title="Generar CNA para esta cuenta"
+                        data-dni="{{ $dni }}"
+                        data-cuenta="{{ $c->cuenta }}"
+                        data-oper="{{ $c->operacion }}"
+                        data-cosecha="{{ $c->cosecha }}"
+                        data-entidad="{{ $c->entidad }}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalCna">
+                  <i class="bi bi-hammer" aria-hidden="true"></i>
+                  <span class="visually-hidden">Generar CNA</span>
+                </button>
               @endif
-
-              <button type="button"
-                      class="btn btn-sm btn-outline-success genCnaBtn"
-                      title="Generar CNA para esta cuenta"
-                      data-dni="{{ $dni }}"
-                      data-cuenta="{{ $c->cuenta }}"
-                      data-oper="{{ $c->operacion }}"
-                      data-cosecha="{{ $c->cosecha }}"
-                      data-entidad="{{ $c->entidad }}"
-                      data-bs-toggle="modal"
-                      data-bs-target="#modalCna">
-                <i class="bi bi-hammer" aria-hidden="true"></i>
-                <span class="visually-hidden">Generar CNA</span>
-              </button>
             </td>
             {{-- === /CELDA CNA === --}}
 
@@ -1048,7 +1073,7 @@
         'CONFIANZA_11','CONFIANZA_12','SEMBRANDO'
       ]);
       if (FAA.has(c))  return {origen:'FONDO ACREENCIA AREQUIPA', serie:'F',  plantilla:'cna_fondo_acreencia_arequipa.docx'};
-      if (FAA2.has(c)) return {origen:'ACREENCIA II',            serie:'F2', plantilla:'cna_fondo_acreencia_arequipa2.docx'};
+      if (FAA2.has(c)) return {origen:'ACREENCIA II',            serie:'F2', plantilla:'cna_fondo_acreencia_arequipa_2.docx'};
       if (KPI.has(c))  return {origen:'KP INVEST SAC',           serie:'KPI',plantilla:'cna_kpinvest.docx'};
       return {origen:'(no reconocido)', serie:'—', plantilla:'—'};
     }

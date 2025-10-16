@@ -29,7 +29,7 @@ class CnaController extends Controller
                 'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
                 'operaciones'           => ['required','array','min:1'],
                 'operaciones.*'         => ['string','max:50'],
-                'cuenta'                => ['nullable','string','max:50'], // operación/cuenta base opcional (preview)
+                'cuenta'                => ['nullable','string','max:50'],
             ], [], [
                 'fecha_pago_realizado'  => 'fecha de pago realizado',
                 'monto_pagado'          => 'monto pagado',
@@ -41,12 +41,10 @@ class CnaController extends Controller
                 return back()->withErrors('Selecciona al menos una operación para la CNA.');
             }
 
-            // Titular (usa numdoc y, por compatibilidad, dni; COALESCE con nombre)
+            // Titular (tu tabla no tiene 'titular': usa 'nombre')
             $titular = $data['titular'] ?? DB::table('clientes_cuentas')
-                ->where(function ($q) use ($dni) {
-                    $q->where('numdoc', $dni)->orWhere('dni', $dni);
-                })
-                ->value(DB::raw('COALESCE(titular, nombre)'));
+                ->where('numdoc', $dni)
+                ->value('nombre');
 
             // Producto de referencia (opcional)
             $productoAuto = DB::table('clientes_cuentas')
@@ -96,7 +94,7 @@ class CnaController extends Controller
 
             WorkflowMailer::cnaPendiente($solicitud);
 
-            // PRG: vuelve a la ficha del cliente (evita quedarse en /{dni}/cnas)
+            // PRG: vuelve a la ficha del cliente
             return redirect()->route('clientes.show', $dni)
                 ->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
         } catch (\Throwable $e) {
@@ -250,104 +248,130 @@ class CnaController extends Controller
      */
     private function generateOutputsFromTemplate(CnaSolicitud $cna): void
     {
-        // Operaciones normalizadas
-        $ops = is_array($cna->operaciones) ? $cna->operaciones : (json_decode($cna->operaciones ?? '[]', true) ?: []);
+        // ---- Operaciones normalizadas
+        $ops = is_array($cna->operaciones)
+            ? $cna->operaciones
+            : (json_decode($cna->operaciones ?? '[]', true) ?: []);
         $ops = array_values(array_filter(array_map('strval', $ops)));
-
-        // Trae también la CUENTA para rellenar ${cuenta}
+    
+        // ---- Trae datos de las operaciones (incluye cuenta)
         $rows = DB::table('clientes_cuentas')
             ->select('operacion','cuenta','cosecha','entidad')
             ->whereIn('operacion', $ops)
             ->get();
-
+    
         $cosecha = (string) ($rows->pluck('cosecha')->filter()->unique()->first() ?? '');
         $origen  = $this->originFromCosecha($cosecha) ?? 'KP INVEST SAC';
         $cfg     = $this->seriesConfig($origen);
         $tpl     = $cfg['template'];
-
+    
         if (!is_file($tpl)) {
-            throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen);
+            throw new \RuntimeException('Plantilla no encontrada para origen: '.$origen.' ('.$tpl.')');
         }
-
-        // Directorios
+    
+        // ---- Directorios destino
         $docxDir = 'cna/docx'; $pdfDir = 'cna/pdfs';
         Storage::makeDirectory($docxDir);
         Storage::makeDirectory($pdfDir);
-
-        // Nombres
-        $docxName = "CNA {$cna->nro_carta} - {$cna->dni}.docx";
-        $pdfName  = "CNA {$cna->nro_carta} - {$cna->dni}.pdf";
-        $docxRel  = $docxDir.'/'.$docxName;
-        $pdfRel   = $pdfDir.'/'.$pdfName;
-
-        // Plantilla
+    
+        $docxRel  = $docxDir."/CNA {$cna->nro_carta} - {$cna->dni}.docx";
+        $pdfRel   =  $pdfDir."/CNA {$cna->nro_carta} - {$cna->dni}.pdf";
+    
+        // ---- Plantilla
         $tp = new TemplateProcessor($tpl);
-
-        // Titular por numdoc (fallback a dni) y COALESCE(titular, nombre)
+    
+        // Cabecera
         $titular = $cna->titular ?: DB::table('clientes_cuentas')
-            ->where(function ($q) use ($cna) {
-                $q->where('numdoc', $cna->dni)->orWhere('dni', $cna->dni);
-            })
-            ->value(DB::raw('COALESCE(titular, nombre)'));
-
+            ->where('numdoc', $cna->dni)
+            ->value('nombre');
+    
         Carbon::setLocale('es');
         $aprobadoAtStr = ($cna->aprobado_at ? Carbon::parse($cna->aprobado_at) : now())
             ->translatedFormat('d \\de F \\de Y');
-
-        // Derivar cuenta (si por alguna razón hay más de una, usa la primera)
+    
         $cuenta  = (string) ($rows->pluck('cuenta')->filter()->unique()->first() ?? ($ops[0] ?? ''));
         $entidad = (string) ($rows->pluck('entidad')->filter()->unique()->first() ?? '');
-
-        // Relleno de placeholders
+    
+        // Placeholders fijos
         $tp->setValue('nro_carta',   $cna->nro_carta);
         $tp->setValue('nombre',      (string) $titular);
         $tp->setValue('numdoc',      $cna->dni);
         $tp->setValue('aprobado_at', $aprobadoAtStr);
-        $tp->setValue('cuenta',      $cuenta);
-        $tp->setValue('operacion',   implode(', ', $ops));
-        $tp->setValue('entidad',     $entidad);
-
-        // Guarda DOCX
-        $tp->saveAs(storage_path('app/'.$docxRel));
-
-        // Convierte a PDF (best-effort)
-        try {
-            $this->convertDocxToPdfViaIlovepdf(storage_path('app/'.$docxRel), storage_path('app/'.$pdfRel));
-            $cna->pdf_path = $pdfRel;
-        } catch (\Throwable $e) {
-            Log::error('Error iLovePDF DOCX→PDF: '.$e->getMessage(), ['cna_id' => $cna->id]);
-            $cna->pdf_path = null;
+    
+        // ---- Tabla: UNA FILA POR OPERACIÓN
+        $n = max(count($ops), 1);
+    
+        // Si la plantilla tiene ${operacion} dentro de la fila de tabla, clonamos por esa clave
+        if ($n > 1) {
+            // clona por el nombre EXACTO del marcador en la fila (operacion)
+            $tp->cloneRow('operacion', $n);
         }
-
-        // Persistir rutas
+    
+        // Relleno numerado (cuenta/entidad repetidos en cada fila)
+        for ($i = 0; $i < $n; $i++) {
+            $idx = $i + 1;
+            $op  = $ops[$i] ?? ($ops[0] ?? '');
+    
+            // Soporta tanto numerado (#1) como base simple (por si la plantilla no está clonada)
+            $tp->setValue("operacion#{$idx}", $op);
+            $tp->setValue("cuenta#{$idx}",    $cuenta);
+            $tp->setValue("entidad#{$idx}",   $entidad);
+        }
+        // Fallback (si la plantilla no usó #1, deja valores “simples” también)
+        $tp->setValue('operacion', implode(', ', $ops));
+        $tp->setValue('cuenta',    $cuenta);
+        $tp->setValue('entidad',   $entidad);
+    
+        // ---- Guarda DOCX
+        $tp->saveAs(storage_path('app/'.$docxRel));
+    
+        // ---- Asegura PDF (iLovePDF → LibreOffice como respaldo)
+        $this->ensurePdfFromDocx(storage_path('app/'.$docxRel), storage_path('app/'.$pdfRel));
+    
+        // Persistir rutas si el PDF existe
         $cna->docx_path = $docxRel;
+        $cna->pdf_path  = (is_file(storage_path('app/'.$pdfRel))) ? $pdfRel : null;
         $cna->save();
     }
-
+    private function ensurePdfFromDocx(string $docxAbs, string $pdfAbs): void
+    {
+        @unlink($pdfAbs);
+    
+        try {
+            $this->convertDocxToPdfViaIlovepdf($docxAbs, $pdfAbs);
+        } catch (\Throwable $e) {
+            Log::warning('iLovePDF falló: '.$e->getMessage());
+        }
+    }
     /** DOCX→PDF con iLovePDF (officepdf). Requiere keys en config/services.php */
     private function convertDocxToPdfViaIlovepdf(string $docxAbs, string $pdfAbs): void
     {
         $public = config('services.ilovepdf.public');
         $secret = config('services.ilovepdf.secret');
-        if (!$public || !$secret) throw new \RuntimeException('Faltan claves de iLovePDF.');
-
+        if (!$public || !$secret) {
+            throw new \RuntimeException('Faltan claves de iLovePDF.');
+        }
+    
         $sdk  = new Ilovepdf($public, $secret);
         $task = $sdk->newTask('officepdf');
         $task->addFile($docxAbs);
         $task->execute();
-
+    
         $outDir = dirname($pdfAbs);
         if (!is_dir($outDir)) @mkdir($outDir, 0775, true);
+    
         $task->download($outDir);
-
+    
+        // Renombra al nombre esperado
         $expected = $outDir.'/'.basename($docxAbs, '.docx').'.pdf';
-        if (!is_file($expected)) {
-            $latest = collect(glob($outDir.'/*.pdf'))->sortByDesc(fn($p) => filemtime($p))->first();
-            if ($latest) $expected = $latest;
+        if (is_file($expected) && $expected !== $pdfAbs) {
+            @unlink($pdfAbs);
+            @rename($expected, $pdfAbs);
         }
-        if (!is_file($expected)) throw new \RuntimeException('No se pudo localizar el PDF generado.');
-
-        if ($expected !== $pdfAbs) { @unlink($pdfAbs); rename($expected, $pdfAbs); }
+    
+        if (!is_file($pdfAbs)) {
+            throw new \RuntimeException('No se pudo localizar el PDF descargado por iLovePDF.');
+        }
     }
 
     /** Cosecha → Origen normalizado */
@@ -375,7 +399,7 @@ class CnaController extends Controller
     {
         $o = strtoupper($origen);
         if (str_contains($o, 'ACREENCIA II')) {
-            return ['serie'=>'F2','suffix'=>'F2','template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa2.docx')];
+            return ['serie'=>'F2','suffix'=>'F2','template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa_2.docx')];
         }
         if (str_contains($o, 'FONDO ACREENCIA AREQUIPA') || str_contains($o,'FONDO ACREENCIAS AREQUIPA')) {
             return ['serie'=>'F', 'suffix'=>'F', 'template'=>storage_path('app/templates/cna_fondo_acreencia_arequipa.docx')];

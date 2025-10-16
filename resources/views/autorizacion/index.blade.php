@@ -417,7 +417,7 @@
   </div>
   {{-- ====== /Solicitudes de CNA ====== --}}
 
-  {{-- Modal: Ver pagos --}}
+  {{-- Modal: Ver pagos (adaptado a pagos_propia nuevo) --}}
   <div class="modal fade" id="modalPagos" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -430,13 +430,15 @@
         <div class="modal-body">
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead>
+              <thead class="position-sticky top-0 bg-body">
                 <tr>
-                  <th class="text-nowrap">Operación/Pagaré</th>
+                  <th class="text-nowrap">Operación</th>
                   <th class="text-nowrap">Fecha</th>
                   <th class="text-end text-nowrap">Monto (S/)</th>
                   <th class="text-nowrap">Gestor</th>
-                  <th class="text-nowrap">Estado</th>
+                  <th class="text-nowrap">Entidad</th>
+                  <th class="text-nowrap">Cosecha</th>
+                  <th class="text-nowrap">Cuenta recaudo</th>
                 </tr>
               </thead>
               <tbody id="pagos_tbody"></tbody>
@@ -449,7 +451,7 @@
       </div>
     </div>
   </div>
-
+  {{-- /Modal: Ver pagos --}}
 @endsection
 
 @push('scripts')
@@ -625,27 +627,40 @@
   (function(){
     const modalEl = document.getElementById('modalPagos');
     if (!modalEl) return;
-    const modal = new bootstrap.Modal(modalEl);
+    const modal   = new bootstrap.Modal(modalEl);
     const spanDni = document.getElementById('pagos_dni');
     const tbody   = document.getElementById('pagos_tbody');
 
+    // Ruta: debe devolver { pagos: [{ operacion, fecha, monto_pagado, gestor, entidad, cosecha, cuenta_recaudo, nombre_cliente? }] }
     const RUTA_PAGOS = @json(route('autorizacion.pagos', '__DNI__')); // placeholder
 
+    const fmt = (v)=> Number(v ?? 0).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+
     function setRowsLoading(){
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary py-3">Cargando…</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Cargando…</td></tr>';
     }
     function setRowsEmpty(){
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>';
     }
     function addRow(p){
+      const oper     = p.operacion ?? p.oper ?? '—';
+      const fechaStr = p.fecha ? new Date(p.fecha).toLocaleDateString('es-PE') : '';
+      const monto    = p.monto_pagado ?? p.monto ?? 0;
+      const gestor   = p.gestor ?? '—';
+      const entidad  = p.entidad ?? '—';
+      const cosecha  = p.cosecha ?? '—';
+      const cuenta   = p.cuenta_recaudo ?? p.cuenta ?? '—';
+      const cliente  = p.nombre_cliente ?? ''; // opcional: lo mostramos como title
+
       const tr = document.createElement('tr');
-      const f  = p.fecha ? new Date(p.fecha).toLocaleDateString('es-PE') : '';
       tr.innerHTML = `
-        <td class="text-nowrap">${p.oper ?? '—'}</td>
-        <td class="text-nowrap">${f}</td>
-        <td class="text-end text-nowrap">${fmt(p.monto)}</td>
-        <td class="text-nowrap">${p.gestor || '—'}</td>
-        <td class="text-nowrap">${String(p.estado || '—').toUpperCase()}</td>
+        <td class="text-nowrap" title="${cliente}">${oper}</td>
+        <td class="text-nowrap">${fechaStr}</td>
+        <td class="text-end text-nowrap">${fmt(monto)}</td>
+        <td class="text-nowrap">${gestor}</td>
+        <td class="text-nowrap">${entidad}</td>
+        <td class="text-nowrap">${cosecha}</td>
+        <td class="text-nowrap">${cuenta}</td>
       `;
       tbody.appendChild(tr);
     }
@@ -667,7 +682,7 @@
           tbody.innerHTML = '';
           arr.forEach(addRow);
         }catch(e){
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Error cargando pagos.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3">Error cargando pagos.</td></tr>';
           console.error('Pagos DNI error:', e);
         }
       });

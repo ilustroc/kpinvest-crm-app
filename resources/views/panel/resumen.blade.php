@@ -470,14 +470,14 @@
     window.location.assign(url.toString());
   });
 
-  // Gráfica de pagos del mes (usa azul --accent)
+  // Gráfica de pagos del mes
   (()=>{
     const el = document.getElementById('chartPagos');
     if(!el) return;
     const payload = (()=>{ try{ return JSON.parse(el.dataset.chart||'{}'); }catch(_){ return {}; }})();
-
     const labels = payload.labels || [];
     const data   = payload.data   || [];
+
     const css    = (v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
     const ACCENT = css('--accent') || '#0b4ea2';
 
