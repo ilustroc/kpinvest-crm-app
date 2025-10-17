@@ -20,9 +20,13 @@
   .viz h6{ margin:0 0 10px; font-weight:700; color:var(--ink) }
   .viz .sub{ color:var(--muted); font-size:.9rem }
 
-  .table-card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px }
-  .table thead th{ color:var(--muted); font-weight:600; border-color:var(--border) }
-  .table tbody td{ border-color:var(--border) }
+  /* alturas controladas */
+  .chart-wrap{ position:relative; width:100%; height:260px; }
+  .chart-wrap--ases{ height:280px; }
+
+  /* tabs de la evolución */
+  .mini-tabs{ display:flex; gap:6px }
+  .mini-tabs .btn{ --bs-btn-padding-y:.175rem; --bs-btn-padding-x:.55rem; --bs-btn-font-size:.8rem }
 </style>
 @endpush
 
@@ -65,18 +69,6 @@
         </select>
       </div>
 
-      <div class="col-12 col-md-3">
-        <label class="form-label">Supervisor</label>
-        <select name="supervisor_id" class="form-select">
-          <option value="">Todos</option>
-          @foreach($supervisores as $s)
-            <option value="{{ $s->id }}" {{ (string)($supervisorId ?? request('supervisor_id')) === (string)$s->id ? 'selected' : '' }}>
-              {{ $s->name }}
-            </option>
-          @endforeach
-        </select>
-      </div>
-
       <div class="col-12 d-flex gap-2 mt-1">
         <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Filtrar</button>
         <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Limpiar</a>
@@ -85,54 +77,70 @@
   </form>
 
   {{-- KPIs --}}
-  <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 mt-3">
-    <div class="col"><div class="kpi"><div class="label">CCD generadas</div><div class="value">{{ $k['ccd_gen'] ?? 0 }}</div></div></div>
-    <div class="col"><div class="kpi"><div class="label">Pagos (N°)</div><div class="value">{{ $k['pagos_num'] ?? 0 }}</div></div></div>
-    <div class="col"><div class="kpi"><div class="label">Pagos (Monto)</div><div class="value">S/ {{ number_format($k['pagos_monto'] ?? 0,2) }}</div></div></div>
+  <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mt-3">
+    <div class="col">
+      <div class="kpi">
+        <div class="label"># Promesas de pago generadas</div>
+        <div class="value">{{ $k['pdp_gen'] ?? 0 }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="kpi">
+        <div class="label">Promesas de pago (monto negociado)</div>
+        <div class="value">S/ {{ number_format($k['pdp_monto'] ?? 0, 2) }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="kpi">
+        <div class="label"># Pagos</div>
+        <div class="value">{{ $k['pagos_num'] ?? 0 }}</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="kpi">
+        <div class="label">Pagos (monto)</div>
+        <div class="value">S/ {{ number_format($k['pagos_monto'] ?? 0,2) }}</div>
+      </div>
+    </div>
   </div>
 
   {{-- Visualizaciones --}}
   <div class="row g-3 mt-2">
+    {{-- Evolución de pagos (dos vistas) --}}
     <div class="col-12 col-xl-6">
       <div class="viz">
-        <h6>Evolución de Pagos</h6>
-        <div class="sub mb-2">12 meses (Monto vs N°)</div>
-        <canvas id="linePagos" height="170"></canvas>
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="mb-0">Evolución de Pagos</h6>
+            <div class="sub">Monto total</div>
+          </div>
+          <div class="mini-tabs" role="tablist" aria-label="evol-tabs">
+            <button id="btnEv12" class="btn btn-outline-primary btn-sm active" type="button">12 meses</button>
+            <button id="btnEvMes" class="btn btn-outline-primary btn-sm" type="button">Este mes (diario)</button>
+          </div>
+        </div>
+        <div class="mt-2 chart-wrap">
+          <canvas id="linePagos12"></canvas>
+          <canvas id="linePagosDia" class="d-none"></canvas>
+        </div>
       </div>
     </div>
 
+    {{-- Top entidades --}}
     <div class="col-12 col-xl-6">
       <div class="viz">
         <h6>Top Entidades (mes)</h6>
         <div class="sub mb-2">Participación por monto</div>
-        <canvas id="pieEntidades" height="170"></canvas>
+        <div class="chart-wrap"><canvas id="pieEntidades"></canvas></div>
       </div>
     </div>
 
+    {{-- Top asesores --}}
     <div class="col-12">
       <div class="viz">
         <h6>Top Asesores (mes)</h6>
         <div class="sub mb-2">Monto recuperado</div>
-        <canvas id="barAsesores" height="220"></canvas>
-      </div>
-    </div>
-
-    {{-- (Opcional) bloque de gestiones o tablas adicionales --}}
-    <div class="col-12 col-xl-6">
-      <div class="table-card">
-        <h6 class="mb-2">Detalle de gestiones recientes</h6>
-        <div class="table-responsive">
-          <table class="table align-middle mb-0">
-            <thead><tr><th>Fecha</th><th>Cliente</th><th>Gestión</th><th>Resultado</th></tr></thead>
-            <tbody>
-              @forelse(($gestiones ?? []) as $g)
-                <tr><td>{{ $g->fecha ?? '-' }}</td><td>{{ $g->cliente ?? '-' }}</td><td>{{ $g->tipo ?? '-' }}</td><td>{{ $g->resultado ?? '-' }}</td></tr>
-              @empty
-                <tr><td colspan="4" class="text-center" style="color:var(--muted)">Sin gestiones recientes</td></tr>
-              @endforelse
-            </tbody>
-          </table>
-        </div>
+        <div class="chart-wrap chart-wrap--ases"><canvas id="barAsesores"></canvas></div>
       </div>
     </div>
   </div>
@@ -143,58 +151,91 @@
 <script>
 (function(){
   const css  = (v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  const col  = { accent: ()=> css('--accent'), brand: ()=> css('--brand'), muted: ()=> css('--muted'), border: ()=> css('--border') };
 
-  const meses     = {!! json_encode($meses ?? []) !!};
-  const serieMto  = {!! json_encode($serie_pagos_monto ?? []) !!};
-  const serieNum  = {!! json_encode($serie_pagos_num ?? []) !!};
+  const meses    = {!! json_encode($meses ?? []) !!};
+  const serieMto = {!! json_encode($serie_pagos_monto ?? []) !!};
+
+  const dias     = {!! json_encode($dias ?? []) !!};
+  const serieDia = {!! json_encode($serie_pagos_dia ?? []) !!};
+
   const entLabels = {!! json_encode($entLabels ?? []) !!};
   const entData   = {!! json_encode($entData ?? []) !!};
   const asesLabels= {!! json_encode($asesLabels ?? []) !!};
   const asesData  = {!! json_encode($asesData ?? []) !!};
 
-  // Auto-submit filtros
+  // Auto-submit filtros al cambiar
   document.querySelectorAll('#filtrosDash input[name="mes"], #filtrosDash select')
     .forEach(el => el.addEventListener('change', () => document.getElementById('filtrosDash').requestSubmit()));
 
-  // LINE+BAR: monto (linea) y # (barras)
-  const ctxL = document.getElementById('linePagos');
-  new Chart(ctxL, {
-    data:{
-      labels: meses,
-      datasets:[
-        { type:'bar',  label:'# Pagos',    data: serieNum,  borderWidth:1 },
-        { type:'line', label:'Monto (S/)', data: serieMto,  tension:.35, borderWidth:2, pointRadius:2 }
-      ]
-    },
+  // ===== Evolución 12M (monto) =====
+  const ch12 = new Chart(document.getElementById('linePagos12'), {
+    type:'line',
+    data:{ labels: meses, datasets:[{ label:'Monto (S/)', data: serieMto, tension:.35, borderWidth:2, pointRadius:2 }]},
     options:{
-      plugins:{ legend:{ display:true } },
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:true }},
       scales:{
-        x:{ ticks:{ color: col.muted() }, grid:{ color: col.border() } },
-        y:{ ticks:{ color: col.muted() }, grid:{ color: col.border() }, beginAtZero:true }
+        x:{ grid:{ color: css('--border') } },
+        y:{ grid:{ color: css('--border') }, beginAtZero:true }
       }
     }
   });
 
-  // PIE: entidades (monto mes)
-  const ctxP = document.getElementById('pieEntidades');
-  new Chart(ctxP, {
-    type:'doughnut',
-    data:{ labels: entLabels, datasets:[{ data: entData }]},
-    options:{ plugins:{ legend:{ position:'bottom' } } }
+  // ===== Evolución del MES (diario) =====
+  const chDia = new Chart(document.getElementById('linePagosDia'), {
+    type:'line',
+    data:{ labels: dias, datasets:[{ label:'Monto (S/)', data: serieDia, tension:.35, borderWidth:2, pointRadius:2 }]},
+    options:{
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:true }},
+      scales:{
+        x:{ grid:{ color: css('--border') } },
+        y:{ grid:{ color: css('--border') }, beginAtZero:true }
+      }
+    }
   });
 
-  // BAR HORIZONTAL: asesores (monto mes)
-  const ctxB = document.getElementById('barAsesores');
-  new Chart(ctxB, {
+  // Toggle entre 12M y Diario
+  const btn12 = document.getElementById('btnEv12');
+  const btnM  = document.getElementById('btnEvMes');
+  const cv12  = document.getElementById('linePagos12');
+  const cvM   = document.getElementById('linePagosDia');
+
+  function setTab(which){
+    const is12 = which === '12';
+    cv12.classList.toggle('d-none', !is12);
+    cvM.classList.toggle('d-none',  is12);
+    btn12.classList.toggle('active', is12);
+    btnM.classList.toggle('active',  !is12);
+    // redibujar por si el canvas estuvo oculto
+    (is12 ? ch12 : chDia).resize();
+  }
+  btn12.addEventListener('click', ()=> setTab('12'));
+  btnM .addEventListener('click', ()=> setTab('M'));
+  setTab('12'); // por defecto
+
+  // ===== DOUGHNUT: Entidades =====
+  new Chart(document.getElementById('pieEntidades'), {
+    type:'doughnut',
+    data:{ labels: entLabels, datasets:[{ data: entData }]},
+    options:{
+      maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom' } },
+      cutout:'58%'
+    }
+  });
+
+  // ===== BAR HORIZONTAL: Asesores =====
+  new Chart(document.getElementById('barAsesores'), {
     type:'bar',
     data:{ labels: asesLabels, datasets:[{ data: asesData }] },
     options:{
+      maintainAspectRatio:false,
       indexAxis:'y',
       plugins:{ legend:{ display:false }},
       scales:{
-        x:{ ticks:{ color: col.muted() }, grid:{ color: col.border() }, beginAtZero:true },
-        y:{ ticks:{ color: col.muted() }, grid:{ display:false } }
+        x:{ grid:{ color: css('--border') }, beginAtZero:true },
+        y:{ grid:{ display:false } }
       }
     }
   });

@@ -126,9 +126,6 @@
         <div class="meta">
           <div class="d-flex align-items-center gap-1">
             <span class="dni-pill"><i class="bi bi-credit-card-2-front"></i> DNI {{ $dni }}</span>
-            <button class="btn btn-outline-secondary btn-sm ms-1" id="btnCopyDni" type="button" title="Copiar DNI" data-bs-toggle="tooltip">
-              <i class="bi bi-clipboard"></i>
-            </button>
           </div>
           @if(isset($cuentas) && count($cuentas)) <div><i class="bi bi-wallet2 me-1"></i>{{ count($cuentas) }} cuenta(s)</div>@endif
           @if(isset($pagos))   <div><i class="bi bi-receipt me-1"></i>{{ count($pagos) }} pago(s)</div>@endif
@@ -157,10 +154,6 @@
       </h2>
 
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-secondary btn-sm" id="btnCopyCtas" type="button" title="Copiar cuentas" data-bs-toggle="tooltip">
-          <i class="bi bi-clipboard"></i> Copiar
-        </button>
-
         {{-- Generar propuesta --}}
         <button class="btn btn-primary btn-sm" id="btnPropuesta" type="button" data-bs-toggle="modal" data-bs-target="#modalPropuesta" disabled>
           <i class="bi bi-flag"></i> Generar propuesta
@@ -364,9 +357,6 @@
         <i class="bi bi-receipt"></i><span>Pagos</span>
       </h2>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-secondary btn-sm" id="btnCopyPag" type="button" title="Copiar pagos" data-bs-toggle="tooltip">
-          <i class="bi bi-clipboard"></i> Copiar
-        </button>
         <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#pagosCollapse">
           Ver/ocultar
         </button>
@@ -1012,30 +1002,6 @@
 
   // Tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{ new bootstrap.Tooltip(el); });
-
-  // Copiar DNI
-  document.getElementById('btnCopyDni')?.addEventListener('click', async ()=>{
-    try{ await navigator.clipboard.writeText(String(@json($dni))); alert('DNI copiado.'); }catch(e){ alert('No se pudo copiar.'); }
-  });
-
-  // Copiar tabla (sin CSV)
-  function copyTableToClipboard(tableId, cols){
-    const t = document.getElementById(tableId); if(!t) return;
-    const head = [...t.querySelectorAll('thead th')].map(th=>th.innerText.trim()).slice(0, cols ?? undefined);
-    const body = [...t.querySelectorAll('tbody tr')].map(tr=>{
-      const tds = tr.querySelectorAll('td'); const arr=[];
-      for(let i=0;i<(cols ?? tds.length);i++){ arr.push((tds[i]?.innerText ?? '').trim()); }
-      return arr.join('\t');
-    });
-    const txt = [head.join('\t'), ...body].join('\n');
-    return navigator.clipboard.writeText(txt);
-  }
-  document.getElementById('btnCopyCtas')?.addEventListener('click', async ()=>{
-    try{ await copyTableToClipboard('tblCuentas'); alert('Cuentas copiadas.'); }catch(e){ alert('No se pudo copiar.'); }
-  });
-  document.getElementById('btnCopyPag')?.addEventListener('click', async ()=>{
-    try{ await copyTableToClipboard('tblPagos'); alert('Pagos copiados.'); }catch(e){ alert('No se pudo copiar.'); }
-  });
 
   // Modal Nota — soporta data-nota y data-nota-json
   (function(){
