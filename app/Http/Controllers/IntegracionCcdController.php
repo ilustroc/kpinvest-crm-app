@@ -90,12 +90,6 @@ class IntegracionCcdController extends Controller
                     $data
                 );
 
-                // Genera código si no existe
-                if (empty($cliente->codigo)) {
-                    $cliente->codigo = 'CCD-' . str_pad($cliente->id, 5, '0', STR_PAD_LEFT);
-                    $cliente->save();
-                }
-
                 $ok++;
             } catch(\Throwable $e){
                 $skip++; $err[]="Fila {$rowNum}: ".$e->getMessage();
