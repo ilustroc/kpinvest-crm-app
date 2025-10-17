@@ -13,6 +13,9 @@ use App\Models\PromesaOperacion;
 use App\Models\PromesaCuota;
 use App\Models\PagoPropia as Pago;
 use App\Models\ClienteCuenta;
+use App\Models\CcdCliente;
+
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ClientsControllers extends Controller
 {
@@ -50,75 +53,59 @@ class ClientsControllers extends Controller
     public function show(string $dni)
     {
         try {
-            /* ===== CUENTAS (usa numdoc / nombre / cuenta) ===== */
+            /* ===== CUENTAS (por DNI) ===== */
             $cuentas = ClienteCuenta::query()
                 ->where('numdoc', $dni)
                 ->orderByDesc('updated_at')
                 ->get([
-                    'numdoc',
-                    'nombre',
-                    'cuenta',            // NUEVO: existe en el esquema actual
-                    'operacion',
-                    'entidad',
-                    'producto',
-                    'cosecha',
-                    'deuda_capital',
-                    'interes',
-                    'deuda_total',
+                    'numdoc','nombre','cuenta','operacion','entidad','producto','cosecha',
+                    'deuda_capital','interes','deuda_total',
                 ]);
 
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
 
-            /* ===== PAGOS (pagos_propia nuevo) ===== */
+            /* ===== PAGOS (por DNI) ===== */
             $pagos = Pago::query()
                 ->where('dni', $dni)
                 ->orderByDesc('fecha')
                 ->get([
-                    'fecha',
-                    'dni',
-                    'operacion',
-                    'entidad',
-                    'nombre_cliente',
-                    'monto_pagado',
-                    'gestor',
-                    'cosecha',
-                    'cuenta_recaudo',
+                    'fecha','dni','operacion','entidad','nombre_cliente','monto_pagado',
+                    'gestor','cosecha','cuenta_recaudo',
                 ]);
-
             $totPagos = (float) $pagos->sum('monto_pagado');
 
-            /* ===== CCD (esta tabla mantiene dni) ===== */
-            $ccd         = collect();
-            $ccdByCodigo = collect();
-            if (Schema::hasTable('ccd_clientes')) {
-                $cols = DB::getSchemaBuilder()->getColumnListing('ccd_clientes');
-                $sel  = collect(['id','dni','codigo','documento','nombre','pdf','archivo','ruta','url','created_at'])
-                    ->filter(fn($c) => in_array($c, $cols))->all();
+            /* ===== CCD (SIEMPRE por DNI/numdoc) ===== */
+            $ccdDocs    = collect();
+            $ccdByDni   = collect();
+            $ccdByCodigo= collect();
 
-                if (!empty($sel)) {
-                    $ccd = DB::table('ccd_clientes')
-                        ->select($sel)
-                        ->where('dni', $dni)
-                        ->orderByDesc('id')
-                        ->get();
+            if (\Schema::hasTable('ccd_clientes')) {
+                // Usa solo columnas reales (si falta 'codigo' no pasa nada)
+                $colsCcd = \DB::getSchemaBuilder()->getColumnListing('ccd_clientes');
+                $selCcd  = collect(['id','numdoc','pdf','cosecha','link','codigo'])
+                            ->filter(fn($c)=>in_array($c, $colsCcd))->all();
 
-                    if (in_array('codigo', $cols)) {
-                        $ccdByCodigo = $ccd->groupBy('codigo');
-                    }
+                $ccdDocs = CcdCliente::query()
+                    ->where('numdoc', $dni)
+                    ->orderByDesc('id')
+                    ->get($selCcd);
+
+                // Fuerza la clave exacta para que la vista haga $ccdByDni[$dni] sin notice
+                $ccdByDni    = collect([$dni => $ccdDocs->values()]);
+                if (in_array('codigo', $colsCcd)) {
+                    $ccdByCodigo = $ccdDocs->groupBy('codigo');
                 }
             }
 
-            /* ===== Mapa operación -> cuenta (desde pagos.cuenta_recaudo) ===== */
+            /* ===== Mapeos de pagos para UI ===== */
             $op2cta = $pagos->groupBy('operacion')->map(function ($grp) {
                 $freq = $grp->pluck('cuenta_recaudo')->filter()->countBy();
                 return $freq->isEmpty() ? null : $freq->sortDesc()->keys()->first();
             });
-
-            /* ===== Pagos agrupados por operación (para métricas en la vista) ===== */
             $pagosGrouped = $pagos->groupBy('operacion');
 
-            // Inyecta props útiles y fija $c->cuenta con prioridad: BD -> pagos -> operacion
+            // Enriquecer filas de cuentas y asegurar "cuenta"
             $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta) {
                 $grupo = $pagosGrouped->get($c->operacion) ?? collect();
                 $c->pagos_count = $grupo->count();
@@ -145,16 +132,16 @@ class ClientsControllers extends Controller
                 ->orderByDesc('fecha_promesa')
                 ->get();
 
-            /* ===== CNAs por CUENTA y por OPERACIÓN ===== */
-            $cnasByCuenta     = collect();
-            $cnasByOperacion  = collect();
+            /* ===== CNAs ===== */
+            $cnasByCuenta    = collect();
+            $cnasByOperacion = collect();
 
-            if (Schema::hasTable('cna_solicitudes')) {
-                $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
+            if (\Schema::hasTable('cna_solicitudes')) {
+                $colsCna = \DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 $want    = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
                 $selCna  = collect($want)->filter(fn($c)=>in_array($c,$colsCna))->values()->all();
 
-                $cnas = DB::table('cna_solicitudes')
+                $cnas = \DB::table('cna_solicitudes')
                     ->select($selCna)
                     ->where('dni', $dni)
                     ->orderByDesc('created_at')
@@ -182,7 +169,7 @@ class ClientsControllers extends Controller
                             'docx_path'       => $row->docx_path  ?? null,
                         ]);
 
-                        // Por cuenta (usa la cuenta ya calculada para la operación)
+                        // Por cuenta (usa la cuenta calculada para esa operación)
                         $ctaDb = optional($cuentas->firstWhere('operacion', $op))->cuenta;
                         $cta   = (string)($ctaDb ?: ($op2cta[$op] ?? $op));
                         $mapCta[$cta] = $mapCta[$cta] ?? collect();
@@ -201,11 +188,14 @@ class ClientsControllers extends Controller
                 $cnasByOperacion = collect($mapOp);
             }
 
-            /* ===== Próximo N.º de carta (display) ===== */
+            /* ===== Próximo N.º de carta (solo si la columna existe) ===== */
             $nextNroCarta = null;
-            if (Schema::hasTable('cna_solicitudes')) {
-                $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
-                $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT);
+            if (\Schema::hasTable('cna_solicitudes')) {
+                $colsCna = \DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
+                if (in_array('correlativo', $colsCna)) {
+                    $maxCorr = (int) \DB::table('cna_solicitudes')->max('correlativo');
+                    $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT);
+                }
             }
 
             return view('clientes.show', [
@@ -214,26 +204,31 @@ class ClientsControllers extends Controller
                 'cuentas'           => $cuentas,
                 'pagos'             => $pagos,
                 'promesas'          => $promesas,
-                'ccd'               => $ccd,
-                'totPagos'          => $totPagos,
+                'ccd'               => $ccdDocs,      // por si quieres depurar
+                'ccdByDni'          => $ccdByDni,     // LA VISTA USARÁ ESTO
                 'ccdByCodigo'       => $ccdByCodigo,
                 'cnasByCuenta'      => $cnasByCuenta,
                 'cnasByOperacion'   => $cnasByOperacion,
                 'pagosPorOperacion' => $pagosGrouped,
                 'nextNroCarta'      => $nextNroCarta,
+                'totPagos'          => $totPagos,
             ]);
 
         } catch (\Throwable $e) {
+            // No atrapamos 404 ni otros HttpException (para que no "rebote" silenciosamente)
+            if ($e instanceof HttpExceptionInterface) {
+                throw $e;
+            }
             \Log::error('Clientes.show ERROR', [
                 'dni'  => $dni,
                 'msg'  => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
-            return back()->withErrors('Ocurrió un error cargando el cliente. Revisa los logs.');
+            return back()->withErrors('Error cargando el cliente: '.$e->getMessage());
         }
     }
-
+    
     /* ==========================
      * Guardar Promesa (conv./cancel.)
      * ========================== */
@@ -283,7 +278,7 @@ class ClientsControllers extends Controller
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
         }
 
-        // Operaciones seleccionadas (para validación y persistencia)
+        // Operaciones seleccionadas
         $opsSel = collect($r->input('operaciones', []))
             ->map(fn($op)=>trim((string)$op))
             ->filter()
@@ -295,7 +290,7 @@ class ClientsControllers extends Controller
         if ($r->input('tipo') === 'convenio') {
             $n = max(1, (int)$r->input('nro_cuotas'));
 
-            // Ajuste de longitud de arrays al N solicitado
+            // Ajuste de longitud
             if (count($cronFechas) !== $n || count($cronMontos) < $n) {
                 $cronFechas = array_slice($cronFechas, 0, $n);
                 $cronMontos = array_slice($cronMontos, 0, max($n, count($cronMontos)));
@@ -306,7 +301,7 @@ class ClientsControllers extends Controller
             $suma = array_sum(array_map('floatval', $cronMontos));
 
             if ($cronBalon > 0) {
-                // ====== CON CUOTA BALÓN: suma del cronograma debe igualar la DEUDA TOTAL ======
+                // Con cuota balón: suma = DEUDA TOTAL seleccionada
                 $deudaSel = (float) DB::table('clientes_cuentas')
                     ->whereIn('operacion', $opsSel)
                     ->sum('deuda_total');
@@ -317,7 +312,7 @@ class ClientsControllers extends Controller
                         ->withInput();
                 }
             } else {
-                // ====== SIN BALÓN: suma del cronograma debe igualar el MONTO CONVENIO ======
+                // Sin balón: suma = monto_convenio
                 if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
                     return back()
                         ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
@@ -345,16 +340,16 @@ class ClientsControllers extends Controller
                 $firstDate = Carbon::parse($cronFechas[0] ?? now());
 
                 // Promedio de cuota: EXCLUYE la cuota balón si existe
-                $sumAll  = array_sum(array_map('floatval', $cronMontos));
-                $mBalon  = ($cronBalon > 0 && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
-                $sumReg  = $sumAll - $mBalon; // solo cuotas regulares
+                $sumAll   = array_sum(array_map('floatval', $cronMontos));
+                $mBalon   = ($cronBalon > 0 && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
+                $sumReg   = $sumAll - $mBalon;
                 $avgCuota = $n > 0 ? ($sumReg / $n) : 0;
 
                 $data = array_merge($base, [
                     'fecha_promesa'  => now()->toDateString(),
                     'fecha_pago'     => $firstDate->toDateString(),
                     'cuota_dia'      => (int)$firstDate->day,
-                    'nro_cuotas'     => $n, // N de cuotas regulares (sin balón)
+                    'nro_cuotas'     => $n,
                     'monto_convenio' => $r->input('monto_convenio'),
                     'monto_cuota'    => $avgCuota,
                 ]);

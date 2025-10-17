@@ -198,9 +198,8 @@
               ($c->pagos_list instanceof \Illuminate\Support\Collection && $c->pagos_list->count()) ||
               (is_array($c->pagos_list) && count($c->pagos_list))
             );
-            $docsCcd = ($ccdByCodigo[$c->operacion] ?? collect());
+            $docsCcd = collect($ccdByDni[$dni] ?? []);
 
-            // AHORA: CNAs agrupadas por CUENTA (no por operación)
             $cnas = collect($cnasByCuenta[$c->cuenta] ?? []);
 
             $badgeFor = fn($estado) => match (true) {
@@ -276,19 +275,22 @@
             {{-- === CELDA CCD === --}}
             <td class="text-nowrap">
               @php $docs = $docsCcd; @endphp
+
               @if($docs->count() === 1)
                 @php
-                  $d    = $docs->first();
-                  $path = $d->pdf ?? $d->archivo ?? $d->ruta ?? $d->url ?? null;
-                  $href = \Illuminate\Support\Str::startsWith((string)$path, ['http://','https://','/']) ? $path : ($path ? url($path) : null);
+                  $d = $docs->first();
+                  // href: usa link si viene; si pdf es URL absoluta úsala; si no, asset() a storage
+                  $href = $d->link
+                    ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
                 @endphp
                 @if($href)
-                  <a href="{{ $href }}" target="_blank" download class="btn btn-sm btn-outline-primary" title="Descargar CCD">
-                    <i class="bi bi-filetype-pdf me-1"></i> CCD
+                  <a href="{{ $href }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Abrir CCD">
+                    <i class="bi bi-filetype-pdf me-1"></i> Ver CCD
                   </a>
                 @else
                   <span class="text-secondary">—</span>
                 @endif
+
               @elseif($docs->count() > 1)
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
@@ -297,12 +299,15 @@
                   <ul class="dropdown-menu dropdown-menu-end">
                     @foreach($docs as $d)
                       @php
-                        $path = $d->pdf ?? $d->archivo ?? $d->ruta ?? $d->url ?? null;
-                        $href = \Illuminate\Support\Str::startsWith((string)$path, ['http://','https://','/']) ? $path : ($path ? url($path) : null);
-                        $name = $d->nombre ?? $d->documento ?? $d->codigo ?? ('CCD '.$d->id);
+                        $href = $d->link
+                          ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
+                        // Nombre legible SOLO con campos existentes: pdf/cosecha/id
+                        $name = $d->pdf
+                          ? pathinfo((string)$d->pdf, PATHINFO_FILENAME)
+                          : ( ($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id );
                       @endphp
                       @if($href)
-                        <li><a class="dropdown-item" href="{{ $href }}" target="_blank" download>{{ $name }}</a></li>
+                        <li><a class="dropdown-item" href="{{ $href }}" target="_blank">{{ $name }}</a></li>
                       @endif
                     @endforeach
                   </ul>
