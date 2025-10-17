@@ -31,7 +31,7 @@
     <div>
       <label class="form-label">Archivo CSV</label>
       <input type="file" name="archivo" class="form-control" accept=".csv,text/csv" required>
-      <div class="form-text">Encabezados: id, codigo, dni, nombre, cartera, pdf</div>
+      <div class="form-text">Encabezados: codigo, dni, nombre, cartera, pdf</div>
     </div>
     <button class="btn btn-primary">
       Subir y procesar

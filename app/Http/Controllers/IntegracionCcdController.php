@@ -10,13 +10,13 @@ class IntegracionCcdController extends Controller
     // ======= Descargar plantilla =======
     public function template()
     {
-        $headers = ['CODIGO','DNI','NOMBRE','CARTERA','PDF'];
+        $headers = ['NUMDOC','PDF','COSECHA','LINK'];
 
         return response()->streamDownload(function () use ($headers) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM UTF-8
             fputcsv($out, $headers);
-            fputcsv($out, ['ABC123','71234567','JUAN PEREZ','CARTERA 1','https://dominio.com/archivos/juan.pdf']);
+            fputcsv($out, ['71234567','https://dominio.com/archivos/juan.pdf','2024-01','https://enlace/descarga']);
             fclose($out);
         }, 'template_ccd.csv', [
             'Content-Type'  => 'text/csv; charset=UTF-8',
@@ -51,7 +51,7 @@ class IntegracionCcdController extends Controller
         $headers = fgetcsv($fh, 0, $del);
         if(!$headers){ fclose($fh); return [0,0,['Sin encabezados']]; }
 
-        // --- Normalización de encabezados ---
+        // --- Normalizador ---
         $norm = fn(string $s): string =>
             trim(preg_replace('/[^A-Z0-9]+/','_',strtr(strtoupper(trim(
                 str_replace(["\xEF\xBB\xBF","\xC2\xA0"],' ',$s)
@@ -60,7 +60,7 @@ class IntegracionCcdController extends Controller
         $map = [];
         foreach ($headers as $i=>$h) $map[$i] = $norm($h);
 
-        // --- Bucle de filas ---
+        // --- Bucle ---
         $ok=0; $skip=0; $err=[]; $rowNum=1;
 
         while(($row=fgetcsv($fh,0,$del))!==false){
@@ -71,24 +71,31 @@ class IntegracionCcdController extends Controller
                 $val = trim($val);
 
                 switch ($k) {
-                    case 'CODIGO':  $data['codigo']  = $val; break;
-                    case 'DNI':     $data['dni']     = $val; break;
-                    case 'NOMBRE':  $data['nombre']  = $val; break;
-                    case 'CARTERA': $data['cartera'] = $val; break;
+                    case 'NUMDOC':  $data['numdoc']  = $val; break;
                     case 'PDF':     $data['pdf']     = $val; break;
+                    case 'COSECHA': $data['cosecha'] = $val; break;
+                    case 'LINK':    $data['link']    = $val; break;
                 }
             }
 
             // Validación mínima
-            if (empty($data['dni'])) {
-                $skip++; $err[]="Fila {$rowNum}: falta DNI."; continue;
+            if (empty($data['numdoc'])) {
+                $skip++; $err[]="Fila {$rowNum}: falta NUMDOC."; continue;
             }
 
             try {
-                CcdCliente::updateOrCreate(
-                    ['dni' => $data['dni']],
+                // Inserta o actualiza según numdoc
+                $cliente = CcdCliente::updateOrCreate(
+                    ['numdoc' => $data['numdoc']],
                     $data
                 );
+
+                // Genera código si no existe
+                if (empty($cliente->codigo)) {
+                    $cliente->codigo = 'CCD-' . str_pad($cliente->id, 5, '0', STR_PAD_LEFT);
+                    $cliente->save();
+                }
+
                 $ok++;
             } catch(\Throwable $e){
                 $skip++; $err[]="Fila {$rowNum}: ".$e->getMessage();
