@@ -1,13 +1,9 @@
-{{-- resources/views/dashboard/index.blade.php --}}
 @extends('layouts.app')
 @section('title','Dashboard')
 @section('crumb','Estadísticas')
 
 @push('head')
 <style>
-  .sect{ display:flex; align-items:center; gap:.6rem; font-weight:700; margin:6px 0 10px }
-  .sect::before{ content:""; width:8px; height:18px; border-radius:4px; background:var(--accent) }
-
   .kpi{ position:relative; background:var(--surface); border:1px solid var(--border);
         border-radius:12px; padding:16px; height:100%; display:flex; flex-direction:column; gap:6px }
   .kpi::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
@@ -20,11 +16,9 @@
   .viz h6{ margin:0 0 10px; font-weight:700; color:var(--ink) }
   .viz .sub{ color:var(--muted); font-size:.9rem }
 
-  /* alturas controladas */
   .chart-wrap{ position:relative; width:100%; height:260px; }
   .chart-wrap--ases{ height:280px; }
 
-  /* tabs de la evolución */
   .mini-tabs{ display:flex; gap:6px }
   .mini-tabs .btn{ --bs-btn-padding-y:.175rem; --bs-btn-padding-x:.55rem; --bs-btn-font-size:.8rem }
 </style>
@@ -59,6 +53,8 @@
         </select>
       </div>
 
+      {{-- El filtro Asesor solo para no-asesor --}}
+      @unless($isAsesor ?? false)
       <div class="col-12 col-md-3">
         <label class="form-label">Asesor</label>
         <select name="asesor" class="form-select">
@@ -68,6 +64,7 @@
           @endforeach
         </select>
       </div>
+      @endunless
 
       <div class="col-12 d-flex gap-2 mt-1">
         <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Filtrar</button>
@@ -106,7 +103,7 @@
 
   {{-- Visualizaciones --}}
   <div class="row g-3 mt-2">
-    {{-- Evolución de pagos (dos vistas) --}}
+    {{-- Evolución de pagos: 12M / Diario --}}
     <div class="col-12 col-xl-6">
       <div class="viz">
         <div class="d-flex justify-content-between align-items-center">
@@ -126,7 +123,7 @@
       </div>
     </div>
 
-    {{-- Top entidades --}}
+    {{-- Top Entidades --}}
     <div class="col-12 col-xl-6">
       <div class="viz">
         <h6>Top Entidades (mes)</h6>
@@ -135,7 +132,8 @@
       </div>
     </div>
 
-    {{-- Top asesores --}}
+    {{-- Top Asesores SOLO para no-asesor --}}
+    @unless($isAsesor ?? false)
     <div class="col-12">
       <div class="viz">
         <h6>Top Asesores (mes)</h6>
@@ -143,6 +141,7 @@
         <div class="chart-wrap chart-wrap--ases"><canvas id="barAsesores"></canvas></div>
       </div>
     </div>
+    @endunless
   </div>
 @endsection
 
@@ -160,14 +159,16 @@
 
   const entLabels = {!! json_encode($entLabels ?? []) !!};
   const entData   = {!! json_encode($entData ?? []) !!};
-  const asesLabels= {!! json_encode($asesLabels ?? []) !!};
-  const asesData  = {!! json_encode($asesData ?? []) !!};
+
+  const hasTopAses = {{ isset($isAsesor) && $isAsesor ? 'false' : 'true' }};
+  const asesLabels = {!! json_encode($asesLabels ?? []) !!};
+  const asesData   = {!! json_encode($asesData ?? []) !!};
 
   // Auto-submit filtros al cambiar
   document.querySelectorAll('#filtrosDash input[name="mes"], #filtrosDash select')
     .forEach(el => el.addEventListener('change', () => document.getElementById('filtrosDash').requestSubmit()));
 
-  // ===== Evolución 12M (monto) =====
+  // 12M
   const ch12 = new Chart(document.getElementById('linePagos12'), {
     type:'line',
     data:{ labels: meses, datasets:[{ label:'Monto (S/)', data: serieMto, tension:.35, borderWidth:2, pointRadius:2 }]},
@@ -181,7 +182,7 @@
     }
   });
 
-  // ===== Evolución del MES (diario) =====
+  // Diario del mes
   const chDia = new Chart(document.getElementById('linePagosDia'), {
     type:'line',
     data:{ labels: dias, datasets:[{ label:'Monto (S/)', data: serieDia, tension:.35, borderWidth:2, pointRadius:2 }]},
@@ -195,7 +196,7 @@
     }
   });
 
-  // Toggle entre 12M y Diario
+  // Toggle
   const btn12 = document.getElementById('btnEv12');
   const btnM  = document.getElementById('btnEvMes');
   const cv12  = document.getElementById('linePagos12');
@@ -207,14 +208,13 @@
     cvM.classList.toggle('d-none',  is12);
     btn12.classList.toggle('active', is12);
     btnM.classList.toggle('active',  !is12);
-    // redibujar por si el canvas estuvo oculto
     (is12 ? ch12 : chDia).resize();
   }
   btn12.addEventListener('click', ()=> setTab('12'));
   btnM .addEventListener('click', ()=> setTab('M'));
-  setTab('12'); // por defecto
+  setTab('12');
 
-  // ===== DOUGHNUT: Entidades =====
+  // Donut Entidades
   new Chart(document.getElementById('pieEntidades'), {
     type:'doughnut',
     data:{ labels: entLabels, datasets:[{ data: entData }]},
@@ -225,20 +225,22 @@
     }
   });
 
-  // ===== BAR HORIZONTAL: Asesores =====
-  new Chart(document.getElementById('barAsesores'), {
-    type:'bar',
-    data:{ labels: asesLabels, datasets:[{ data: asesData }] },
-    options:{
-      maintainAspectRatio:false,
-      indexAxis:'y',
-      plugins:{ legend:{ display:false }},
-      scales:{
-        x:{ grid:{ color: css('--border') }, beginAtZero:true },
-        y:{ grid:{ display:false } }
+  // Top asesores (solo si aplica)
+  if (hasTopAses) {
+    new Chart(document.getElementById('barAsesores'), {
+      type:'bar',
+      data:{ labels: asesLabels, datasets:[{ data: asesData }] },
+      options:{
+        maintainAspectRatio:false,
+        indexAxis:'y',
+        plugins:{ legend:{ display:false }},
+        scales:{
+          x:{ grid:{ color: css('--border') }, beginAtZero:true },
+          y:{ grid:{ display:false } }
+        }
       }
-    }
-  });
+    });
+  }
 })();
 </script>
 @endpush

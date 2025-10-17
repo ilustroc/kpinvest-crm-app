@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Models\PagoPropia as Pago;
 use App\Models\PromesaPago;
@@ -12,11 +13,17 @@ class DashboardController extends Controller
 {
     public function index(Request $r)
     {
+        /* =============== Usuario y rol =============== */
+        $user     = Auth::user();
+        $isAsesor = strtolower((string)($user->role ?? '')) === 'asesor';
+        $asesorNombre = trim((string)($user->name ?? ''));
+
         /* ================== Filtros ================== */
         $mesParam = $r->query('mes', now('America/Lima')->format('Y-m')); // YYYY-MM
         $fCosecha = trim((string)$r->query('cosecha', ''));
         $fEntidad = trim((string)$r->query('entidad', ''));
-        $fAsesor  = trim((string)$r->query('asesor',  '') ?: (string)$r->query('gestor',''));
+        // El filtro "Asesor" SOLO aplica para no-asesor
+        $fAsesor  = $isAsesor ? '' : trim((string)$r->query('asesor',  '') ?: (string)$r->query('gestor',''));
 
         /* ========== Rango del mes (zona Lima) ========== */
         try {
@@ -33,18 +40,29 @@ class DashboardController extends Controller
 
         /* ====== Base de pagos + filtros seleccionados ====== */
         $base = Pago::query();
+
+        // Si es asesor, restringimos SIEMPRE por su nombre (pagos_propias.gestor)
+        if ($isAsesor && $asesorNombre !== '') {
+            $base->where('gestor', $asesorNombre);
+        } elseif (!$isAsesor && $fAsesor !== '') {
+            $base->where('gestor', 'like', "%{$fAsesor}%");
+        }
+
         if ($fCosecha !== '') $base->where('cosecha', $fCosecha);
         if ($fEntidad !== '') $base->where('entidad', $fEntidad);
-        if ($fAsesor  !== '') $base->where('gestor', 'like', "%{$fAsesor}%");
 
         /* ================= KPIs del MES ================= */
-        // Promesas generadas (conteo y monto negociado)
-        $pdpGen   = PromesaPago::whereBetween('created_at', [$inicioMes, $finMes])->count();
-        $pdpMonto = (float) PromesaPago::whereBetween('created_at', [$inicioMes, $finMes])
+        // PROMESAS (conteo y monto). Si es asesor, por su user_id
+        $pdpQuery = PromesaPago::whereBetween('created_at', [$inicioMes, $finMes]);
+        if ($isAsesor) {
+            $pdpQuery->where('user_id', $user->id);
+        }
+        $pdpGen   = (clone $pdpQuery)->count();
+        $pdpMonto = (float) (clone $pdpQuery)
             ->selectRaw("SUM(CASE WHEN tipo='convenio' THEN COALESCE(monto_convenio,0) ELSE COALESCE(monto,0) END) as t")
             ->value('t');
 
-        // Pagos del mes (con filtros)
+        // PAGOS del mes (ya con restricciones de arriba)
         $pagosNum   = (clone $base)->whereBetween('fecha', [$inicioMes, $finMes])->count();
         $pagosMonto = (float) ((clone $base)->whereBetween('fecha', [$inicioMes, $finMes])->sum('monto_pagado'));
 
@@ -94,26 +112,40 @@ class DashboardController extends Controller
             ->groupBy('entidad')
             ->orderByDesc('total')->limit(8)->get();
 
-        $topAsesMes = (clone $base)
-            ->selectRaw('COALESCE(NULLIF(TRIM(gestor),""),"—") as gestor, SUM(monto_pagado) as total')
-            ->whereBetween('fecha', [$inicioMes, $finMes])
-            ->groupBy('gestor')
-            ->orderByDesc('total')->limit(10)->get();
-
+        // Para asesores NO mostramos ranking de asesores, pero preparamos datos por si rol != asesor
         $entLabels  = $topEntMes->pluck('entidad');
         $entData    = $topEntMes->pluck('total')->map(fn($v)=>(float)$v);
-        $asesLabels = $topAsesMes->pluck('gestor');
-        $asesData   = $topAsesMes->pluck('total')->map(fn($v)=>(float)$v);
+
+        $asesLabels = collect();
+        $asesData   = collect();
+        if (!$isAsesor) {
+            $topAsesMes = (clone $base)
+                ->selectRaw('COALESCE(NULLIF(TRIM(gestor),""),"—") as gestor, SUM(monto_pagado) as total')
+                ->whereBetween('fecha', [$inicioMes, $finMes])
+                ->groupBy('gestor')
+                ->orderByDesc('total')->limit(10)->get();
+
+            $asesLabels = $topAsesMes->pluck('gestor');
+            $asesData   = $topAsesMes->pluck('total')->map(fn($v)=>(float)$v);
+        }
 
         /* ====== Opciones de selects DEPENDIENTES DEL MES ====== */
-        $optsMes   = Pago::query()->whereBetween('fecha', [$inicioMes, $finMes]);
+        $optsMes = Pago::query()->whereBetween('fecha', [$inicioMes, $finMes]);
+        if ($isAsesor && $asesorNombre !== '') {
+            $optsMes->where('gestor', $asesorNombre);
+        }
+
         $cosechas  = (clone $optsMes)->whereNotNull('cosecha')->select('cosecha')->distinct()->orderBy('cosecha')->pluck('cosecha');
         $entidades = (clone $optsMes)->whereNotNull('entidad')->select('entidad')->distinct()->orderBy('entidad')->pluck('entidad');
-        $asesores  = (clone $optsMes)->whereNotNull('gestor') ->select('gestor') ->distinct()->orderBy('gestor')->pluck('gestor');
+
+        // Lista de asesores SOLO para no-asesor (filtro visible)
+        $asesores  = $isAsesor ? collect() :
+            (clone $optsMes)->whereNotNull('gestor')->select('gestor')->distinct()->orderBy('gestor')->pluck('gestor');
 
         return view('dashboard.index', [
             'mes'               => $mesParam,
             'k'                 => $k,
+            'isAsesor'          => $isAsesor,
 
             'meses'             => $meses,
             'serie_pagos_monto' => $serie_pagos_monto,
