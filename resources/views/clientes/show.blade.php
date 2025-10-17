@@ -285,7 +285,7 @@
                 @endphp
                 @if($href)
                   <a href="{{ $href }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Abrir CCD">
-                    <i class="bi bi-filetype-pdf me-1"></i> Ver CCD
+                    <i class="bi bi-filetype-pdf me-1"></i>
                   </a>
                 @else
                   <span class="text-secondary">—</span>
