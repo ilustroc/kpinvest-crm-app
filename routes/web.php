@@ -15,6 +15,7 @@ use App\Http\Controllers\AutorizacionController;
 use App\Http\Controllers\PromesaPdfController;
 use App\Http\Controllers\CnaController;
 use App\Http\Controllers\ReportePromesasController;
+use App\Http\Controllers\IntegracionCcdController;
 
 /*
 |--------------------------------------------------------------------------
@@ -131,16 +132,26 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('role:administrador')->group(function () {
 
-        Route::view('/integracion/data', 'placeholders.integracion-data')->name('integracion.data');
-
+        Route::view('/integracion/data', 'placeholders.integracion-data')
+            ->name('integracion.data');
         Route::get('/integracion/data/clientes/template', [ClientesCargaController::class, 'templateClientesMaster'])
             ->name('integracion.data.clientes.template');
         Route::post('/integracion/data/clientes/import',  [ClientesCargaController::class, 'importClientesMaster'])
             ->name('integracion.data.clientes.import');
+        
+        Route::get('/integracion/ccd', [IntegracionCcdController::class, 'index'])
+            ->name('integracion.ccd');
+        Route::get('/integracion/ccd/template', [IntegracionCcdController::class, 'template'])
+            ->name('integracion.ccd.template');
+        Route::post('/integracion/ccd/import', [IntegracionCcdController::class, 'import'])
+            ->name('integracion.ccd.import');
 
-        Route::get('/integracion/pagos',          [PlaceholdersPagosController::class, 'index'])->name('integracion.pagos');
-        Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])->name('integracion.pagos.import');
-        Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])->name('integracion.pagos.template');
+        Route::get('/integracion/pagos',          [PlaceholdersPagosController::class, 'index'])
+            ->name('integracion.pagos');
+        Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])
+            ->name('integracion.pagos.import');
+        Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])
+            ->name('integracion.pagos.template');
 
         // Administración de usuarios
         Route::get('/administracion',                           [AdminUsersController::class, 'index'])->name('administracion');

@@ -219,6 +219,7 @@
           @if(in_array($role,['administrador','sistemas']))
             <div class="lab">ADMIN / SOPORTE</div>
             <a class="{{ request()->is('integracion/pagos') ? 'active' : '' }}" href="{{ url('/integracion/pagos') }}"><i class="bi bi-upload"></i><span>Integración ▸ Subir Pagos</span></a>
+            <a class="{{ request()->is('integracion/ccd') ? 'active' : '' }}" href="{{ url('/integracion/ccd') }}"><i class="bi bi-database"></i><span>Integración ▸ Subir CCD</span></a>
             <a class="{{ request()->is('integracion/data') ? 'active' : '' }}" href="{{ url('/integracion/data') }}"><i class="bi bi-cloud-upload"></i><span>Integración ▸ Subir Data</span></a>
             <a class="{{ request()->is('administracion') ? 'active' : '' }}" href="{{ url('/administracion') }}"><i class="bi bi-gear"></i><span>Administración</span></a>
           @endif

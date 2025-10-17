@@ -252,7 +252,6 @@ class ClientsControllers extends Controller
             'nota'          => 'nullable|string|max:500',
             'telefono'      => 'required|string|max:30',
 
-            // Lista de operaciones obligatoria
             'operaciones'   => 'required|array|min:1',
             'operaciones.*' => 'string|max:50',
 
@@ -284,22 +283,46 @@ class ClientsControllers extends Controller
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
         }
 
+        // Operaciones seleccionadas (para validación y persistencia)
+        $opsSel = collect($r->input('operaciones', []))
+            ->map(fn($op)=>trim((string)$op))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         // ===== REGLAS CONVENIO
         if ($r->input('tipo') === 'convenio') {
             $n = max(1, (int)$r->input('nro_cuotas'));
-            if (count($cronFechas) !== $n || count($cronMontos) !== $n) {
+
+            // Ajuste de longitud de arrays al N solicitado
+            if (count($cronFechas) !== $n || count($cronMontos) < $n) {
                 $cronFechas = array_slice($cronFechas, 0, $n);
-                $cronMontos = array_slice($cronMontos, 0, $n);
+                $cronMontos = array_slice($cronMontos, 0, max($n, count($cronMontos)));
                 while (count($cronFechas) < $n) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
                 while (count($cronMontos) < $n) $cronMontos[] = 0;
             }
+
             $suma = array_sum(array_map('floatval', $cronMontos));
-            if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
-                return back()->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
-                            ->withInput();
-            }
-            if ($cronBalon > 0 && $cronBalon > $n) {
-                return back()->withErrors('La cuota balón no existe en el cronograma.')->withInput();
+
+            if ($cronBalon > 0) {
+                // ====== CON CUOTA BALÓN: suma del cronograma debe igualar la DEUDA TOTAL ======
+                $deudaSel = (float) DB::table('clientes_cuentas')
+                    ->whereIn('operacion', $opsSel)
+                    ->sum('deuda_total');
+
+                if (abs($suma - $deudaSel) > 0.01) {
+                    return back()
+                        ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con la deuda total seleccionada (S/ '.number_format($deudaSel,2).') para convenios con cuota balón.')
+                        ->withInput();
+                }
+            } else {
+                // ====== SIN BALÓN: suma del cronograma debe igualar el MONTO CONVENIO ======
+                if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
+                    return back()
+                        ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
+                        ->withInput();
+                }
             }
         }
 
@@ -320,13 +343,18 @@ class ClientsControllers extends Controller
             if ($r->input('tipo') === 'convenio') {
                 $n = max(1, (int)$r->input('nro_cuotas'));
                 $firstDate = Carbon::parse($cronFechas[0] ?? now());
-                $avgCuota = $n > 0 ? (array_sum(array_map('floatval', $cronMontos)) / $n) : 0;
+
+                // Promedio de cuota: EXCLUYE la cuota balón si existe
+                $sumAll  = array_sum(array_map('floatval', $cronMontos));
+                $mBalon  = ($cronBalon > 0 && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
+                $sumReg  = $sumAll - $mBalon; // solo cuotas regulares
+                $avgCuota = $n > 0 ? ($sumReg / $n) : 0;
 
                 $data = array_merge($base, [
                     'fecha_promesa'  => now()->toDateString(),
                     'fecha_pago'     => $firstDate->toDateString(),
                     'cuota_dia'      => (int)$firstDate->day,
-                    'nro_cuotas'     => $n,
+                    'nro_cuotas'     => $n, // N de cuotas regulares (sin balón)
                     'monto_convenio' => $r->input('monto_convenio'),
                     'monto_cuota'    => $avgCuota,
                 ]);
@@ -343,21 +371,13 @@ class ClientsControllers extends Controller
             $promesa = PromesaPago::create($data);
 
             // Operaciones
-            $ops = collect($r->input('operaciones', []))
-                ->map(fn($op)=>trim((string)$op))
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-
-            // Legacy concat
-            $promesa->operacion = implode(', ', $ops);
+            $promesa->operacion = implode(', ', $opsSel);
             $promesa->save();
 
-            // Detalle
+            // Detalle de operaciones
             $now = now();
             $rows = [];
-            foreach ($ops as $op) {
+            foreach ($opsSel as $op) {
                 $rows[] = [
                     'promesa_id' => $promesa->id,
                     'operacion'  => $op,
@@ -375,18 +395,18 @@ class ClientsControllers extends Controller
                         'promesa_id' => $promesa->id,
                         'nro'        => $i + 1,
                         'fecha'      => Carbon::parse($f)->toDateString(),
-                        'monto'      => (float)$cronMontos[$i],
+                        'monto'      => (float)($cronMontos[$i] ?? 0),
                         'es_balon'   => ($cronBalon === ($i + 1)),
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                 }
                 PromesaCuota::insert($rows);
             }
 
             DB::commit();
-
             WorkflowMailer::promesaPendiente($promesa);
+
             return back()->with('ok', 'Propuesta registrada y enviada para autorización.');
         } catch (\Throwable $e) {
             DB::rollBack();

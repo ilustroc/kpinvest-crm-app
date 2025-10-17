@@ -701,18 +701,6 @@
                 {{-- inputs ocultos que se envían --}}
                 <div id="cvHidden"></div>
 
-                <div class="row g-2 mt-2">
-                  <div class="col-md-4">
-                    <div class="form-text">Deuda capital seleccionada: <b>S/ <span id="cvCapSel">0.00</span></b></div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="form-text">Total cronograma: <b>S/ <span id="cvSuma">0.00</span></b></div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="form-text">Cuota balón estimada (capital − convenio): <b>S/ <span id="cvBalonEst">0.00</span></b></div>
-                  </div>
-                </div>
-
                 <div class="form-text mt-1">
                   * El total del cronograma debe coincidir con el <b>Monto convenio</b>.
                 </div>
@@ -802,119 +790,220 @@
 
 @push('scripts')
 <script>
-  (function(){
-    /* === Map de saldos por operación === */
-    const OP_SALDOS = @json($cuentas->pluck('saldo_capital','operacion'));
+(function(){
+  /* === Refs cronograma === */
+  const nro   = document.getElementById('cvNro');
+  const total = document.getElementById('cvTotal');
+  const cuota = document.getElementById('cvCuota');
+  const fIni  = document.getElementById('cvFechaIni');
+  const gen   = document.getElementById('cvGen');
+  const tblEl = document.getElementById('tblCrono');
+  const suma  = document.getElementById('cvSuma');
+  const hid   = document.getElementById('cvHidden');
+  const btnGuardar = document.querySelector('#formPropuesta button[type="submit"]');
+  const hintDia = document.getElementById('cvHintDia');
+  const tipoSel = document.getElementById('tipoPropuesta');
+  const forceBalon = document.getElementById('forceBalon');
 
-    /* === Refs cronograma === */
-    const nro   = document.getElementById('cvNro');
-    const total = document.getElementById('cvTotal');
-    const cuota = document.getElementById('cvCuota');
-    const fIni  = document.getElementById('cvFechaIni');
-    const gen   = document.getElementById('cvGen');
-    const tblEl = document.getElementById('tblCrono');
-    const suma  = document.getElementById('cvSuma');
-    const hid   = document.getElementById('cvHidden');
-    const btnGuardar = document.querySelector('#formPropuesta button[type="submit"]');
-    const hintDia = document.getElementById('cvHintDia');
+  if (!tblEl || !nro || !total || !hid) return;
+  const tbl = tblEl.querySelector('tbody');
 
-    const capSelOut = document.getElementById('cvCapSel');
-    const balonOut  = document.getElementById('cvBalonEst');
+  /* === (opcional) mapa directo desde el backend === */
+  const OP_DEUDAS = (typeof window.OP_DEUDAS !== 'undefined')
+    ? window.OP_DEUDAS
+    : ((typeof window.OP_SALDOS !== 'undefined') ? window.OP_SALDOS : {});
 
-    if (!tblEl || !nro || !total || !hid) return;
-    const tbl = tblEl.querySelector('tbody');
+  const selectedOps = () =>
+    [...document.querySelectorAll('#opsHidden input[name="operaciones[]"]')].map(i => i.value);
 
-    const to2 = n => String(n).padStart(2,'0');
-    const fmt = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
-    const num = v => Number(String(v ?? '').replace(',','.')) || 0;
+  /* === helpers === */
+  const to2  = n => String(n).padStart(2,'0');
+  const fmt2 = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
+  const num  = v => {
+    const s = String(v ?? '').replace(/[^\d,.\-]/g,'').replace(/,/g,''); // "24,492.55" -> "24492.55"
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
 
-    const selectedOps = () =>
-      [...document.querySelectorAll('#opsHidden input[name="operaciones[]"]')].map(i => i.value);
+  const isBalon = () => {
+    const opt = tipoSel?.selectedOptions?.[0];
+    return (opt && opt.dataset.balon === '1') || (forceBalon?.value === '1');
+  };
 
-    const capitalSeleccionado = () =>
-      selectedOps().reduce((s, op) => s + (num(OP_SALDOS?.[op])||0), 0);
+  function addMonthsNoOverflow(base, months){
+    const d = new Date(base);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    if (d.getDate() !== day) d.setDate(0);
+    return d;
+  }
 
-    function renderRows(n){
-      tbl.innerHTML = '';
-      for (let i=1; i<=n; i++){
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="text-center">${to2(i)}</td>
-          <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
-          <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
-        `;
-        tbl.appendChild(tr);
-      }
-      recalc();
-    }
-
-    function recalc(){
-      let s = 0;
-      [...tbl.querySelectorAll('tr')].forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
-      if (suma) suma.textContent = fmt(s);
-
-      hid.innerHTML = '';
-      [...tbl.querySelectorAll('tr')].forEach(tr => {
-        const f = tr.querySelector('.cr-fecha')?.value || '';
-        const m = tr.querySelector('.cr-monto')?.value || '';
-        hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_fecha[]" value="${f}">`);
-        hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
-      });
-
-      const capSel = capitalSeleccionado();
-      const montoConvenio = num(total.value);
-      const balon = Math.max(0, +(capSel - montoConvenio).toFixed(2));
-      if (capSelOut) capSelOut.textContent = fmt(capSel);
-      if (balonOut)  balonOut.textContent  = fmt(balon);
-
-      const ok = Math.abs(s - montoConvenio) <= 0.01;
-      if (btnGuardar) btnGuardar.disabled = !ok;
-      if (suma) suma.classList.toggle('text-danger', !ok);
-    }
-
-    function addMonthsNoOverflow(base, months){
-      const d = new Date(base);
-      const day = d.getDate();
-      d.setMonth(d.getMonth() + months);
-      if (d.getDate() !== day) d.setDate(0);
-      return d;
-    }
-    function genAuto(){
-      const n = Math.max(1, parseInt(nro.value || '0', 10));
-      if (!n) return;
-      if (tbl.children.length !== n) renderRows(n);
-
-      const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
-      const m = num(cuota?.value) || (num(total.value) / n);
-
-      [...tbl.querySelectorAll('tr')].forEach((tr, idx)=>{
-        const f = tr.querySelector('.cr-fecha');
-        const mm = tr.querySelector('.cr-monto');
-        if (start){
-          const d = addMonthsNoOverflow(start, idx);
-          f.valueAsDate = d;
-        }
-        mm.value = fmt(m);
-      });
-      recalc();
-    }
-
-    gen?.addEventListener('click', genAuto);
-    nro.addEventListener('change', ()=>{ renderRows(Math.max(1, parseInt(nro.value || '1', 10))); });
-    tbl.addEventListener('input', e=>{ if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
-    fIni?.addEventListener('change', ()=>{
-      const v = fIni.value;
-      if (!hintDia) return;
-      if (!v){ hintDia.textContent = 'Día de pago: —'; return; }
-      const d = new Date(v + 'T00:00:00');
-      hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
+  /* === localizar columna "Deuda total" en #tblCuentas === */
+  const ctasTable = document.getElementById('tblCuentas');
+  let IDX_DEUDA = -1, IDX_CAPITAL = -1;
+  if (ctasTable){
+    const ths = ctasTable.querySelectorAll('thead th');
+    ths.forEach((th, i) => {
+      const t = (th.textContent || '').toLowerCase().trim();
+      if (IDX_DEUDA < 0 && t.includes('deuda') && t.includes('total')) IDX_DEUDA = i;
+      if (IDX_CAPITAL < 0 && (t.includes('saldo capital') || t === 'capital' || t.includes('capital'))) IDX_CAPITAL = i;
     });
-    total?.addEventListener('input', recalc);
+  }
 
-    renderRows(Math.max(1, parseInt(nro.value || '1', 10)));
-  })();
+  /* === deuda por operación: evita tomar el N° de operación === */
+  function lookupDeuda(op){
+    // 1) Mapa JS si viene del backend
+    if (OP_DEUDAS && OP_DEUDAS[op] != null) return num(OP_DEUDAS[op]);
 
-  /* ================== Utilidades generales de la vista ================== */
+    // 2) Fila en tabla y columna específica "Deuda total"
+    const row = document.querySelector(`#tblCuentas tbody tr[data-oper="${op}"]`);
+    if (row){
+      if (IDX_DEUDA >= 0){
+        const t = row.cells?.[IDX_DEUDA]?.textContent || '';
+        const v = num(t);
+        if (v > 0) return v;
+      }
+      // 3) data-* comunes
+      const ds = row.dataset || {};
+      const cand = ds.deudaTotal ?? ds.deuda ?? ds.total ?? ds.saldocapital ?? ds.capital;
+      if (cand){
+        const v = num(cand);
+        if (v > 0) return v;
+      }
+      // 4) Fallback seguro: usar la ÚLTIMA celda que tenga monto (suele ser deuda total)
+      const cells = [...row.querySelectorAll('td')].reverse();
+      for (const td of cells){
+        const txt = td.textContent || '';
+        // Evita claramente la celda con la operación (entera y sin decimales)
+        if (/^\s*\d{6,}\s*$/.test(txt)) continue;
+        const v = num(txt);
+        if (v > 0) return v;
+      }
+    }
+    return 0;
+  }
+
+  const deudaSeleccionada = () =>
+    selectedOps().reduce((s, op) => s + lookupDeuda(op), 0);
+
+  /* === render rows === */
+  function renderRows(nBase){
+    const n = Math.max(1, parseInt(nBase || '1', 10));
+    const rows = isBalon() ? n + 1 : n; // +1 si es cuota balón
+    tbl.innerHTML = '';
+    for (let i=1; i<=rows; i++){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-center">${to2(i)}</td>
+        <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
+        <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
+      `;
+      tbl.appendChild(tr);
+    }
+    recalc();
+  }
+
+  /* === recálculo y ocultos === */
+  function recalc(){
+    const rows = [...tbl.querySelectorAll('tr')];
+    const convenio = num(total.value);
+
+    // Balón = Deuda total seleccionada − convenio (nunca negativa)
+    let montoBalon = 0;
+    if (isBalon() && rows.length >= 2){
+      const deuda = +deudaSeleccionada();
+      montoBalon = Math.max(+((deuda - convenio).toFixed(2)), 0);
+      const lastMonto = rows[rows.length-1].querySelector('.cr-monto');
+      if (lastMonto) lastMonto.value = fmt2(montoBalon);
+    }
+
+    // Suma visual
+    let s = 0;
+    rows.forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
+    if (suma) suma.textContent = fmt2(s);
+
+    // ocultos
+    hid.innerHTML = '';
+    rows.forEach(tr => {
+      const f = tr.querySelector('.cr-fecha')?.value || '';
+      const m = tr.querySelector('.cr-monto')?.value || '';
+      hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_fecha[]" value="${f}">`);
+      hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
+    });
+    if (isBalon() && rows.length >= 2){
+      hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_balon" value="${rows.length}">`);
+    }
+
+    // Validación: las cuotas regulares deben sumar el convenio
+    const sReg = isBalon() ? (s - montoBalon) : s;
+    const ok = Math.abs(sReg - convenio) <= 0.01;
+    if (btnGuardar) btnGuardar.disabled = !ok;
+    if (suma) suma.classList.toggle('text-danger', !ok);
+  }
+
+  /* === autogenerar === */
+  function genAuto(){
+    const n = Math.max(1, parseInt(nro.value || '0', 10));
+    if (!n) return;
+
+    renderRows(n);
+
+    const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
+    const convenio = num(total.value);
+    const montoCuota = num(cuota?.value);
+
+    const rows = [...tbl.querySelectorAll('tr')];
+    rows.forEach((tr, idx) => {
+      const f = tr.querySelector('.cr-fecha');
+      const m = tr.querySelector('.cr-monto');
+
+      if (start){
+        const d = addMonthsNoOverflow(start, idx);
+        f.valueAsDate = d;
+      }
+
+      if (!isBalon()){
+        const eq = montoCuota > 0 ? montoCuota : (convenio / rows.length);
+        m.value = fmt2(eq);
+      } else {
+        const baseN = rows.length - 1; // sin la balón
+        if (idx < baseN){
+          const val = montoCuota > 0 ? montoCuota : (convenio / baseN);
+          m.value = fmt2(val);
+        } else {
+          m.value = fmt2(0); // se fija en recalc() con (deuda − convenio)
+        }
+      }
+    });
+
+    recalc();
+  }
+
+  /* === eventos === */
+  gen?.addEventListener('click', genAuto);
+  nro.addEventListener('change',   () => renderRows(nro.value));
+  tbl.addEventListener('input',    e => { if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
+  total?.addEventListener('input', recalc);
+  tipoSel?.addEventListener('change', () => renderRows(nro.value));
+  fIni?.addEventListener('change', () => {
+    const v = fIni.value;
+    if (!hintDia) return;
+    if (!v){ hintDia.textContent = 'Día de pago: —'; return; }
+    const d = new Date(v + 'T00:00:00');
+    hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
+  });
+
+  // Recalcular al abrir o si cambian operaciones seleccionadas
+  document.getElementById('modalPropuesta')?.addEventListener('shown.bs.modal', recalc);
+  document.getElementById('modalPropuesta')?.addEventListener('change', (e) => {
+    if (e.target && e.target.name === 'operaciones[]') recalc();
+  });
+
+  // Inicial
+  renderRows(nro.value || 1);
+})();
+
+/* ================== Utilidades generales de la vista ================== */
 
   // Tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{ new bootstrap.Tooltip(el); });
