@@ -278,7 +278,7 @@ class ClientsControllers extends Controller
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
         }
 
-        // Operaciones seleccionadas
+        // Operaciones (para validar y guardar)
         $opsSel = collect($r->input('operaciones', []))
             ->map(fn($op)=>trim((string)$op))
             ->filter()
@@ -288,20 +288,22 @@ class ClientsControllers extends Controller
 
         // ===== REGLAS CONVENIO
         if ($r->input('tipo') === 'convenio') {
-            $n = max(1, (int)$r->input('nro_cuotas'));
+            $n = max(1, (int)$r->input('nro_cuotas'));      // cuotas regulares (sin balón)
+            $hasBalon = $cronBalon > 0;
+            $expected = $n + ($hasBalon ? 1 : 0);           // total de filas del cronograma
 
-            // Ajuste de longitud
-            if (count($cronFechas) !== $n || count($cronMontos) < $n) {
-                $cronFechas = array_slice($cronFechas, 0, $n);
-                $cronMontos = array_slice($cronMontos, 0, max($n, count($cronMontos)));
-                while (count($cronFechas) < $n) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
-                while (count($cronMontos) < $n) $cronMontos[] = 0;
+            // Ajustar arrays al tamaño esperado (¡no recortar la fila de balón!)
+            if (count($cronFechas) !== $expected || count($cronMontos) !== $expected) {
+                $cronFechas = array_slice($cronFechas, 0, $expected);
+                $cronMontos = array_slice($cronMontos, 0, $expected);
+                while (count($cronFechas) < $expected) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
+                while (count($cronMontos) < $expected) $cronMontos[] = 0;
             }
 
             $suma = array_sum(array_map('floatval', $cronMontos));
 
-            if ($cronBalon > 0) {
-                // Con cuota balón: suma = DEUDA TOTAL seleccionada
+            if ($hasBalon) {
+                // Con balón: la suma del cronograma debe igualar la DEUDA TOTAL seleccionada
                 $deudaSel = (float) DB::table('clientes_cuentas')
                     ->whereIn('operacion', $opsSel)
                     ->sum('deuda_total');
@@ -312,7 +314,7 @@ class ClientsControllers extends Controller
                         ->withInput();
                 }
             } else {
-                // Sin balón: suma = monto_convenio
+                // Sin balón: la suma debe igualar el monto_convenio
                 if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
                     return back()
                         ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
@@ -336,12 +338,14 @@ class ClientsControllers extends Controller
             ];
 
             if ($r->input('tipo') === 'convenio') {
-                $n = max(1, (int)$r->input('nro_cuotas'));
-                $firstDate = Carbon::parse($cronFechas[0] ?? now());
+                $n         = max(1, (int)$r->input('nro_cuotas'));
+                $hasBalon  = $cronBalon > 0;
+                $expected  = $n + ($hasBalon ? 1 : 0);
+                $firstDate = \Carbon\Carbon::parse($cronFechas[0] ?? now());
 
-                // Promedio de cuota: EXCLUYE la cuota balón si existe
+                // Promedio de cuota (solo regulares, excluye balón)
                 $sumAll   = array_sum(array_map('floatval', $cronMontos));
-                $mBalon   = ($cronBalon > 0 && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
+                $mBalon   = ($hasBalon && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
                 $sumReg   = $sumAll - $mBalon;
                 $avgCuota = $n > 0 ? ($sumReg / $n) : 0;
 
@@ -349,12 +353,12 @@ class ClientsControllers extends Controller
                     'fecha_promesa'  => now()->toDateString(),
                     'fecha_pago'     => $firstDate->toDateString(),
                     'cuota_dia'      => (int)$firstDate->day,
-                    'nro_cuotas'     => $n,
+                    'nro_cuotas'     => $n,                              // regulares
                     'monto_convenio' => $r->input('monto_convenio'),
                     'monto_cuota'    => $avgCuota,
                 ]);
-            } else { // cancelación
-                $fecha = Carbon::parse($r->input('fecha_pago'));
+            } else {
+                $fecha = \Carbon\Carbon::parse($r->input('fecha_pago'));
                 $data = array_merge($base, [
                     'fecha_promesa' => $fecha->toDateString(),
                     'fecha_pago'    => $fecha->toDateString(),
@@ -382,14 +386,15 @@ class ClientsControllers extends Controller
             }
             PromesaOperacion::insert($rows);
 
-            // Cronograma (solo convenio)
+            // Cronograma (incluye balón si existe)
             if ($promesa->tipo === 'convenio') {
                 $rows = [];
-                foreach ($cronFechas as $i => $f) {
+                $totalItems = count($cronFechas); // ya es n (+1 si balón)
+                for ($i = 0; $i < $totalItems; $i++) {
                     $rows[] = [
                         'promesa_id' => $promesa->id,
                         'nro'        => $i + 1,
-                        'fecha'      => Carbon::parse($f)->toDateString(),
+                        'fecha'      => \Carbon\Carbon::parse($cronFechas[$i])->toDateString(),
                         'monto'      => (float)($cronMontos[$i] ?? 0),
                         'es_balon'   => ($cronBalon === ($i + 1)),
                         'created_at' => $now,
@@ -400,6 +405,8 @@ class ClientsControllers extends Controller
             }
 
             DB::commit();
+
+            // Mail / workflow
             WorkflowMailer::promesaPendiente($promesa);
 
             return back()->with('ok', 'Propuesta registrada y enviada para autorización.');

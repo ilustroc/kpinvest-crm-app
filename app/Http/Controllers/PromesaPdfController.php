@@ -59,7 +59,7 @@ class PromesaPdfController extends Controller
             };
             $fmtDate = fn($v) => \Carbon\Carbon::parse($v)->format('d/m/Y');
 
-            // ---- Monto a repartir
+            // ---- "Monto a repartir" SOLO para columna ${monto_divido}
             $montoTotal = $promesa->tipo === 'convenio'
                 ? (float)($promesa->monto_convenio ?? 0)
                 : (float)($promesa->monto ?? 0);
@@ -86,14 +86,17 @@ class PromesaPdfController extends Controller
                 $tablaOps[] = [
                     'operacion'     => (string)$op,
                     'deuda_total'   => $fmtDebt($deu),
-                    'monto_divido'  => $fmtNo00($parte),   // <-- nuevo marcador
+                    'monto_divido'  => $fmtNo00($parte),
                 ];
             }
 
-            // ---- Cronograma
+            // ---- Cronograma (y suma para ${monto})
             $rowsCrono = [];
+            $sumaCronoRaw = 0.0; // <--- suma de monto_cuota
+
             if ($promesa->relationLoaded('cuotas') && $promesa->cuotas->count()) {
                 foreach ($promesa->cuotas as $c) {
+                    $sumaCronoRaw += (float)$c->monto;
                     $rowsCrono[] = [
                         'nro_cuotas'  => str_pad((int)$c->nro, 2, '0', STR_PAD_LEFT),
                         'monto_cuota' => $fmtNo00($c->monto),
@@ -105,15 +108,18 @@ class PromesaPdfController extends Controller
                     $n = (int)($promesa->nro_cuotas ?? 1) ?: 1;
                     $mon = (float)($promesa->monto_cuota ?? 0);
                     if ($mon <= 0 && (float)($promesa->monto_convenio ?? 0) > 0) $mon = (float)$promesa->monto_convenio / $n;
+                    $sumaCronoRaw += $mon;
                     $rowsCrono[] = [
                         'nro_cuotas'  => str_pad($n, 2, '0', STR_PAD_LEFT),
                         'monto_cuota' => $fmtNo00($mon),
                         'fecha_pago'  => $fmtDate($promesa->fecha_pago ?? $promesa->fecha_promesa ?? now()),
                     ];
-                } else {
+                } else { // cancelación
+                    $mon = (float)($promesa->monto ?? 0);
+                    $sumaCronoRaw += $mon;
                     $rowsCrono[] = [
                         'nro_cuotas'  => '01',
-                        'monto_cuota' => $fmtNo00($promesa->monto ?? 0),
+                        'monto_cuota' => $fmtNo00($mon),
                         'fecha_pago'  => $fmtDate($promesa->fecha_pago ?? $promesa->fecha_promesa ?? now()),
                     ];
                 }
@@ -123,19 +129,19 @@ class PromesaPdfController extends Controller
             $doc = new TemplateProcessor($tpl);
 
             $creador = DB::table('users')->where('id',$promesa->user_id)->value('name');
-            $doc->setValue('name', (string)($creador ?? ''));  // por si tu plantilla lo usa
+            $doc->setValue('name', (string)($creador ?? ''));
             $doc->setValue('id', str_pad((string)$promesa->id, 4, '0', STR_PAD_LEFT));
             $doc->setValue('created_at', $promesa->created_at ? $fmtDate($promesa->created_at) : '');
             $doc->setValue('nombre',        $nombre);
             $doc->setValue('numdoc',        $numdoc);
             $doc->setValue('telefono',      (string)($promesa->telefono ?? ''));
             $doc->setValue('direccion',     $direccion);
-            $doc->setValue('entidad',       $entidad);                 // <-- ahora sí
+            $doc->setValue('entidad',       $entidad);
 
-            // total negociado (para la fila libre bajo cronograma)
-            $doc->setValue('monto', $fmtNo00($montoTotal));
+            // === ${monto} ahora es la suma de ${monto_cuota}
+            $doc->setValue('monto', $fmtNo00($sumaCronoRaw));
 
-            // Tabla de operaciones (usa marcador 'operacion' y 'monto_divido')
+            // Tabla de operaciones
             if (method_exists($doc, 'cloneRowAndSetValues')) {
                 $doc->cloneRowAndSetValues('operacion', $tablaOps ?: [['operacion'=>'','deuda_total'=>$fmtDebt(0),'monto_divido'=>$fmtNo00($montoTotal)]]);
             } else {
@@ -168,18 +174,16 @@ class PromesaPdfController extends Controller
                 }
             }
 
-            // Directorio temporal (¡crear si no existe!)
+            // Directorio temporal
             $tmpDir = storage_path('app/tmp');
-            if (!is_dir($tmpDir)) {
-                @mkdir($tmpDir, 0775, true);
-            }
+            if (!is_dir($tmpDir)) @mkdir($tmpDir, 0775, true);
 
-            // Guardar DOCX (ya lo tienes)
+            // Guardar DOCX
             $docxOut = $tmpDir . "/Conv_{$promesa->dni}.docx";
             $pdfOut  = $tmpDir . "/Conv_{$promesa->dni}.pdf";
             $doc->saveAs($docxOut);
 
-            // === CONVERTIR DOCX -> PDF con iLovePDF ===
+            // iLovePDF
             try {
                 $public = config('services.ilovepdf.public');
                 $secret = config('services.ilovepdf.secret');
@@ -194,7 +198,6 @@ class PromesaPdfController extends Controller
                 $task->execute();
                 $task->download($tmpDir);
 
-                // A veces el nombre puede variar; busca el PDF generado
                 $cands = glob($tmpDir . "/Conv_{$promesa->dni}*.pdf");
                 if (!$cands) {
                     throw new \RuntimeException('iLovePDF no devolvió un PDF en el directorio de salida');
@@ -205,7 +208,6 @@ class PromesaPdfController extends Controller
                 return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
             }
 
-            // Responder el PDF
             return response()->file($pdfOut, [
                 'Content-Type'  => 'application/pdf',
                 'Cache-Control' => 'private, max-age=0, no-store, no-cache, must-revalidate',
