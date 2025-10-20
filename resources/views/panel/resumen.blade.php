@@ -53,13 +53,41 @@
     border:1px solid transparent; background:#fff; transition:.15s
   }
   .notif-item:hover{ background:var(--bs-tertiary-bg); border-color:var(--bs-border-color) }
-  .notif-dot{ width:9px;height:9px;border-radius:50%; background:var(--accent) } /* azul por defecto */
+  .notif-dot{ width:9px;height:9px;border-radius:50%; background:var(--accent) }
   .notif-body .notif-main{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .notif-body .notif-sub{ font-size:.85rem; color:var(--bs-secondary-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .notif-cta{
     font-size:.75rem; border:1px solid var(--bs-border-color); background:#fff; border-radius:999px; padding:.18rem .55rem; white-space:nowrap
   }
   .notifs-footer{ border-top:1px dashed var(--bs-border-color); padding:.5rem .6rem .6rem; background:#fff }
+
+  /* === Autocomplete (sugerencias) === */
+  .quick-menu{
+    position:absolute; top:100%; left:0; z-index:1000;
+    display:none; width:540px; max-height:320px; overflow:auto;
+    margin-top:.25rem; border:1px solid var(--border, var(--bs-border-color));
+    border-radius:8px; background:var(--surface, #fff);
+    box-shadow:0 10px 24px rgba(20,20,40,.12);
+  }
+  .quick-menu.show{ display:block; }
+  .quick-item{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:.75rem; padding:.5rem .75rem; cursor:pointer; text-decoration:none; color:inherit;
+  }
+  .quick-item:hover, .quick-item.active{
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+  }
+  .quick-left{ display:flex; align-items:center; gap:.5rem; min-width:0 }
+  .quick-dni{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Roboto Mono", monospace;
+    font-weight:700; letter-spacing:.2px; white-space:nowrap;
+  }
+  .quick-sep{ opacity:.6 }
+  .quick-name{
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .quick-meta{ color:var(--bs-secondary-color); font-size:.85rem; white-space:nowrap }
+  .quick-hl{ font-weight:700; background: color-mix(in oklab, var(--brand) 25%, transparent) }
 </style>
 @endpush
 
@@ -89,16 +117,55 @@
           <div>
             <h5 class="mb-1">¡Bienvenido(a)!</h5>
             <div class="text-secondary small">Panel inicial.</div>
+
+            @if (session('quick_error'))
+              <div class="alert alert-warning py-1 px-2 mt-2 mb-0" role="alert">
+                <i class="bi bi-exclamation-triangle me-1"></i> {{ session('quick_error') }}
+              </div>
+            @endif
           </div>
-          <form id="frmQuickDni" class="d-flex" role="search">
-            <input id="inpQuickDni" class="form-control form-control-sm me-2" inputmode="numeric" autocomplete="off"
-                   placeholder="Buscar cliente por DNI" aria-label="DNI">
+
+          <form id="frmQuick" class="position-relative d-flex align-items-center" role="search"
+                action="{{ route('clientes.quick') }}" method="GET" autocomplete="off">
+            <input id="inpQuick"
+                   name="q"
+                   class="form-control form-control-sm me-2"
+                   placeholder="DNI / Operación / Nombre"
+                   aria-label="Buscar por DNI, Operación o Nombre">
             <button class="btn btn-primary btn-sm" type="submit">
               <i class="bi bi-search me-1"></i> Buscar
             </button>
+
+            {{-- Dropdown de sugerencias --}}
+            <div id="quickSug" class="quick-menu"></div>
           </form>
         </div>
       </div>
+
+      {{-- Lista de coincidencias ambigua (opcional) --}}
+      @if (session('quick_list'))
+        <div class="card pad mt-2">
+          <h6 class="mb-2">Coincidencias</h6>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead><tr><th>DNI</th><th>Nombre</th><th>Operación</th><th>Cosecha</th><th></th></tr></thead>
+              <tbody>
+              @foreach(session('quick_list') as $r)
+                <tr>
+                  <td class="text-nowrap">{{ $r['dni'] ?? $r->dni }}</td>
+                  <td>{{ $r['nombre'] ?? $r->nombre }}</td>
+                  <td class="text-nowrap">{{ $r['operacion'] ?? $r->operacion }}</td>
+                  <td class="text-nowrap">{{ $r['cosecha'] ?? $r->cosecha }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ route('clientes.show', $r['dni'] ?? $r->dni) }}">Ver</a>
+                  </td>
+                </tr>
+              @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+      @endif
 
       {{-- KPIs --}}
       <div class="row g-3">
@@ -126,10 +193,16 @@
       @unless($isAsesor)
       <div class="card pad shadow-soft quick">
         <div class="d-flex flex-wrap gap-2">
-          <a href="{{ route('autorizacion') }}" class="btn btn-outline-primary"><i class="bi bi-inboxes me-1"></i> Autorización</a>
-          <a href="{{ route('clientes.index') }}" class="btn btn-outline-secondary"><i class="bi bi-people me-1"></i> Clientes</a>
-          <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-graph-up me-1"></i> Dashboard</a>
-          <a href="{{ route('reportes.pdp') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Reportes</a>
+          <a href="{{ route('autorizacion') }}" class="btn btn-outline-primary">
+            <i class="bi bi-inboxes me-1"></i> Autorización
+          </a>
+          {{-- Se quita el acceso a "Clientes" porque el buscador ahora está aquí --}}
+          <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-graph-up me-1"></i> Dashboard
+          </a>
+          <a href="{{ route('reportes.pdp') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Reportes
+          </a>
         </div>
       </div>
       @endunless
@@ -164,8 +237,7 @@
         </div>
 
         <div class="notifs-body">
-
-          {{-- ========== VISTA ASESOR ========== --}}
+          {{-- ===== VISTA ASESOR ===== --}}
           @if($isAsesor)
             {{-- Promesas del asesor --}}
             <section class="notif-group">
@@ -340,7 +412,7 @@
             </section>
 
           @else
-          {{-- ========== VISTA SUPERVISOR / ADMIN ========== --}}
+          {{-- ===== VISTA SUPERVISOR / ADMIN ===== --}}
 
             {{-- Promesas por aprobar --}}
             <section class="notif-group">
@@ -448,21 +520,74 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 <script>
-  // Buscar por DNI -> /clientes/{dni}
-  (() => {
-    const frm   = document.getElementById('frmQuickDni');
-    const input = document.getElementById('inpQuickDni');
-    if (!frm || !input) return;
-    const SHOW_URL = @json(route('clientes.show','__DNI__'));
-    frm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const dni = (input.value || '').replace(/\D/g,'').slice(0,12);
-      if (!dni) { input.focus(); return; }
-      window.location.assign(SHOW_URL.replace('__DNI__', encodeURIComponent(dni)));
+  /* ====================== AUTOCOMPLETE ====================== */
+  (function(){
+    const frm = document.getElementById('frmQuick');
+    const inp = document.getElementById('inpQuick');
+    const sug = document.getElementById('quickSug');
+    if (!frm || !inp || !sug) return;
+
+    let timer=null, idx=-1;
+
+    const SUG_URL = @json(route('clientes.suggest'));
+    function hide(){ sug.classList.remove('show'); sug.innerHTML=''; idx=-1; }
+    function show(){ if(!sug.classList.contains('show')) sug.classList.add('show'); }
+
+    const escRx = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    function mark(txt, q){
+      if(!q) return txt;
+      const rx = new RegExp('('+escRx(q)+')','ig');
+      return String(txt||'').replace(rx,'<span class="quick-hl">$1</span>');
+    }
+    function setActive(i){
+      const items = [...sug.querySelectorAll('.quick-item')];
+      items.forEach((a,k)=>a.classList.toggle('active', k===i));
+      idx = i;
+    }
+    function render(items, q){
+      if(!items.length){ hide(); return; }
+      sug.innerHTML = items.map((it,i)=>`
+        <a href="${it.url}" class="quick-item ${i===0?'active':''}" data-idx="${i}">
+          <div class="quick-left">
+            <span class="quick-dni">${mark(it.dni,q)}</span>
+            <span class="quick-sep">»</span>
+            <span class="quick-name">${mark(it.nombre,q)}</span>
+          </div>
+          <div class="quick-meta">${mark(it.operacion||'—',q)} · ${it.cosecha||'—'}</div>
+        </a>
+      `).join('');
+      sug.querySelectorAll('.quick-item').forEach((a,i)=>{
+        a.addEventListener('mouseenter',()=>setActive(i));
+      });
+      show(); idx=0;
+    }
+    function fetchSuggest(q){
+      if (!q || q.trim().length<1){ hide(); return; }
+      fetch(SUG_URL+'?q='+encodeURIComponent(q.trim()), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(r=>r.json()).then(data=>render(data, q)).catch(()=>hide());
+    }
+
+    inp.addEventListener('input', ()=>{
+      clearTimeout(timer);
+      timer=setTimeout(()=>fetchSuggest(inp.value), 140);
     });
+    inp.addEventListener('focus', ()=>{ if(inp.value.trim()) fetchSuggest(inp.value); });
+
+    // Teclado
+    inp.addEventListener('keydown', (e)=>{
+      const items = [...sug.querySelectorAll('.quick-item')];
+      if(e.key==='ArrowDown' && items.length){ e.preventDefault(); setActive(Math.min(idx+1, items.length-1)); }
+      if(e.key==='ArrowUp'   && items.length){ e.preventDefault(); setActive(Math.max(idx-1, 0)); }
+      if(e.key==='Enter'     && items.length && idx>=0){
+        e.preventDefault(); items[idx].click();
+      }
+      if(e.key==='Escape'){ hide(); }
+    });
+
+    document.addEventListener('click', (e)=>{ if(!e.target.closest('#frmQuick')) hide(); });
   })();
 
-  // Selector de mes
+  /* ====================== SELECTOR DE MES ====================== */
   document.getElementById('mesPicker')?.addEventListener('change', (e)=>{
     const ym = e.target.value || '';
     const url = new URL(window.location.href);
@@ -470,8 +595,8 @@
     window.location.assign(url.toString());
   });
 
-  // Gráfica de pagos del mes
-  (()=>{
+  /* ====================== CHART: PAGOS DEL MES ====================== */
+  (function(){
     const el = document.getElementById('chartPagos');
     if(!el) return;
     const payload = (()=>{ try{ return JSON.parse(el.dataset.chart||'{}'); }catch(_){ return {}; }})();

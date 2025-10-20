@@ -3,16 +3,12 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
-
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Pagination\LengthAwarePaginator;
-
 use App\Support\WorkflowMailer;
-
 use App\Models\PromesaPago;
 use App\Models\PromesaOperacion;
 use App\Models\PromesaCuota;
@@ -20,40 +16,96 @@ use App\Models\PagoPropia as Pago;
 use App\Models\ClienteCuenta;
 use App\Models\CcdCliente;
 use Throwable;
-
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ClientsControllers extends Controller
 {
-    /* ==========================
-     * Listado
-     * ========================== */
-    public function index(Request $r)
+    public function quickLookup(Request $r)
     {
-        $q  = trim((string) $r->query('q', ''));
-        $pp = (int) $r->query('pp', 20) ?: 20;
+        $q = trim((string)$r->query('q', ''));
+        if ($q === '') {
+            return back()->withInput()->with('quick_error', 'Ingresa DNI, Operación o Nombre.');
+        }
 
-        $clientes = ClienteCuenta::query()
-            ->select([
-                'numdoc as dni',
-                'operacion',
-                'nombre',
-                'cosecha',
-                'updated_at',
-            ])
-            ->when($q !== '', function ($w) use ($q) {
+        $base = DB::table('clientes_cuentas');
+
+        // 1) DNI exacto (solo dígitos largos)
+        if (preg_match('/^\d{6,}$/', $q)) {
+            $dni = (clone $base)->where('numdoc', $q)->value('numdoc');
+            if ($dni) return redirect()->route('clientes.show', $dni);
+
+            // 2) Operación exacta
+            $dniOp = (clone $base)->where('operacion', $q)->value('numdoc');
+            if ($dniOp) return redirect()->route('clientes.show', $dniOp);
+        }
+
+        // 3) Coincidencias por cualquier campo (LIKE)
+        $cands = $this->candidateDnies($q, 20); // devuelve collection de DNIs
+
+        if ($cands->isEmpty()) {
+            return back()->withInput()->with('quick_error', 'Cliente no ubicado.');
+        }
+        if ($cands->count() === 1) {
+            return redirect()->route('clientes.show', $cands->first());
+        }
+
+        // 4) Armar lista (un row representativo por DNI)
+        $rows = DB::table('clientes_cuentas')
+            ->whereIn('numdoc', $cands)
+            ->orderByDesc('updated_at')
+            ->get(['numdoc as dni','nombre','operacion','cosecha','updated_at'])
+            ->unique('dni')
+            ->values();
+
+        return back()->withInput()->with('quick_list', $rows->toArray());
+    }
+
+    /** Endpoint para autocompletar (JSON) */
+    public function suggest(Request $r)
+    {
+        $q = trim((string)$r->query('q', ''));
+        if ($q === '') return response()->json([]);
+
+        $dnies = $this->candidateDnies($q, 8);
+
+        $rows = DB::table('clientes_cuentas')
+            ->whereIn('numdoc', $dnies)
+            ->orderByDesc('updated_at')
+            ->get(['numdoc as dni','nombre','operacion','cosecha'])
+            ->unique('dni')
+            ->values()
+            ->map(function($r){
+                return [
+                    'dni'       => $r->dni,
+                    'nombre'    => $r->nombre,
+                    'operacion' => $r->operacion,
+                    'cosecha'   => $r->cosecha,
+                    'url'       => route('clientes.show', $r->dni),
+                ];
+            });
+
+        return response()->json($rows);
+    }
+
+    /** Busca DNIs candidatos por DNI/operación/nombre (LIKE + agrupación) */
+    private function candidateDnies(string $q, int $limit = 10)
+    {
+        $q = trim($q);
+        $base = DB::table('clientes_cuentas');
+
+        return (clone $base)
+            ->selectRaw('numdoc, MAX(updated_at) as u')
+            ->where(function($w) use ($q){
                 $w->where('numdoc', 'like', "%{$q}%")
                 ->orWhere('operacion', 'like', "%{$q}%")
                 ->orWhere('nombre', 'like', "%{$q}%");
             })
-            ->orderByDesc('updated_at')
-            ->paginate($pp);
-
-        /** @var \Illuminate\Pagination\LengthAwarePaginator $clientes */
-        $clientes->withQueryString();
-
-        return view('clientes.index', compact('clientes', 'q'));
+            ->groupBy('numdoc')
+            ->orderByDesc('u')
+            ->limit($limit)
+            ->pluck('numdoc');
     }
+
 
     /* ==========================
      * Ficha del cliente

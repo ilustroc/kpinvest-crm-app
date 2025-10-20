@@ -203,7 +203,6 @@
       <nav class="navy">
         <div class="lab">GENERAL</div>
         <a href="{{ route('panel') }}" class="{{ request()->routeIs('panel') ? 'active' : '' }}"><i class="bi bi-grid"></i><span>Resumen</span></a>
-        <a href="{{ route('clientes.index') }}" class="{{ request()->routeIs('clientes.index') ? 'active' : '' }}"><i class="bi bi-search"></i><span>Buscar Cliente</span></a>
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-graph-up"></i><span>Estadísticas</span></a>
 
         @auth

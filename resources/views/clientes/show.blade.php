@@ -789,7 +789,7 @@
 @push('scripts')
 <script>
 (function(){
-  // ===== Refs
+  // ===== Refs (ya las tienes arriba)
   const nro   = document.getElementById('cvNro');
   const total = document.getElementById('cvTotal');
   const cuota = document.getElementById('cvCuota');
@@ -802,27 +802,20 @@
   const hintDia = document.getElementById('cvHintDia');
   const tipoSel = document.getElementById('tipoPropuesta');
   const tipoTag = document.getElementById('modalTipoTag');
+  const formCon = document.getElementById('formConvenio');
+  const formCan = document.getElementById('formCancelacion');
+  const modal   = document.getElementById('modalPropuesta');
 
   if (!tblEl || !nro || !total || !hid) return;
   const tbl = tblEl.querySelector('tbody');
 
-  // ===== Helpers
+  // Helpers (los mismos que ya tienes)
   const to2  = n => String(n).padStart(2,'0');
   const fmt2 = n => (Math.round((Number(n)||0)*100)/100).toFixed(2);
-  const num  = v => {
-    const s = String(v ?? '').replace(/[^\d,.\-]/g,'').replace(/,/g,'');
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
-  function addMonthsNoOverflow(base, months){
-    const d = new Date(base);
-    const day = d.getDate();
-    d.setMonth(d.getMonth() + months);
-    if (d.getDate() !== day) d.setDate(0);
-    return d;
-  }
+  const num  = v => { const s=String(v??'').replace(/[^\d,.\-]/g,'').replace(/,/g,''); const n=parseFloat(s); return isNaN(n)?0:n; };
+  function addMonthsNoOverflow(base, months){ const d=new Date(base); const day=d.getDate(); d.setMonth(d.getMonth()+months); if(d.getDate()!==day)d.setDate(0); return d; }
 
-  // ===== Render/recálculo (sin lógica de “balón”)
+  // Render / recálculo (igual que tenías)
   function renderRows(nBase){
     const n = Math.max(1, parseInt(nBase || '1', 10));
     tbl.innerHTML = '';
@@ -831,13 +824,11 @@
       tr.innerHTML = `
         <td class="text-center">${to2(i)}</td>
         <td><input type="date" class="form-control form-control-sm cr-fecha"></td>
-        <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>
-      `;
+        <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm cr-monto"></td>`;
       tbl.appendChild(tr);
     }
     recalc();
   }
-
   function recalc(){
     const rows = [...tbl.querySelectorAll('tr')];
     const convenio = num(total.value);
@@ -845,7 +836,6 @@
     rows.forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
     if (suma) suma.textContent = fmt2(s);
 
-    // ocultos
     hid.innerHTML = '';
     rows.forEach(tr => {
       const f = tr.querySelector('.cr-fecha')?.value || '';
@@ -854,40 +844,53 @@
       hid.insertAdjacentHTML('beforeend', `<input type="hidden" name="cron_monto[]" value="${m}">`);
     });
 
-    // Validación: suma == monto convenio
     const ok = Math.abs(s - convenio) <= 0.01;
     if (btnGuardar) btnGuardar.disabled = !ok;
     if (suma) suma.classList.toggle('text-danger', !ok);
   }
-
   function genAuto(){
     const n = Math.max(1, parseInt(nro.value || '0', 10));
     if (!n) return;
-
     renderRows(n);
-
     const start = fIni?.value ? new Date(fIni.value + 'T00:00:00') : null;
     const convenio   = num(total.value);
     const montoCuota = num(cuota?.value);
     const rows = [...tbl.querySelectorAll('tr')];
-
     rows.forEach((tr, idx) => {
       const f = tr.querySelector('.cr-fecha');
       const m = tr.querySelector('.cr-monto');
-
-      if (start){
-        const d = addMonthsNoOverflow(start, idx);
-        f.valueAsDate = d;
-      }
-
-      const val = (montoCuota > 0) ? montoCuota : (convenio / rows.length);
-      m.value = fmt2(val);
+      if (start){ f.valueAsDate = addMonthsNoOverflow(start, idx); }
+      m.value = fmt2(montoCuota > 0 ? montoCuota : (convenio / rows.length));
     });
-
     recalc();
   }
 
-  // ===== Eventos
+  // === Mostrar texto del tipo y alternar bloques ===
+  const req = (el, on)=> el && (on ? el.setAttribute('required','required') : el.removeAttribute('required'));
+
+  function syncTipoTag(){
+    const text = tipoSel?.selectedOptions?.[0]?.textContent?.trim() || 'Convenio';
+    if (tipoTag) tipoTag.textContent = text;
+  }
+
+  function toggleTipo(){
+    const t = (tipoSel?.value || '').toLowerCase();
+    const isConv = (t === 'convenio' || t === 'convenio_balon'); // <<— ambos usan el MISMO form
+    formCon?.classList.toggle('d-none', !isConv);
+    formCan?.classList.toggle('d-none',  isConv);
+
+    req(document.querySelector('[name="nro_cuotas"]'),     isConv);
+    req(document.querySelector('[name="monto_convenio"]'), isConv);
+    req(document.querySelector('[name="fecha_pago_cancel"]'), !isConv);
+    req(document.querySelector('[name="monto_cancel"]'),      !isConv);
+
+    syncTipoTag();
+
+    // Si al abrir venía oculto (p.ej. del uso anterior), re-renderiza filas
+    if (isConv) renderRows(nro.value || 1);
+  }
+
+  // Eventos UI
   gen?.addEventListener('click', genAuto);
   nro.addEventListener('change',   () => renderRows(nro.value));
   tbl.addEventListener('input',    e => { if (e.target.matches('.cr-monto, .cr-fecha')) recalc(); });
@@ -899,31 +902,18 @@
     const d = new Date(v + 'T00:00:00');
     hintDia.textContent = `Día de pago: ${d.getDate()} de cada mes`;
   });
+  tipoSel?.addEventListener('change', toggleTipo);
 
-  // Mostrar el texto del tipo en el encabezado
-  function syncTipoTag(){
-    const text = tipoSel?.selectedOptions?.[0]?.textContent?.trim() || 'Convenio';
-    if (tipoTag) tipoTag.textContent = text;
-  }
-  tipoSel?.addEventListener('change', () => {
-    // Mostrar/ocultar bloques (convenio / cancelación). Ambos “convenio*” usan el mismo formulario.
-    const t = (tipoSel.value || '').toLowerCase();
-    const isConv = t.startsWith('convenio');
-    document.getElementById('formConvenio')?.classList.toggle('d-none', !isConv);
-    document.getElementById('formCancelacion')?.classList.toggle('d-none', isConv);
-    // Requeridos
-    const req = (el, on)=> el && (on ? el.setAttribute('required','required') : el.removeAttribute('required'));
-    req(document.querySelector('[name="nro_cuotas"]'), isConv);
-    req(document.querySelector('[name="monto_convenio"]'), isConv);
-    req(document.querySelector('[name="fecha_pago_cancel"]'), !isConv);
-    req(document.querySelector('[name="monto_cancel"]'), !isConv);
-    syncTipoTag();
+  // **Aplicar estado correcto al cargar y CADA VEZ que se abre el modal**
+  toggleTipo(); // inicial
+  modal?.addEventListener('show.bs.modal', () => {
+    // asegura que si la vez anterior quedó en "cancelación", ahora se muestre el bloque correcto
+    toggleTipo();
+    // recalcula totales por si había datos previos
+    total?.dispatchEvent(new Event('input'));
   });
-  syncTipoTag();
-
-  // Inicial
-  renderRows(nro.value || 1);
 })();
+
 /* ================== Utilidades generales de la vista ================== */
 
   // Tooltips

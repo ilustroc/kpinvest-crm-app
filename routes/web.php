@@ -56,8 +56,14 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('clientes')->group(function () {
-        Route::get('/',      [ClientsControllers::class,'index'])->name('clientes.index');
-        Route::get('/{dni}', [ClientsControllers::class,'show'])->name('clientes.show');
+        Route::get('/suggest', [ClientsControllers::class,'suggest'])
+            ->name('clientes.suggest');
+
+        Route::get('/lookup', [ClientsControllers::class,'quickLookup'])
+            ->name('clientes.quick');
+
+        Route::get('/{dni}', [ClientsControllers::class,'show'])
+            ->name('clientes.show');
 
         Route::post('/{dni}/promesas', [ClientsControllers::class,'storePromesa'])
             ->name('clientes.promesas.store');
