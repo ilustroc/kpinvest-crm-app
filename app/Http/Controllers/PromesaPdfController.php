@@ -57,7 +57,7 @@ class PromesaPdfController extends Controller
                 $v = (float)$v;
                 return fmod($v,1.0)==0.0 ? number_format($v,0,'.',',') : number_format($v,2,'.',',');
             };
-            $fmtDate = fn($v) => \Carbon\Carbon::parse($v)->format('d/m/Y');
+            $fmtDate = fn($v) => Carbon::parse($v)->format('d/m/Y');
 
             // ---- "Monto a repartir" SOLO para columna ${monto_divido}
             $montoTotal = $promesa->tipo === 'convenio'
@@ -191,7 +191,7 @@ class PromesaPdfController extends Controller
                     throw new \RuntimeException('Llaves iLovePDF no configuradas');
                 }
 
-                $ilovepdf = new \Ilovepdf\Ilovepdf($public, $secret);
+                $ilovepdf = new Ilovepdf($public, $secret);
                 $task = $ilovepdf->newTask('officepdf');
                 $task->setOutputFilename("Conv_{$promesa->dni}");
                 $task->addFile($docxOut);
@@ -203,8 +203,8 @@ class PromesaPdfController extends Controller
                     throw new \RuntimeException('iLovePDF no devolvió un PDF en el directorio de salida');
                 }
                 $pdfOut = $cands[0];
-            } catch (\Throwable $e) {
-                \Log::warning('iLovePDF falló, entregando DOCX', ['msg' => $e->getMessage()]);
+            } catch (Throwable $e) {
+                Log::warning('iLovePDF falló, entregando DOCX', ['msg' => $e->getMessage()]);
                 return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
             }
 
@@ -213,8 +213,8 @@ class PromesaPdfController extends Controller
                 'Cache-Control' => 'private, max-age=0, no-store, no-cache, must-revalidate',
             ]);
 
-        } catch (\Throwable $e) {
-            \Log::error('Error generando Conv PDF', ['promesa_id'=>$promesa->id ?? null, 'msg'=>$e->getMessage()]);
+        } catch (Throwable $e) {
+            Log::error('Error generando Conv PDF', ['promesa_id'=>$promesa->id ?? null, 'msg'=>$e->getMessage()]);
             if (!empty($docxOut ?? null) && is_file($docxOut)) {
                 return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
             }

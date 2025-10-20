@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
 use App\Models\PromesaPago;
 use App\Models\CnaSolicitud;
 use App\Models\PagoPropia as Pago;
@@ -10,7 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 use App\Support\WorkflowMailer;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class AutorizacionController extends Controller
 {
@@ -27,9 +28,9 @@ class AutorizacionController extends Controller
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function ($x) use ($q) {
                     $x->where('promesas_pago.dni','like',"%{$q}%")
-                      ->orWhere('promesas_pago.nota','like',"%{$q}%")
-                      ->orWhere('promesas_pago.operacion','like',"%{$q}%")
-                      ->orWhereHas('operaciones', fn($qq)=>$qq->where('operacion','like',"%{$q}%"));
+                    ->orWhere('promesas_pago.nota','like',"%{$q}%")
+                    ->orWhere('promesas_pago.operacion','like',"%{$q}%")
+                    ->orWhereHas('operaciones', fn($qq)=>$qq->where('operacion','like',"%{$q}%"));
                 });
             });
 
@@ -43,8 +44,8 @@ class AutorizacionController extends Controller
         }
 
         $rows = $promesas->select('promesas_pago.*','u.name as creador_nombre')
-                         ->orderByDesc('promesas_pago.fecha_promesa')
-                         ->get();
+                        ->orderByDesc('promesas_pago.fecha_promesa')
+                        ->get();
 
         // ===== Prefetch por DNI (fallback). clientes_cuentas usa numdoc
         $dnis = $rows->pluck('dni')->filter()->unique()->values()->all();
@@ -118,10 +119,9 @@ class AutorizacionController extends Controller
                     'operacion'     => (string)$cc->operacion,
                     'entidad'       => (string)($cc->entidad ?? ''),
                     'producto'      => (string)($cc->producto ?? ''),
-                    'saldo_capital' => (float)($cc->deuda_capital ?? 0), // alias para el front
+                    'saldo_capital' => (float)($cc->deuda_capital ?? 0),
                     'deuda_total'   => (float)($cc->deuda_total   ?? 0),
-                    'fecha_castigo' => $cc->fecha_castigo ? (string)$cc->fecha_castigo : null, // <-- NUEVO
-                    // (opcional por compatibilidad con vistas viejas)
+                    'fecha_castigo' => $cc->fecha_castigo ? (string)$cc->fecha_castigo : null,
                     'anio_castigo'  => $cc->fecha_castigo ? (int)substr((string)$cc->fecha_castigo, 0, 4) : null,
                 ];
             }
@@ -164,9 +164,9 @@ class AutorizacionController extends Controller
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function($x) use ($q){
                     $x->where('dni','like',"%{$q}%")
-                      ->orWhere('nro_carta','like',"%{$q}%")
-                      ->orWhere('producto','like',"%{$q}%")
-                      ->orWhere('observacion','like',"%{$q}%");
+                    ->orWhere('nro_carta','like',"%{$q}%")
+                    ->orWhere('producto','like',"%{$q}%")
+                    ->orWhere('observacion','like',"%{$q}%");
                 });
             });
 
@@ -180,8 +180,10 @@ class AutorizacionController extends Controller
         }
 
         $cnaRows = $cnaBase->orderByDesc('created_at')
-            ->paginate(10, ['*'], 'page_cna')
-            ->withQueryString();
+            ->paginate(10, ['*'], 'page_cna');
+
+        /** @var LengthAwarePaginator $cnaRows */
+        $cnaRows->withQueryString();
 
         // Producto por operación (opcional)
         $opsAllCna = collect($cnaRows->items())
@@ -349,7 +351,7 @@ class AutorizacionController extends Controller
                 'pagos' => $rows,
             ], 200);
         } catch (\Throwable $e) {
-            \Log::error('pagosDni error', ['dni' => $dni, 'msg' => $e->getMessage()]);
+            Log::error('pagosDni error', ['dni' => $dni, 'msg' => $e->getMessage()]);
             return response()->json([
                 'dni'   => $dni,
                 'pagos' => [],
@@ -366,7 +368,7 @@ class AutorizacionController extends Controller
         try {
             $fn();
         } catch (\Throwable $e) {
-            \Log::error('WorkflowMailer error: '.$context, $extra + [
+            Log::error('WorkflowMailer error: '.$context, $extra + [
                 'msg'  => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

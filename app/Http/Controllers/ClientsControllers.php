@@ -3,9 +3,14 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+
 use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Pagination\LengthAwarePaginator;
+
 use App\Support\WorkflowMailer;
 
 use App\Models\PromesaPago;
@@ -14,6 +19,7 @@ use App\Models\PromesaCuota;
 use App\Models\PagoPropia as Pago;
 use App\Models\ClienteCuenta;
 use App\Models\CcdCliente;
+use Throwable;
 
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -24,8 +30,8 @@ class ClientsControllers extends Controller
      * ========================== */
     public function index(Request $r)
     {
-        $q  = trim((string)$r->query('q',''));
-        $pp = (int)($r->query('pp', 20)) ?: 20;
+        $q  = trim((string) $r->query('q', ''));
+        $pp = (int) $r->query('pp', 20) ?: 20;
 
         $clientes = ClienteCuenta::query()
             ->select([
@@ -36,15 +42,17 @@ class ClientsControllers extends Controller
                 'updated_at',
             ])
             ->when($q !== '', function ($w) use ($q) {
-                $w->where('numdoc',   'like', "%{$q}%")
-                  ->orWhere('operacion','like', "%{$q}%")
-                  ->orWhere('nombre',  'like', "%{$q}%");
+                $w->where('numdoc', 'like', "%{$q}%")
+                ->orWhere('operacion', 'like', "%{$q}%")
+                ->orWhere('nombre', 'like', "%{$q}%");
             })
             ->orderByDesc('updated_at')
-            ->paginate($pp)
-            ->withQueryString();
+            ->paginate($pp);
 
-        return view('clientes.index', compact('clientes','q'));
+        /** @var \Illuminate\Pagination\LengthAwarePaginator $clientes */
+        $clientes->withQueryString();
+
+        return view('clientes.index', compact('clientes', 'q'));
     }
 
     /* ==========================
@@ -80,9 +88,9 @@ class ClientsControllers extends Controller
             $ccdByDni   = collect();
             $ccdByCodigo= collect();
 
-            if (\Schema::hasTable('ccd_clientes')) {
+            if (Schema::hasTable('ccd_clientes')) {
                 // Usa solo columnas reales (si falta 'codigo' no pasa nada)
-                $colsCcd = \DB::getSchemaBuilder()->getColumnListing('ccd_clientes');
+                $colsCcd = DB::getSchemaBuilder()->getColumnListing('ccd_clientes');
                 $selCcd  = collect(['id','numdoc','pdf','cosecha','link','codigo'])
                             ->filter(fn($c)=>in_array($c, $colsCcd))->all();
 
@@ -136,12 +144,12 @@ class ClientsControllers extends Controller
             $cnasByCuenta    = collect();
             $cnasByOperacion = collect();
 
-            if (\Schema::hasTable('cna_solicitudes')) {
-                $colsCna = \DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
+            if (Schema::hasTable('cna_solicitudes')) {
+                $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 $want    = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
                 $selCna  = collect($want)->filter(fn($c)=>in_array($c,$colsCna))->values()->all();
 
-                $cnas = \DB::table('cna_solicitudes')
+                $cnas = DB::table('cna_solicitudes')
                     ->select($selCna)
                     ->where('dni', $dni)
                     ->orderByDesc('created_at')
@@ -190,10 +198,10 @@ class ClientsControllers extends Controller
 
             /* ===== Próximo N.º de carta (solo si la columna existe) ===== */
             $nextNroCarta = null;
-            if (\Schema::hasTable('cna_solicitudes')) {
-                $colsCna = \DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
+            if (Schema::hasTable('cna_solicitudes')) {
+                $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 if (in_array('correlativo', $colsCna)) {
-                    $maxCorr = (int) \DB::table('cna_solicitudes')->max('correlativo');
+                    $maxCorr = (int) DB::table('cna_solicitudes')->max('correlativo');
                     $nextNroCarta = str_pad(($maxCorr ?: 0) + 1, 6, '0', STR_PAD_LEFT);
                 }
             }
@@ -214,12 +222,12 @@ class ClientsControllers extends Controller
                 'totPagos'          => $totPagos,
             ]);
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // No atrapamos 404 ni otros HttpException (para que no "rebote" silenciosamente)
             if ($e instanceof HttpExceptionInterface) {
                 throw $e;
             }
-            \Log::error('Clientes.show ERROR', [
+            Log::error('Clientes.show ERROR', [
                 'dni'  => $dni,
                 'msg'  => $e->getMessage(),
                 'file' => $e->getFile(),
@@ -240,10 +248,10 @@ class ClientsControllers extends Controller
             $r->merge(['fecha_pago' => $r->input('fecha_pago_cancel')]);
         }
 
-        // ===== VALIDACIÓN
+        // ===== VALIDACIÓN (admite convenio_balon pero se tratará como convenio)
         $rules = [
             'dni'           => 'required|string|max:30',
-            'tipo'          => 'required|in:convenio,cancelacion',
+            'tipo'          => 'required|in:convenio,convenio_balon,cancelacion',
             'nota'          => 'nullable|string|max:500',
             'telefono'      => 'required|string|max:30',
 
@@ -254,14 +262,13 @@ class ClientsControllers extends Controller
             'fecha_pago'    => 'exclude_unless:tipo,cancelacion|required|date',
             'monto_cancel'  => 'exclude_unless:tipo,cancelacion|required|numeric|min:0.01',
 
-            // Convenio
-            'nro_cuotas'     => 'exclude_unless:tipo,convenio|required|integer|min:1',
-            'monto_convenio' => 'exclude_unless:tipo,convenio|required|numeric|min:0.01',
-            'cron_fecha'     => 'exclude_unless:tipo,convenio|required|array|min:1',
-            'cron_fecha.*'   => 'exclude_unless:tipo,convenio|date',
-            'cron_monto'     => 'exclude_unless:tipo,convenio|required|array|min:1',
-            'cron_monto.*'   => 'exclude_unless:tipo,convenio|numeric|min:0.01',
-            'cron_balon'     => 'exclude_unless:tipo,convenio|nullable|integer|min:1',
+            // Convenio (igual para convenio y convenio_balon)
+            'nro_cuotas'     => 'exclude_unless:tipo,convenio,convenio_balon|required|integer|min:1',
+            'monto_convenio' => 'exclude_unless:tipo,convenio,convenio_balon|required|numeric|min:0.01',
+            'cron_fecha'     => 'exclude_unless:tipo,convenio,convenio_balon|required|array|min:1',
+            'cron_fecha.*'   => 'exclude_unless:tipo,convenio,convenio_balon|date',
+            'cron_monto'     => 'exclude_unless:tipo,convenio,convenio_balon|required|array|min:1',
+            'cron_monto.*'   => 'exclude_unless:tipo,convenio,convenio_balon|numeric|min:0.01',
         ];
         $r->validate($rules);
 
@@ -272,13 +279,12 @@ class ClientsControllers extends Controller
 
         $cronFechas = array_map(fn($f)=>$this->toIsoDate($f), (array)$r->input('cron_fecha', []));
         $cronMontos = array_map(fn($m)=>$this->normalizeMoney($m), (array)$r->input('cron_monto', []));
-        $cronBalon  = (int)$r->input('cron_balon', 0);
 
         foreach (['monto_convenio','monto_cancel'] as $fld) {
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
         }
 
-        // Operaciones (para validar y guardar)
+        // Operaciones (sanitizar)
         $opsSel = collect($r->input('operaciones', []))
             ->map(fn($op)=>trim((string)$op))
             ->filter()
@@ -286,40 +292,28 @@ class ClientsControllers extends Controller
             ->values()
             ->all();
 
+        // ===== Unificar tipo: convenio_balon -> convenio (misma mecánica)
+        $tipo = $r->input('tipo');
+        if ($tipo === 'convenio_balon') {
+            $tipo = 'convenio';
+            $r->merge(['tipo' => 'convenio']);
+        }
+
         // ===== REGLAS CONVENIO
-        if ($r->input('tipo') === 'convenio') {
-            $n = max(1, (int)$r->input('nro_cuotas'));      // cuotas regulares (sin balón)
-            $hasBalon = $cronBalon > 0;
-            $expected = $n + ($hasBalon ? 1 : 0);           // total de filas del cronograma
-
-            // Ajustar arrays al tamaño esperado (¡no recortar la fila de balón!)
-            if (count($cronFechas) !== $expected || count($cronMontos) !== $expected) {
-                $cronFechas = array_slice($cronFechas, 0, $expected);
-                $cronMontos = array_slice($cronMontos, 0, $expected);
-                while (count($cronFechas) < $expected) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
-                while (count($cronMontos) < $expected) $cronMontos[] = 0;
+        if ($tipo === 'convenio') {
+            $n = max(1, (int)$r->input('nro_cuotas'));
+            // Ajustar arrays
+            if (count($cronFechas) !== $n || count($cronMontos) !== $n) {
+                $cronFechas = array_slice($cronFechas, 0, $n);
+                $cronMontos = array_slice($cronMontos, 0, $n);
+                while (count($cronFechas) < $n) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
+                while (count($cronMontos) < $n) $cronMontos[] = 0;
             }
-
             $suma = array_sum(array_map('floatval', $cronMontos));
-
-            if ($hasBalon) {
-                // Con balón: la suma del cronograma debe igualar la DEUDA TOTAL seleccionada
-                $deudaSel = (float) DB::table('clientes_cuentas')
-                    ->whereIn('operacion', $opsSel)
-                    ->sum('deuda_total');
-
-                if (abs($suma - $deudaSel) > 0.01) {
-                    return back()
-                        ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con la deuda total seleccionada (S/ '.number_format($deudaSel,2).') para convenios con cuota balón.')
-                        ->withInput();
-                }
-            } else {
-                // Sin balón: la suma debe igualar el monto_convenio
-                if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
-                    return back()
-                        ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
-                        ->withInput();
-                }
+            if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
+                return back()
+                    ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
+                    ->withInput();
             }
         }
 
@@ -330,35 +324,30 @@ class ClientsControllers extends Controller
             $base = [
                 'dni'                 => $dni,
                 'nota'                => $r->input('nota'),
-                'tipo'                => $r->input('tipo'),
+                'tipo'                => $tipo, // ya normalizado
                 'telefono'            => $telefono,
                 'workflow_estado'     => 'pendiente',
                 'cumplimiento_estado' => 'pendiente',
                 'user_id'             => $r->user()->id ?? null,
             ];
 
-            if ($r->input('tipo') === 'convenio') {
+            if ($tipo === 'convenio') {
                 $n         = max(1, (int)$r->input('nro_cuotas'));
-                $hasBalon  = $cronBalon > 0;
-                $expected  = $n + ($hasBalon ? 1 : 0);
-                $firstDate = \Carbon\Carbon::parse($cronFechas[0] ?? now());
+                $firstDate = Carbon::parse($cronFechas[0] ?? now());
 
-                // Promedio de cuota (solo regulares, excluye balón)
-                $sumAll   = array_sum(array_map('floatval', $cronMontos));
-                $mBalon   = ($hasBalon && isset($cronMontos[$cronBalon-1])) ? (float)$cronMontos[$cronBalon-1] : 0.0;
-                $sumReg   = $sumAll - $mBalon;
-                $avgCuota = $n > 0 ? ($sumReg / $n) : 0;
+                $suma     = array_sum(array_map('floatval', $cronMontos));
+                $avgCuota = $n > 0 ? ($suma / $n) : 0;
 
                 $data = array_merge($base, [
                     'fecha_promesa'  => now()->toDateString(),
                     'fecha_pago'     => $firstDate->toDateString(),
                     'cuota_dia'      => (int)$firstDate->day,
-                    'nro_cuotas'     => $n,                              // regulares
+                    'nro_cuotas'     => $n,
                     'monto_convenio' => $r->input('monto_convenio'),
                     'monto_cuota'    => $avgCuota,
                 ]);
-            } else {
-                $fecha = \Carbon\Carbon::parse($r->input('fecha_pago'));
+            } else { // cancelación
+                $fecha = Carbon::parse($r->input('fecha_pago'));
                 $data = array_merge($base, [
                     'fecha_promesa' => $fecha->toDateString(),
                     'fecha_pago'    => $fecha->toDateString(),
@@ -384,24 +373,24 @@ class ClientsControllers extends Controller
                     'updated_at' => $now,
                 ];
             }
-            PromesaOperacion::insert($rows);
+            if ($rows) PromesaOperacion::insert($rows);
 
-            // Cronograma (incluye balón si existe)
-            if ($promesa->tipo === 'convenio') {
+            // Cronograma (todas cuotas normales; es_balon = 0 siempre)
+            if ($tipo === 'convenio') {
                 $rows = [];
-                $totalItems = count($cronFechas); // ya es n (+1 si balón)
+                $totalItems = count($cronFechas);
                 for ($i = 0; $i < $totalItems; $i++) {
                     $rows[] = [
                         'promesa_id' => $promesa->id,
                         'nro'        => $i + 1,
-                        'fecha'      => \Carbon\Carbon::parse($cronFechas[$i])->toDateString(),
+                        'fecha'      => Carbon::parse($cronFechas[$i])->toDateString(),
                         'monto'      => (float)($cronMontos[$i] ?? 0),
-                        'es_balon'   => ($cronBalon === ($i + 1)),
+                        'es_balon'   => 0,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
                 }
-                PromesaCuota::insert($rows);
+                if ($rows) PromesaCuota::insert($rows);
             }
 
             DB::commit();
@@ -410,7 +399,7 @@ class ClientsControllers extends Controller
             WorkflowMailer::promesaPendiente($promesa);
 
             return back()->with('ok', 'Propuesta registrada y enviada para autorización.');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             DB::rollBack();
             return back()->withErrors($e->getMessage())->withInput();
         }
@@ -420,29 +409,62 @@ class ClientsControllers extends Controller
      * Helpers
      * ========================== */
     /** Normaliza fechas a formato ISO (YYYY-MM-DD). */
-    private function toIsoDate(?string $v): ?string
+    private function toIsoDate(?string $v, string $tz = 'America/Lima'): ?string
     {
         $v = trim((string)$v);
         if ($v === '') return null;
 
-        if (preg_match('~^\d{1,2}/\d{1,2}/\d{4}$~', $v)) {
-            [$d,$m,$y] = explode('/', $v);
-            return sprintf('%04d-%02d-%02d', (int)$y, (int)$m, (int)$d);
+        // 1) d/m/Y (con o sin hora)
+        if (preg_match('~^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$~', $v, $m)) {
+            [$all,$d,$mth,$y] = $m;
+            if (checkdate((int)$mth, (int)$d, (int)$y)) {
+                return sprintf('%04d-%02d-%02d', (int)$y, (int)$mth, (int)$d);
+            }
+            return null;
         }
-        if (preg_match('~^\d{4}-\d{1,2}-\d{1,2}$~', $v)) {
-            return $v;
+
+        // 2) d-m-Y (con o sin hora)
+        if (preg_match('~^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$~', $v, $m)) {
+            [$all,$d,$mth,$y] = $m;
+            if (checkdate((int)$mth, (int)$d, (int)$y)) {
+                return sprintf('%04d-%02d-%02d', (int)$y, (int)$mth, (int)$d);
+            }
+            return null;
         }
-        $ts = strtotime($v);
-        return $ts ? date('Y-m-d', $ts) : null;
+
+        // 3) Y-m-d (con o sin hora)
+        if (preg_match('~^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$~', $v, $m)) {
+            [$all,$y,$mth,$d] = $m;
+            if (checkdate((int)$mth, (int)$d, (int)$y)) {
+                return sprintf('%04d-%02d-%02d', (int)$y, (int)$mth, (int)$d);
+            }
+            return null;
+        }
+
+        // 4) Fallback: dejar que Carbon intente parsear
+        try {
+            return Carbon::parse($v, $tz)->toDateString();
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
-    /** Normaliza montos: "1.234,56", "S/ 200" → "1234.56". */
-    private function normalizeMoney(?string $v): ?string
+    private function normalizeMoney(?string $v): ?float
     {
         $v = trim((string)$v);
         if ($v === '') return null;
 
-        $v = preg_replace('/[^0-9\-\.,]/', '', $v) ?? '';
+        $negative = false;
+        if ($v[0] === '(' && substr($v, -1) === ')') {
+            $negative = true;
+            $v = substr($v, 1, -1);
+        }
+
+        $v = preg_replace('/[^\d\-\.,]/', '', $v) ?? '';
+
+        $v = preg_replace('/\s+/', '', $v);
+        $v = preg_replace('/^-+/', '-', $v);
+
         $hasComma = strpos($v, ',') !== false;
         $hasDot   = strpos($v, '.') !== false;
 
@@ -458,10 +480,19 @@ class ClientsControllers extends Controller
         } elseif ($hasComma && !$hasDot) {
             $v = str_replace('.', '', $v);
             $v = str_replace(',', '.', $v);
+        } elseif (!$hasComma && $hasDot) {
+            if (preg_match('~^\d{1,3}(\.\d{3})+$~', $v)) {
+                $v = str_replace('.', '', $v);
+            }
         } else {
-            $v = str_replace(',', '', $v);
+            // Solo dígitos: nada que hacer
         }
 
-        return is_numeric($v) ? $v : null;
+        if (!is_numeric($v)) return null;
+        $n = (float) $v;
+        if ($negative) $n = -$n;
+
+        return $n;
     }
+
 }
