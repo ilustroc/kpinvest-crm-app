@@ -369,7 +369,6 @@
                 <td class="text-truncate" style="max-width:420px" title="{{ $cna->observacion }}">
                   {{ $cna->observacion ?: '—' }}
                 </td>
-
                 <td class="text-end">
                   <button type="button"
                           class="btn btn-outline-secondary btn-sm me-1 js-ver-pagos"
@@ -383,13 +382,13 @@
                     <button type="button"
                             class="btn btn-primary btn-sm js-open-nota"
                             data-title="Pre-aprobar CNA"
-                            data-action="{{ route('cna.preaprobar',$cna) }}">
+                            data-action="{{ route('cna.preaprobar', $cna) }}">
                       Pre-aprobar
                     </button>
 
                     <button type="button"
                             class="btn btn-outline-danger btn-sm js-open-rechazo"
-                            data-action="{{ route('cna.rechazar.sup',$cna) }}"
+                            data-action="{{ route('cna.rechazar.sup', $cna) }}"
                             data-bs-toggle="modal" data-bs-target="#modalRechazo">
                       Rechazar
                     </button>
@@ -397,13 +396,13 @@
                     <button type="button"
                             class="btn btn-primary btn-sm js-open-nota"
                             data-title="Aprobar CNA"
-                            data-action="{{ route('cna.aprobar',$cna) }}">
+                            data-action="{{ route('cna.aprobar', $cna) }}">
                       Aprobar
                     </button>
 
                     <button type="button"
                             class="btn btn-outline-danger btn-sm js-open-rechazo"
-                            data-action="{{ route('cna.rechazar.admin',$cna) }}"
+                            data-action="{{ route('cna.rechazar.admin', $cna) }}"
                             data-bs-toggle="modal" data-bs-target="#modalRechazo">
                       Rechazar
                     </button>

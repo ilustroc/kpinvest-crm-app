@@ -300,10 +300,10 @@ class ClientsControllers extends Controller
             $r->merge(['fecha_pago' => $r->input('fecha_pago_cancel')]);
         }
 
-        // ===== VALIDACIÓN (admite convenio_balon pero se tratará como convenio)
+        // ===== VALIDACIÓN
         $rules = [
             'dni'           => 'required|string|max:30',
-            'tipo'           => 'required|in:convenio,convenio_balon,cancelacion',
+            'tipo'          => 'required|in:convenio,convenio_balon,cancelacion',
             'nota'          => 'nullable|string|max:500',
             'telefono'      => 'required|string|max:30',
 
@@ -314,7 +314,7 @@ class ClientsControllers extends Controller
             'fecha_pago'    => 'exclude_unless:tipo,cancelacion|required|date',
             'monto_cancel'  => 'exclude_unless:tipo,cancelacion|required|numeric|min:0.01',
 
-            // Convenio (igual para convenio y convenio_balon)
+            // Convenio y Convenio (cuota balón)
             'nro_cuotas'     => 'exclude_unless:tipo,convenio,convenio_balon|required|integer|min:1',
             'monto_convenio' => 'exclude_unless:tipo,convenio,convenio_balon|required|numeric|min:0.01',
             'cron_fecha'     => 'exclude_unless:tipo,convenio,convenio_balon|required|array|min:1',
@@ -332,6 +332,7 @@ class ClientsControllers extends Controller
 
         $cronFechas = array_map(fn($f)=>$this->toIsoDate($f), (array)$r->input('cron_fecha', []));
         $cronMontos = array_map(fn($m)=>$this->normalizeMoney($m), (array)$r->input('cron_monto', []));
+        $cronBalon  = (int)$r->input('cron_balon', 0); // 1-based cuando es convenio_balon
 
         foreach (['monto_convenio','monto_cancel'] as $fld) {
             if ($r->has($fld)) $r->merge([$fld => $this->normalizeMoney($r->input($fld))]);
@@ -345,27 +346,38 @@ class ClientsControllers extends Controller
             ->values()
             ->all();
 
-        // ===== Unificar tipo: convenio_balon -> convenio (misma mecánica)
-        $tipo = $r->input('tipo');
-        if ($tipo === 'convenio_balon') {
-            $tipo = 'convenio';
-            $r->merge(['tipo' => 'convenio']);
-        }
+        $tipo = $r->input('tipo'); // se guardará tal cual (convenio o convenio_balon)
 
-        // ===== REGLAS CONVENIO
-        if ($tipo === 'convenio') {
+        // ===== REGLAS CONVENIO / CONVENIO_BALON
+        if (in_array($tipo, ['convenio','convenio_balon'], true)) {
             $n = max(1, (int)$r->input('nro_cuotas'));
-            // Ajustar arrays
-            if (count($cronFechas) !== $n || count($cronMontos) !== $n) {
-                $cronFechas = array_slice($cronFechas, 0, $n);
-                $cronMontos = array_slice($cronMontos, 0, $n);
-                while (count($cronFechas) < $n) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
-                while (count($cronMontos) < $n) $cronMontos[] = 0;
+
+            // Si es balón, esperamos n + 1 filas; si no, n filas.
+            $esperadas = $n + ($tipo === 'convenio_balon' ? 1 : 0);
+            if (count($cronFechas) !== $esperadas || count($cronMontos) !== $esperadas) {
+                $cronFechas = array_slice($cronFechas, 0, $esperadas);
+                $cronMontos = array_slice($cronMontos, 0, $esperadas);
+                while (count($cronFechas) < $esperadas) $cronFechas[] = $cronFechas ? end($cronFechas) : now()->toDateString();
+                while (count($cronMontos) < $esperadas) $cronMontos[] = 0;
             }
+
+            // Validación de suma: regular == monto_convenio (excluye la cuota balón)
             $suma = array_sum(array_map('floatval', $cronMontos));
-            if (abs($suma - (float)$r->input('monto_convenio')) > 0.01) {
+            $sumaReg = $suma;
+
+            if ($tipo === 'convenio_balon') {
+                // Corregimos índice y validamos rango
+                if ($cronBalon < 1 || $cronBalon > count($cronMontos)) {
+                    return back()->withErrors('Índice de cuota balón inválido.')->withInput();
+                }
+                $sumaReg -= (float)$cronMontos[$cronBalon - 1];
+            } else {
+                $cronBalon = 0; // no hay balón
+            }
+
+            if (abs($sumaReg - (float)$r->input('monto_convenio')) > 0.01) {
                 return back()
-                    ->withErrors('La suma del cronograma (S/ '.number_format($suma,2).') debe coincidir con el Monto convenio.')
+                    ->withErrors('La suma de las cuotas regulares debe coincidir con el Monto convenio.')
                     ->withInput();
             }
         }
@@ -377,25 +389,27 @@ class ClientsControllers extends Controller
             $base = [
                 'dni'                 => $dni,
                 'nota'                => $r->input('nota'),
-                'tipo'                => $tipo, // ya normalizado
+                'tipo'                => $tipo, // se guarda 'convenio' o 'convenio_balon'
                 'telefono'            => $telefono,
                 'workflow_estado'     => 'pendiente',
                 'cumplimiento_estado' => 'pendiente',
                 'user_id'             => $r->user()->id ?? null,
             ];
 
-            if ($tipo === 'convenio') {
-                $n         = max(1, (int)$r->input('nro_cuotas'));
+            if (in_array($tipo, ['convenio','convenio_balon'], true)) {
                 $firstDate = Carbon::parse($cronFechas[0] ?? now());
+                $nReg = max(1, (int)$r->input('nro_cuotas'));                 // nro de cuotas regulares
+                $sumaReg = ($tipo === 'convenio_balon' && $cronBalon)
+                    ? array_sum($cronMontos) - (float)$cronMontos[$cronBalon - 1]
+                    : array_sum($cronMontos);
 
-                $suma     = array_sum(array_map('floatval', $cronMontos));
-                $avgCuota = $n > 0 ? ($suma / $n) : 0;
+                $avgCuota = $nReg > 0 ? ($sumaReg / $nReg) : 0;
 
                 $data = array_merge($base, [
                     'fecha_promesa'  => now()->toDateString(),
                     'fecha_pago'     => $firstDate->toDateString(),
                     'cuota_dia'      => (int)$firstDate->day,
-                    'nro_cuotas'     => $n,
+                    'nro_cuotas'     => $nReg,
                     'monto_convenio' => $r->input('monto_convenio'),
                     'monto_cuota'    => $avgCuota,
                 ]);
@@ -411,52 +425,53 @@ class ClientsControllers extends Controller
             /** @var \App\Models\PromesaPago $promesa */
             $promesa = PromesaPago::create($data);
 
-            // Operaciones
+            // Operaciones (relación)
             $promesa->operacion = implode(', ', $opsSel);
             $promesa->save();
 
-            // Detalle de operaciones
             $now = now();
-            $rows = [];
-            foreach ($opsSel as $op) {
-                $rows[] = [
-                    'promesa_id' => $promesa->id,
-                    'operacion'  => $op,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-            if ($rows) PromesaOperacion::insert($rows);
 
-            // Cronograma (todas cuotas normales; es_balon = 0 siempre)
-            if ($tipo === 'convenio') {
-                $rows = [];
-                $totalItems = count($cronFechas);
-                for ($i = 0; $i < $totalItems; $i++) {
-                    $rows[] = [
+            // Detalle operaciones
+            if ($opsSel) {
+                $rowsOps = [];
+                foreach ($opsSel as $op) {
+                    $rowsOps[] = [
                         'promesa_id' => $promesa->id,
-                        'nro'        => $i + 1,
-                        'fecha'      => Carbon::parse($cronFechas[$i])->toDateString(),
-                        'monto'      => (float)($cronMontos[$i] ?? 0),
-                        'es_balon'   => 0,
+                        'operacion'  => $op,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
                 }
-                if ($rows) PromesaCuota::insert($rows);
+                PromesaOperacion::insert($rowsOps);
+            }
+
+            // Cronograma
+            if (in_array($tipo, ['convenio','convenio_balon'], true)) {
+                $rows = [];
+                foreach ($cronFechas as $i => $f) {
+                    $rows[] = [
+                        'promesa_id' => $promesa->id,
+                        'nro'        => $i + 1,
+                        'fecha'      => Carbon::parse($f)->toDateString(),
+                        'monto'      => (float)($cronMontos[$i] ?? 0),
+                        'es_balon'   => ($tipo === 'convenio_balon' && $cronBalon === ($i + 1)) ? 1 : 0,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                PromesaCuota::insert($rows);
             }
 
             DB::commit();
 
-            // Mail / workflow
             WorkflowMailer::promesaPendiente($promesa);
-
             return back()->with('ok', 'Propuesta registrada y enviada para autorización.');
         } catch (Throwable $e) {
             DB::rollBack();
             return back()->withErrors($e->getMessage())->withInput();
         }
     }
+
 
     /* ==========================
      * Helpers

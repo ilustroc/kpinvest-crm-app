@@ -14,7 +14,7 @@ class ClientesCargaController extends Controller
             'NUMDOC','CUENTA','OPERACION','NOMBRE','PRODUCTO',
             'DPTO','PROVINCIA','DISTRITO','DIRECCION',
             'ENTIDAD','COSECHA','FECHA_COMPRA','FECHA_CASTIGO',
-            'DEUDA_CAPITAL','INTERES','DEUDA_TOTAL',
+            'MONEDA','DEUDA_CAPITAL','INTERES','DEUDA_TOTAL',
         ];
 
         return response()->streamDownload(function () use ($headers) {
@@ -118,6 +118,7 @@ class ClientesCargaController extends Controller
                     case 'COSECHA':        $data['cosecha']        = $val; break;
                     case 'FECHA_COMPRA':   $data['fecha_compra']   = $date($val); break;
                     case 'FECHA_CASTIGO':  $data['fecha_castigo']  = $date($val); break;
+                    case 'MONEDA':         $data['moneda']         = $val; break;
                     case 'DEUDA_CAPITAL':  $data['deuda_capital']  = $num($val); break;
                     case 'INTERES':        $data['interes']        = $num($val); break;
                     case 'DEUDA_TOTAL':    $data['deuda_total']    = $num($val); break;

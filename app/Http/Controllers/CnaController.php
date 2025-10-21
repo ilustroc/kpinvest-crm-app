@@ -113,7 +113,7 @@ class CnaController extends Controller
     // =========================================================
     // FLUJO DE APROBACIÓN
     // =========================================================
-    public function preaprobar(CnaSolicitud $cna)
+    public function preaprobar(Request $request, CnaSolicitud $cna)
     {
         $this->authorizeRole('supervisor');
 
@@ -121,9 +121,10 @@ class CnaController extends Controller
             return back()->withErrors('Solo se puede pre-aprobar una solicitud pendiente.');
         }
 
+        $this->appendNota($cna, $request);
         $cna->update([
             'workflow_estado' => 'preaprobada',
-            'pre_aprobado_por'=> Auth::id(),
+            'pre_aprobado_por'=> auth()->id(),
             'pre_aprobado_at' => now(),
             'rechazado_por'   => null,
             'rechazado_at'    => null,
@@ -163,9 +164,10 @@ class CnaController extends Controller
             return back()->withErrors('Solo se puede aprobar una CNA pre-aprobada.');
         }
 
+        $this->appendNota($cna, $request);
         $cna->update([
             'workflow_estado' => 'aprobada',
-            'aprobado_por'    => Auth::id(),
+            'aprobado_por'    => auth()->id(),
             'aprobado_at'     => now(),
         ]);
 
@@ -420,4 +422,13 @@ class CnaController extends Controller
         $nro  = str_pad((string)$corr, 6, '0', STR_PAD_LEFT) . $suffix;
         return ['corr'=>$corr,'nro'=>$nro];
     }
+
+    private function appendNota(CnaSolicitud $cna, Request $r): void
+    {
+    $txt = trim((string)$r->input('nota_estado', ''));
+    if ($txt !== '') {
+        $prefix = '[' . now()->format('Y-m-d H:i') . '] ' . (auth()->user()->name ?? 'sistema') . ': ';
+        $cna->nota = trim(($cna->nota ? $cna->nota . "\n" : '') . $prefix . $txt);
+    }
+}
 }

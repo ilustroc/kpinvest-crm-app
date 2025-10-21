@@ -107,7 +107,7 @@
 
   <div class="wrap row g-0">
     <!-- IZQUIERDA -->
-    <div class="side col-12 col-lg-6 d-flex flex-column">
+    <div class="side col-12 col-lg-6 d-none d-lg-flex flex-column">
       <div class="d-flex align-items-center justify-content-between">
         <a href="/" class="brand d-inline-flex align-items-center gap-2">
           <!-- ÚNICO logo -->
