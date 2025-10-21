@@ -126,7 +126,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/cna/{cna}/rechazar-admin', [CnaController::class,'rechazarAdmin'])->name('cna.rechazar.admin');
     });
 
-    Route::middleware('role:administrador,supervisor')->group(function () {
+    Route::middleware('role:administrador,supervisor,asesor')->group(function () {
         Route::get('/cna/{id}/pdf',  [CnaController::class, 'pdf'])->name('cna.pdf');
         Route::get('/cna/{id}/docx', [CnaController::class, 'docx'])->name('cna.docx');
     });

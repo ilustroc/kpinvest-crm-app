@@ -380,19 +380,33 @@
                   </button>
 
                   @if($isSupervisor)
-                    <form class="d-inline" method="POST" action="{{ route('cna.preaprobar',$cna) }}">@csrf
-                      <button class="btn btn-primary btn-sm">Pre-aprobar</button>
-                    </form>
-                    <form class="d-inline" method="POST" action="{{ route('cna.rechazar.sup',$cna) }}">@csrf
-                      <button class="btn btn-outline-danger btn-sm">Rechazar</button>
-                    </form>
+                    <button type="button"
+                            class="btn btn-primary btn-sm js-open-nota"
+                            data-title="Pre-aprobar CNA"
+                            data-action="{{ route('cna.preaprobar',$cna) }}">
+                      Pre-aprobar
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm js-open-rechazo"
+                            data-action="{{ route('cna.rechazar.sup',$cna) }}"
+                            data-bs-toggle="modal" data-bs-target="#modalRechazo">
+                      Rechazar
+                    </button>
                   @else
-                    <form class="d-inline" method="POST" action="{{ route('cna.aprobar',$cna) }}">@csrf
-                      <button class="btn btn-primary btn-sm">Aprobar</button>
-                    </form>
-                    <form class="d-inline" method="POST" action="{{ route('cna.rechazar.admin',$cna) }}">@csrf
-                      <button class="btn btn-outline-danger btn-sm">Rechazar</button>
-                    </form>
+                    <button type="button"
+                            class="btn btn-primary btn-sm js-open-nota"
+                            data-title="Aprobar CNA"
+                            data-action="{{ route('cna.aprobar',$cna) }}">
+                      Aprobar
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm js-open-rechazo"
+                            data-action="{{ route('cna.rechazar.admin',$cna) }}"
+                            data-bs-toggle="modal" data-bs-target="#modalRechazo">
+                      Rechazar
+                    </button>
                   @endif
                 </td>
               </tr>

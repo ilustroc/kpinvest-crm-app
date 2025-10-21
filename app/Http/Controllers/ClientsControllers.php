@@ -303,7 +303,7 @@ class ClientsControllers extends Controller
         // ===== VALIDACIÓN (admite convenio_balon pero se tratará como convenio)
         $rules = [
             'dni'           => 'required|string|max:30',
-            'tipo'          => 'required|in:convenio,convenio_balon,cancelacion',
+            'tipo'           => 'required|in:convenio,convenio_balon,cancelacion',
             'nota'          => 'nullable|string|max:500',
             'telefono'      => 'required|string|max:30',
 
@@ -321,6 +321,7 @@ class ClientsControllers extends Controller
             'cron_fecha.*'   => 'exclude_unless:tipo,convenio,convenio_balon|date',
             'cron_monto'     => 'exclude_unless:tipo,convenio,convenio_balon|required|array|min:1',
             'cron_monto.*'   => 'exclude_unless:tipo,convenio,convenio_balon|numeric|min:0.01',
+            'cron_balon'     => 'exclude_unless:tipo,convenio_balon|nullable|integer|min:1',
         ];
         $r->validate($rules);
 
