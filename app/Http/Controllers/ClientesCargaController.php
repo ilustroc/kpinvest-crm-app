@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\ClienteCuenta;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class ClientesCargaController extends Controller
 {
@@ -45,6 +47,7 @@ class ClientesCargaController extends Controller
     {
         $fh = fopen($filepath,'r'); if(!$fh) return [0,0,['No se pudo abrir el archivo']];
 
+        // Detecta delimitador
         $first = fgets($fh); if($first===false){ fclose($fh); return [0,0,['Archivo vacío']]; }
         $del = (substr_count($first,';') > substr_count($first,',')) ? ';' : ',';
         rewind($fh);
@@ -54,8 +57,8 @@ class ClientesCargaController extends Controller
 
         // ---------- Normalizadores ----------
         $norm = function(string $s): string {
-            $s = preg_replace('/^\xEF\xBB\xBF/u','',$s);       // BOM
-            $s = str_replace("\xC2\xA0",' ',$s);               // NBSP
+            $s = preg_replace('/^\xEF\xBB\xBF/u','',$s);
+            $s = str_replace("\xC2\xA0",' ',$s);
             $s = strtoupper(trim($s));
             $s = strtr($s, ['Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ü'=>'U','Ñ'=>'N']);
             $s = preg_replace('/[^A-Z0-9]+/','_',$s);
@@ -64,10 +67,7 @@ class ClientesCargaController extends Controller
         $map = [];
         foreach ($headers as $i=>$h) $map[$i] = $norm($h);
 
-        // Permite pequeñas variaciones de naming/acentos
-        $alias = [
-            'ENTIDAD_FINANCIERA'=> 'ENTIDAD',
-        ];
+        $alias = ['ENTIDAD_FINANCIERA'=> 'ENTIDAD'];
 
         $toUtf8 = function(?string $s): ?string {
             if ($s===null) return null; $s = trim($s);
@@ -93,11 +93,65 @@ class ClientesCargaController extends Controller
             return null;
         };
 
-        // ---------- Bucle ----------
+        // ---------- Bulk por chunks ----------
+        DB::connection()->disableQueryLog();
+        @set_time_limit(0);
+        @ini_set('memory_limit','1024M');
+
         $ok=0; $skip=0; $err=[]; $rowNum=1;
+        $batch=[]; $BATCH_SIZE=2000;
+        $now = Carbon::now()->toDateTimeString();
+
+        // columnas a actualizar en UPSERT (no incluye la clave)
+        $updateCols = [
+            'cuenta','nombre','producto','dpto','provincia','distrito','direccion',
+            'entidad','cosecha','fecha_compra','fecha_castigo','moneda',
+            'deuda_capital','interes','deuda_total','updated_at'
+        ];
+
+        $flush = function() use (&$batch,&$ok,&$skip,&$err,$updateCols) {
+            if (empty($batch)) return;
+            try {
+                DB::table('clientes_cuentas')->upsert(
+                    $batch,
+                    ['numdoc','operacion'],
+                    $updateCols
+                );
+                $ok += count($batch);
+            } catch (\Throwable $e) {
+                // Si el lote falla, intenta partirlo en dos para no perder todo
+                if (count($batch) > 100) {
+                    $mid = intdiv(count($batch),2);
+                    $left  = array_slice($batch,0,$mid);
+                    $right = array_slice($batch,$mid);
+                    try {
+                        DB::table('clientes_cuentas')->upsert($left, ['numdoc','operacion'], $updateCols);
+                        $ok += count($left);
+                    } catch (\Throwable $e2) {
+                        $skip += count($left);
+                        $err[] = 'Lote A falló: '.$e2->getMessage();
+                    }
+                    try {
+                        DB::table('clientes_cuentas')->upsert($right,['numdoc','operacion'], $updateCols);
+                        $ok += count($right);
+                    } catch (\Throwable $e3) {
+                        $skip += count($right);
+                        $err[] = 'Lote B falló: '.$e3->getMessage();
+                    }
+                } else {
+                    $skip += count($batch);
+                    $err[] = 'Lote falló: '.$e->getMessage();
+                }
+            }
+            $batch = [];
+        };
 
         while(($row=fgetcsv($fh,0,$del))!==false){
-            $rowNum++; $data=[];
+            $rowNum++;
+            $data = [
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
 
             foreach($row as $i=>$val){
                 $k = $map[$i] ?? null; if(!$k) continue;
@@ -125,23 +179,18 @@ class ClientesCargaController extends Controller
                 }
             }
 
-            // Clave mínima requerida
+            // Clave mínima
             if (empty($data['numdoc']) || empty($data['operacion'])) {
                 $skip++; $err[]="Fila {$rowNum}: faltan NUMDOC u OPERACION."; continue;
             }
 
-            try {
-                ClienteCuenta::updateOrCreate(
-                    ['numdoc' => $data['numdoc'], 'operacion' => $data['operacion']],
-                    $data
-                );
-                $ok++;
-            } catch(\Throwable $e){
-                $skip++; $err[]="Fila {$rowNum}: ".$e->getMessage();
-            }
+            $batch[] = $data;
+            if (count($batch) >= $BATCH_SIZE) $flush();
         }
 
         fclose($fh);
+        $flush(); // último lote
+
         return [$ok,$skip,$err];
     }
 }
