@@ -133,11 +133,13 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Admin
+    | Admin (Integración + Administración)
     |--------------------------------------------------------------------------
     */
-    Route::middleware(middleware: 'role:administrador,supervisor')->group(function () {
+    // Antes: Route::middleware('role:administrador')->group(function () {
+    Route::middleware('role:administrador,supervisor')->group(function () {
 
+        // INTEGRACIÓN: Data maestro de clientes
         Route::view('/integracion/data', 'placeholders.integracion-data')
             ->name('integracion.data');
         Route::get('/integracion/data/clientes/template', [ClientesCargaController::class, 'templateClientesMaster'])
@@ -145,6 +147,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/integracion/data/clientes/import',  [ClientesCargaController::class, 'importClientesMaster'])
             ->name('integracion.data.clientes.import');
         
+        // INTEGRACIÓN: CCD
         Route::get('/integracion/ccd', [IntegracionCcdController::class, 'index'])
             ->name('integracion.ccd');
         Route::get('/integracion/ccd/template', [IntegracionCcdController::class, 'template'])
@@ -152,6 +155,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/integracion/ccd/import', [IntegracionCcdController::class, 'import'])
             ->name('integracion.ccd.import');
 
+        // INTEGRACIÓN: Pagos
         Route::get('/integracion/pagos',          [PlaceholdersPagosController::class, 'index'])
             ->name('integracion.pagos');
         Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])
@@ -159,7 +163,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])
             ->name('integracion.pagos.template');
 
-        // Administración de usuarios
+        // ADMINISTRACIÓN DE USUARIOS
         Route::get('/administracion',                           [AdminUsersController::class, 'index'])->name('administracion');
         Route::post('/administracion/supervisores',             [AdminUsersController::class, 'storeSupervisor'])->name('administracion.supervisores.store');
         Route::post('/administracion/asesores',                 [AdminUsersController::class, 'storeAsesor'])->name('administracion.asesores.store');
