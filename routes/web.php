@@ -136,7 +136,7 @@ Route::middleware('auth')->group(function () {
     | Admin
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:administrador')->group(function () {
+    Route::middleware(middleware: 'role:administrador,supervisor')->group(function () {
 
         Route::view('/integracion/data', 'placeholders.integracion-data')
             ->name('integracion.data');

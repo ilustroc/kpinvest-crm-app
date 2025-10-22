@@ -67,9 +67,6 @@
     {{-- Botones abrir modales --}}
     <div class="card pad mb-2">
       <div class="d-flex flex-wrap gap-2">
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSupervisor">
-          <i class="bi bi-person-gear me-1"></i> Nuevo supervisor
-        </button>
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsesor">
           <i class="bi bi-person-plus me-1"></i> Nuevo asesor
         </button>
@@ -241,38 +238,6 @@
           </table>
         </div>
       @endif
-    </div>
-  </div>
-
-  {{-- Modal: Crear supervisor --}}
-  <div class="modal fade" id="modalSupervisor" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <form method="POST" action="{{ route('administracion.supervisores.store') }}" class="modal-content" autocomplete="off">
-        @csrf
-        <div class="modal-header">
-          <h6 class="modal-title"><i class="bi bi-person-gear me-1"></i> Crear supervisor</h6>
-          <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-        </div>
-        <div class="modal-body vstack gap-3">
-          <div>
-            <label class="form-label">Nombre</label>
-            <input name="name" class="form-control" required placeholder="Ej: Ana Pérez">
-          </div>
-          <div>
-            <label class="form-label">Email</label>
-            <input name="email" type="email" class="form-control" required placeholder="supervisor@empresa.com">
-          </div>
-          <div>
-            <label class="form-label">Contraseña</label>
-            <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-            <div class="helper small text-secondary mt-1">Se enviará al usuario o puedes cambiarla luego.</div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-          <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
-        </div>
-      </form>
     </div>
   </div>
 
