@@ -11,6 +11,8 @@ class AdminUsersController extends Controller
 {
     public function index(Request $r)
     {
+        // Si quitaste la columna "# Asesores" de la vista,
+        // puedes eliminar ->withCount('asesores')
         $supervisores = User::where('role', 'supervisor')
             ->withCount('asesores')
             ->with(['asesores' => fn($q) => $q->orderBy('name')])
@@ -31,12 +33,12 @@ class AdminUsersController extends Controller
         ]);
 
         User::create([
-            'name'        => $data['name'],
-            'email'       => $data['email'],
-            'password'    => Hash::make($data['password']),
-            'role'        => 'supervisor',
-            'supervisor_id' => null,
-            'is_active'   => true,
+            'name'           => $data['name'],
+            'email'          => $data['email'],
+            'password'       => Hash::make($data['password']),
+            'role'           => 'supervisor',
+            'supervisor_id'  => null,
+            // sin is_active
         ]);
 
         return back()->with('ok','Supervisor creado correctamente.');
@@ -57,7 +59,7 @@ class AdminUsersController extends Controller
             'password'      => Hash::make($data['password']),
             'role'          => 'asesor',
             'supervisor_id' => $data['supervisor_id'],
-            'is_active'     => true,
+            // sin is_active
         ]);
 
         return back()->with('ok','Asesor creado y asignado correctamente.');
@@ -74,16 +76,6 @@ class AdminUsersController extends Controller
         $id->update(['supervisor_id' => $data['supervisor_id']]);
 
         return back()->with('ok','Asesor reasignado correctamente.');
-    }
-
-    /** Activar/Desactivar (toggle) */
-    public function toggleActive(User $user)
-    {
-        $user->is_active = ! (bool) $user->is_active;
-        $user->save();
-
-        $msg = $user->is_active ? 'Usuario activado.' : 'Usuario desactivado.';
-        return back()->with('ok', $msg);
     }
 
     /** Cambiar contraseña */

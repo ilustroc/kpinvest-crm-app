@@ -4,23 +4,20 @@
 
 @push('head')
 <style>
-  /* ======= MODO COMPACTO (verde + azul, menos alto y tipografía menor) ======= */
+  /* ======= MODO COMPACTO ======= */
   .admin-compact .card.pad{ padding:12px 14px; border-radius:12px }
   .admin-compact h5{ font-size:1rem; margin-bottom:.7rem }
   .admin-compact .helper{ font-size:.82rem }
 
-  /* inputs / selects / botones más pequeños */
   .admin-compact .form-control,
   .admin-compact .form-select{ font-size:.92rem; padding:.35rem .6rem; height:auto }
   .admin-compact .btn{ --bs-btn-padding-y:.32rem; --bs-btn-padding-x:.6rem; --bs-btn-border-radius:.45rem; font-size:.92rem }
   .admin-compact .btn-sm{ --bs-btn-padding-y:.25rem; --bs-btn-padding-x:.5rem; font-size:.9rem }
 
-  /* chips KPI */
   .admin-compact .chip{ padding:10px 12px; border-radius:12px }
   .admin-compact .chip .t i{ width:28px; height:28px; border-radius:8px; font-size:.95rem }
   .admin-compact .chip .s{ font-size:.88rem }
 
-  /* tabla estructura (menos alto, sticky header, cebreado sutil) */
   .admin-compact .struct .table> :not(caption)>*>*{ padding:.55rem .65rem }
   .admin-compact .struct .table thead th{
     font-size:.78rem; letter-spacing:.3px;
@@ -37,22 +34,23 @@
     background: color-mix(in oklab, var(--brand) 10%, transparent);
   }
 
-  /* mini tarjetas de cada asesor, más chicas */
-  .admin-compact .assignee{ padding:.45rem .55rem; border-radius:10px; gap:.45rem }
-  .admin-compact .badge-state{ padding:.15rem .5rem; font-weight:700; font-size:.86rem }
-  .admin-compact .dot{ width:8px; height:8px }
+  .admin-compact .assignee{ padding:.45rem .55rem; border-radius:10px; gap:.45rem; display:flex; align-items:center; background:#fff; border:1px solid var(--border) }
 
-  /* botones de la tabla coherentes con marca */
-  .admin-compact .btn-primary{ background:var(--brand); border-color:var(--brand) }
-  .admin-compact .btn-primary:hover{ background:color-mix(in oklab, var(--brand) 85%, black) }
-  .admin-compact .btn-outline-primary{ color:var(--brand); border-color:var(--brand) }
-  .admin-compact .btn-outline-primary:hover{ color:#fff; background:var(--brand) }
+  /* Icon-only buttons */
+  .btn-icon{
+    --size: 36px;
+    width:var(--size); height:var(--size);
+    padding:0; display:inline-flex; align-items:center; justify-content:center;
+    border-radius:10px;
+  }
+  .btn-icon i{ font-size:1.05rem; }
 </style>
 @endpush
 
 @section('content')
   <div class="admin-compact">
-      {{-- ALERTAS --}}
+
+    {{-- ALERTAS --}}
     @if(session('ok'))
       <div class="alert alert-success d-flex align-items-center" role="alert">
         <i class="bi bi-check-circle me-2"></i>
@@ -66,99 +64,20 @@
       </div>
     @endif
 
-    {{-- KPIs rápidos --}}
-    <div class="row g-3 mb-1">
-      <div class="col-sm-6 col-lg-3">
-        <div class="chip">
-          <div class="t"><i class="bi bi-person-gear"></i><span>Supervisores</span></div>
-          <div class="value fw-bold fs-5">{{ $supervisores->count() }}</div>
-          <div class="s">Usuarios con rol de Supervisor</div>
-        </div>
-      </div>
-      <div class="col-sm-6 col-lg-3">
-        <div class="chip">
-          <div class="t"><i class="bi bi-people"></i><span>Asesores</span></div>
-          <div class="value fw-bold fs-5">{{ $supervisores->sum('asesores_count') }}</div>
-          <div class="s">Total de asesores registrados</div>
-        </div>
+    {{-- Botones abrir modales --}}
+    <div class="card pad mb-2">
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSupervisor">
+          <i class="bi bi-person-gear me-1"></i> Nuevo supervisor
+        </button>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsesor">
+          <i class="bi bi-person-plus me-1"></i> Nuevo asesor
+        </button>
       </div>
     </div>
 
-    <div class="row g-3">
-      {{-- Crear Supervisor --}}
-      <div class="col-lg-6">
-        <div class="card pad">
-          <h5 class="mb-3 d-flex align-items-center gap-2">
-            <i class="bi bi-person-gear" style="color:var(--accent)"></i> <span>Crear Supervisor</span>
-          </h5>
-          <form method="POST" action="{{ route('administracion.supervisores.store') }}" class="vstack gap-3" autocomplete="off">
-            @csrf
-            <div>
-              <label class="form-label">Nombre</label>
-              <input name="name" class="form-control" value="{{ old('name') }}" required placeholder="Ej: Ana Pérez">
-              @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-              <label class="form-label">Email</label>
-              <input name="email" type="email" class="form-control" value="{{ old('email') }}" required placeholder="supervisor@empresa.com">
-              @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-              <label class="form-label">Contraseña</label>
-              <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-              <div class="helper">Se enviará al usuario o cámbiala luego desde Administración.</div>
-              @error('password')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div class="d-grid d-sm-block">
-              <button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Crear Supervisor</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {{-- Crear Asesor --}}
-      <div class="col-lg-6">
-        <div class="card pad">
-          <h5 class="mb-3 d-flex align-items-center gap-2">
-            <i class="bi bi-person-plus" style="color:var(--accent)"></i> <span>Crear Asesor</span>
-          </h5>
-          <form method="POST" action="{{ route('administracion.asesores.store') }}" class="vstack gap-3" autocomplete="off">
-            @csrf
-            <div>
-              <label class="form-label">Nombre</label>
-              <input name="name" class="form-control" value="{{ old('name') }}" required placeholder="Ej: Carlos López">
-              @error('name')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-              <label class="form-label">Email</label>
-              <input name="email" type="email" class="form-control" value="{{ old('email') }}" required placeholder="asesor@empresa.com">
-              @error('email')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-              <label class="form-label">Contraseña</label>
-              <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-              @error('password')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div>
-              <label class="form-label">Supervisor</label>
-              <select name="supervisor_id" class="form-select" required>
-                <option value="">Selecciona…</option>
-                @foreach($supervisores as $sup)
-                  <option value="{{ $sup->id }}" @selected(old('supervisor_id')==$sup->id)>{{ $sup->name }} — {{ $sup->email }}</option>
-                @endforeach
-              </select>
-              @error('supervisor_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-            </div>
-            <div class="d-grid d-sm-block">
-              <button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Crear Asesor</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    {{-- Estructura: Supervisores y Asesores --}}
-    <div class="card pad mt-3 struct">
+    {{-- Estructura --}}
+    <div class="card pad struct">
       <h5 class="mb-3 d-flex align-items-center gap-2">
         <i class="bi bi-diagram-3" style="color:var(--accent)"></i> <span>Estructura</span>
       </h5>
@@ -172,7 +91,6 @@
               <tr>
                 <th>Supervisor</th>
                 <th>Email</th>
-                <th>Estado</th>
                 <th class="text-center"># Asesores</th>
                 <th>Asesores (reasignables)</th>
                 <th class="text-end">Acciones</th>
@@ -183,14 +101,9 @@
                 <tr>
                   <td class="fw-semibold">{{ $sup->name }}</td>
                   <td class="text-secondary">{{ $sup->email }}</td>
-                  <td>
-                    <span class="badge-state {{ $sup->is_active ? 'on' : 'off' }}">
-                      <span class="dot {{ $sup->is_active ? 'on' : 'off' }}"></span>
-                      {{ $sup->is_active ? 'Activo' : 'Inactivo' }}
-                    </span>
-                  </td>
                   <td class="text-center">
-                    <span class="badge" style="border-radius:999px; background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 28%, transparent)">
+                    <span class="badge"
+                      style="border-radius:999px; background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 28%, transparent)">
                       {{ $sup->asesores_count }}
                     </span>
                   </td>
@@ -205,38 +118,27 @@
                             <span class="me-2">
                               {{ $asesor->name }}
                               <span class="text-secondary">({{ $asesor->email }})</span>
-                              <span class="badge-state {{ $asesor->is_active ? 'on' : 'off' }} ms-1">
-                                <span class="dot {{ $asesor->is_active ? 'on' : 'off' }}"></span>
-                                {{ $asesor->is_active ? 'Activo' : 'Inactivo' }}
-                              </span>
                             </span>
 
-                            {{-- Reasignar --}}
-                            <form method="POST" action="{{ route('administracion.asesores.reassign', $asesor->id) }}" class="d-flex gap-2 ms-auto">
-                              @csrf @method('PATCH')
-                              <select name="supervisor_id" class="form-select form-select-sm" style="width:auto; min-width: 200px">
-                                @foreach($todosSupervisores as $sid => $sname)
-                                  <option value="{{ $sid }}" @selected($asesor->supervisor_id == $sid)>{{ $sname }}</option>
-                                @endforeach
-                              </select>
-                              <button class="btn btn-sm btn-outline-primary" title="Reasignar" onclick="return confirm('¿Reasignar a este asesor?')">
-                                <i class="bi bi-arrow-repeat"></i><span class="d-none d-md-inline ms-1">Reasignar</span>
+                            <div class="ms-auto d-inline-flex gap-2">
+                              {{-- Reasignar (modal) --}}
+                              <button
+                                class="btn btn-outline-primary btn-icon"
+                                data-bs-toggle="tooltip" title="Reasignar"
+                                data-bs-target="#reassign-{{ $asesor->id }}" data-bs-toggle-second="modal"
+                                onclick="document.getElementById('reassign-{{ $asesor->id }}-open').click(); return false;">
+                                <i class="bi bi-arrow-left-right"></i>
                               </button>
-                            </form>
+                              <button id="reassign-{{ $asesor->id }}-open" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#reassign-{{ $asesor->id }}"></button>
 
-                            {{-- Activar/Desactivar asesor --}}
-                            <form method="POST" action="{{ route('administracion.usuarios.toggle', $asesor) }}" onsubmit="return confirm('¿Seguro?')">
-                              @csrf @method('PATCH')
-                              <button class="btn btn-sm {{ $asesor->is_active ? 'btn-outline-danger' : 'btn-outline-success' }}">
-                                <i class="bi {{ $asesor->is_active ? 'bi-slash-circle' : 'bi-check-circle' }}"></i>
-                                <span class="d-none d-md-inline ms-1">{{ $asesor->is_active ? 'Desactivar' : 'Activar' }}</span>
+                              {{-- Password --}}
+                              <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" title="Contraseña"
+                                      data-bs-target="#pw-usr-{{ $asesor->id }}" data-bs-toggle-second="modal"
+                                      onclick="document.getElementById('pw-open-{{ $asesor->id }}').click(); return false;">
+                                <i class="bi bi-key"></i>
                               </button>
-                            </form>
-
-                            {{-- Cambiar password asesor (modal) --}}
-                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $asesor->id }}">
-                              <i class="bi bi-key"></i><span class="d-none d-md-inline ms-1">Contraseña</span>
-                            </button>
+                              <button id="pw-open-{{ $asesor->id }}" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $asesor->id }}"></button>
+                            </div>
                           </div>
 
                           {{-- Modal password asesor --}}
@@ -265,25 +167,45 @@
                               </form>
                             </div>
                           </div>
+
+                          {{-- Modal reasignar asesor --}}
+                          <div class="modal fade" id="reassign-{{ $asesor->id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog">
+                              <form method="POST" action="{{ route('administracion.asesores.reassign', $asesor->id) }}" class="modal-content">
+                                @csrf @method('PATCH')
+                                <div class="modal-header">
+                                  <h6 class="modal-title"><i class="bi bi-arrow-left-right me-1"></i> Reasignar — {{ $asesor->name }}</h6>
+                                  <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                </div>
+                                <div class="modal-body">
+                                  <label class="form-label">Supervisor destino</label>
+                                  <select name="supervisor_id" class="form-select" required>
+                                    @foreach($todosSupervisores as $sid => $sname)
+                                      <option value="{{ $sid }}" @selected($asesor->supervisor_id == $sid)>{{ $sname }}</option>
+                                    @endforeach
+                                  </select>
+                                </div>
+                                <div class="modal-footer">
+                                  <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+                                  <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Reasignar</button>
+                                </div>
+                              </form>
+                            </div>
+                          </div>
                         @endforeach
                       </div>
                     @endif
                   </td>
 
-                  {{-- Acciones supervisor --}}
+                  {{-- Acciones supervisor (iconos) --}}
                   <td class="text-end">
                     <div class="d-inline-flex gap-2">
-                      <form method="POST" action="{{ route('administracion.usuarios.toggle', $sup) }}" onsubmit="return confirm('¿Seguro?')">
-                        @csrf @method('PATCH')
-                        <button class="btn btn-sm {{ $sup->is_active ? 'btn-outline-danger' : 'btn-outline-success' }}">
-                          <i class="bi {{ $sup->is_active ? 'bi-slash-circle' : 'bi-check-circle' }}"></i>
-                          <span class="d-none d-md-inline ms-1">{{ $sup->is_active ? 'Desactivar' : 'Activar' }}</span>
-                        </button>
-                      </form>
-
-                      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $sup->id }}">
-                        <i class="bi bi-key"></i><span class="d-none d-md-inline ms-1">Contraseña</span>
+                      <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" title="Contraseña"
+                              data-bs-target="#pw-usr-{{ $sup->id }}" data-bs-toggle-second="modal"
+                              onclick="document.getElementById('pw-sup-open-{{ $sup->id }}').click(); return false;">
+                        <i class="bi bi-key"></i>
                       </button>
+                      <button id="pw-sup-open-{{ $sup->id }}" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $sup->id }}"></button>
                     </div>
 
                     {{-- Modal password supervisor --}}
@@ -321,58 +243,105 @@
       @endif
     </div>
   </div>
+
+  {{-- Modal: Crear supervisor --}}
+  <div class="modal fade" id="modalSupervisor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="POST" action="{{ route('administracion.supervisores.store') }}" class="modal-content" autocomplete="off">
+        @csrf
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-person-gear me-1"></i> Crear supervisor</h6>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body vstack gap-3">
+          <div>
+            <label class="form-label">Nombre</label>
+            <input name="name" class="form-control" required placeholder="Ej: Ana Pérez">
+          </div>
+          <div>
+            <label class="form-label">Email</label>
+            <input name="email" type="email" class="form-control" required placeholder="supervisor@empresa.com">
+          </div>
+          <div>
+            <label class="form-label">Contraseña</label>
+            <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
+            <div class="helper small text-secondary mt-1">Se enviará al usuario o puedes cambiarla luego.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {{-- Modal: Crear asesor --}}
+  <div class="modal fade" id="modalAsesor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="POST" action="{{ route('administracion.asesores.store') }}" class="modal-content" autocomplete="off">
+        @csrf
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-person-plus me-1"></i> Crear asesor</h6>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body vstack gap-3">
+          <div>
+            <label class="form-label">Nombre</label>
+            <input name="name" class="form-control" required placeholder="Ej: Carlos López">
+          </div>
+          <div>
+            <label class="form-label">Email</label>
+            <input name="email" type="email" class="form-control" required placeholder="asesor@empresa.com">
+          </div>
+          <div>
+            <label class="form-label">Contraseña</label>
+            <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
+          </div>
+          <div>
+            <label class="form-label">Supervisor</label>
+            <select name="supervisor_id" class="form-select" required>
+              <option value="">Selecciona…</option>
+              @foreach($supervisores as $sup)
+                <option value="{{ $sup->id }}">{{ $sup->name }} — {{ $sup->email }}</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
 @endsection
+
 @push('scripts')
 <script>
-/* ====== Auto-poner botón para ver/ocultar contraseña en todos los campos ====== */
-(function(){
-  function enhancePwdInputs(scope=document){
-    const pwds = scope.querySelectorAll('input[type="password"]:not([data-has-toggle])');
-    pwds.forEach(inp=>{
-      // marca para no procesar dos veces
-      inp.setAttribute('data-has-toggle','1');
+  // Tooltips (iconos)
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 
-      // crea input-group pequeño y mueve el input adentro
-      const wrap = document.createElement('div');
-      wrap.className = 'input-group input-group-sm pwd-group';
-      inp.parentNode.insertBefore(wrap, inp);
-      wrap.appendChild(inp);
-
-      // botón ojo
+  // Ojo/ocultar en inputs password (modales)
+  document.addEventListener('shown.bs.modal', (e)=>{
+    e.target.querySelectorAll('input[type="password"]').forEach(inp=>{
+      if (inp.dataset.hasToggle) return;
+      inp.dataset.hasToggle = '1';
+      const group = document.createElement('div');
+      group.className = 'input-group';
+      inp.parentNode.insertBefore(group, inp);
+      group.appendChild(inp);
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'btn btn-outline-secondary js-toggle-pwd';
-      btn.setAttribute('aria-label','Mostrar contraseña');
+      btn.className = 'btn btn-outline-secondary';
       btn.innerHTML = '<i class="bi bi-eye"></i>';
-      wrap.appendChild(btn);
-    });
-  }
-
-  // inicial
-  enhancePwdInputs(document);
-
-  // toggle
-  document.addEventListener('click', e=>{
-    const btn = e.target.closest('.js-toggle-pwd');
-    if(!btn) return;
-    const inp = btn.parentElement.querySelector('input[type="password"], input[type="text"]');
-    if(!inp) return;
-    const show = inp.type === 'password';
-    inp.type = show ? 'text' : 'password';
-    btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-    btn.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
-    inp.focus();
-  });
-
-  // si hay modales que se inyectan tarde, observa el DOM
-  const mo = new MutationObserver(muts=>{
-    muts.forEach(m=>{
-      m.addedNodes.forEach(n=>{
-        if(n.nodeType===1) enhancePwdInputs(n);
+      btn.addEventListener('click', ()=>{
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
       });
+      group.appendChild(btn);
     });
   });
-  mo.observe(document.body, {childList:true, subtree:true});
-})();
 </script>
 @endpush
