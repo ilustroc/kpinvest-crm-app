@@ -4,47 +4,29 @@
 
 @push('head')
 <style>
-  /* ===== UI compacta y legible ===== */
   .ui-compact .card.pad{padding:14px 16px;border-radius:14px}
   .ui-compact .form-control{font-size:.92rem;padding:.4rem .6rem;height:auto;background:var(--surface);border-color:var(--border)}
   .ui-compact .form-control:focus{border-color:var(--brand);box-shadow:0 0 0 .25rem color-mix(in oklab,var(--brand) 22%,transparent)}
   .ui-compact .btn{--bs-btn-padding-y:.36rem;--bs-btn-padding-x:.7rem;--bs-btn-border-radius:.55rem;font-size:.92rem}
-
-  /* Filtros */
   .filters .form-label{font-weight:600;color:var(--muted);font-size:.85rem;margin-bottom:.2rem}
 
-  /* Tabla */
   .rpt-pdp .table{font-size:.93rem}
   .rpt-pdp .table thead th{
     position:sticky; top:0; z-index:1;
     background:color-mix(in oklab,var(--surface-2) 55%,transparent);
     border-bottom:1px solid var(--border);
   }
-  [data-theme="dark"] .rpt-pdp .table thead th{
-    background:color-mix(in oklab,var(--surface-2) 40%,transparent);
-  }
+  [data-theme="dark"] .rpt-pdp .table thead th{background:color-mix(in oklab,var(--surface-2) 40%,transparent)}
   .rpt-pdp .table> :not(caption)>*>*{padding:.5rem .6rem}
-  .rpt-pdp .table tbody tr:nth-child(even){
-    background:color-mix(in oklab,var(--surface-2) 22%,transparent);
-  }
-  .rpt-pdp .table tbody tr:hover{
-    background:color-mix(in oklab,var(--brand) 10%,transparent);
-  }
+  .rpt-pdp .table tbody tr:nth-child(even){background:color-mix(in oklab,var(--surface-2) 22%,transparent)}
+  .rpt-pdp .table tbody tr:hover{background:color-mix(in oklab,var(--brand) 10%,transparent)}
   .nowrap{white-space:nowrap}
   .text-mono{font-variant-numeric:tabular-nums}
 
-  /* Loader */
-  .skeleton{
-    border:1px dashed var(--border);border-radius:12px;padding:1rem;
-    color:var(--muted);text-align:center
-  }
-  .skeleton .spin{
-    display:inline-block; width:1rem; height:1rem; border:.18rem solid var(--border);
-    border-top-color:var(--brand); border-radius:50%; animation:sp 1s linear infinite; vertical-align:middle; margin-right:.4rem
-  }
+  .skeleton{border:1px dashed var(--border);border-radius:12px;padding:1rem;color:var(--muted);text-align:center}
+  .skeleton .spin{display:inline-block;width:1rem;height:1rem;border:.18rem solid var(--border);border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite;vertical-align:middle;margin-right:.4rem}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  /* Barra inferior */
   .pager-wrap{gap:.5rem}
   .tiny{font-size:.88rem;color:var(--muted)}
 </style>
@@ -65,16 +47,16 @@
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">Estado</label>
-        <input type="text" name="estado" class="form-control" placeholder="aprobada / pendiente / ..." value="{{ $estado }}">
+        <input type="text" name="estado" class="form-control" placeholder="aprobado / pendiente / ..." value="{{ $estado }}">
       </div>
       <div class="col-6 col-md-2">
-        <label class="form-label">Gestor</label>
-        <input type="text" name="gestor" class="form-control" value="{{ $gestor }}">
+        <label class="form-label">Negociador</label>
+        <input type="text" name="negociador" class="form-control" value="{{ $negociador ?? '' }}">
       </div>
       <div class="col-12 col-md-3">
         <label class="form-label">Buscar</label>
         <div class="input-group">
-          <input type="text" name="q" class="form-control" placeholder="DNI / nota / observación" value="{{ $q }}">
+          <input type="text" name="q" class="form-control" placeholder="DNI / operación / entidad / nota / teléfono" value="{{ $q }}">
           <button class="btn btn-outline-secondary" id="btnBuscar"><i class="bi bi-search"></i></button>
         </div>
       </div>
@@ -90,7 +72,7 @@
 
     <hr class="my-3">
 
-    {{-- Tabla (contenido reemplazable por AJAX) --}}
+    {{-- Tabla --}}
     <div id="tablaPdp">
       <div id="pagMeta" data-page="{{ $rows->currentPage() }}" data-total="{{ $rows->total() }}"></div>
 
@@ -99,50 +81,46 @@
           <table class="table table-sm align-middle">
             <thead>
               <tr>
-                <th>DOCUMENTO</th>
-                <th>CLIENTE</th>
-                <th>NIVEL 3</th>
-                <th>CONTACTO</th>
-                <th>AGENTE</th>
-                <th>OPERACIÓN</th>
-                <th>ENTIDAD</th>
-                <th>CARTERA</th>
-                <th>FECHA GESTIÓN</th>
-                <th>FECHA CITA</th>
-                <th>TELÉFONO</th>
-                <th>OBSERVACIÓN</th>
-                <th class="text-end">MONTO PROMESA</th>
-                <th class="text-end">NRO CUOTAS</th>
-                <th>FECHA PROMESA</th>
-                <th>PROCEDENCIA LLAMADA</th>
-                <th>GESTOR</th>
-                <th>CARTERA FINAL</th>
+                <th>Tipo_Neg</th>
+                <th>Entidad</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Telefono</th>
+                <th>Nrodoc</th>
+                <th>Negociador</th>
+                <th>Situacion</th>
+                <th>Operacion</th>
+                <th>Moneda</th>
+                <th class="text-end">Deuda_Act</th>
+                <th class="text-end">Capital_Act</th>
+                <th class="text-end">Cuotas</th>
+                <th>Fec_Pag</th>
+                <th class="text-end">Pago_Ini</th>
+                <th>Glosa_Neg</th>
               </tr>
             </thead>
             <tbody>
             @forelse($rows as $r)
               <tr>
-                <td class="nowrap">{{ $r->documento }}</td>
-                <td class="nowrap">{{ $r->cliente }}</td>
-                <td>Compromiso de pago</td>
-                <td>CONTACTO</td>
-                <td class="nowrap">{{ $r->agente }}</td>
-                <td class="nowrap">{{ $r->operacion }}</td>
+                <td class="nowrap">{{ $r->tipo_neg }}</td>
                 <td class="nowrap">{{ $r->entidad }}</td>
-                <td class="nowrap">{{ $r->cartera_agente }}</td>
-                <td class="nowrap text-mono">{{ \Carbon\Carbon::parse($r->fecha_gestion)->format('Y-m-d H:i:s') }}</td>
-                <td></td>
-                <td></td>
-                <td class="nowrap">{{ $r->observacion }}</td>
-                <td class="text-end text-mono">{{ $r->monto_promesa!==null ? number_format((float)$r->monto_promesa,2) : '' }}</td>
-                <td class="text-end text-mono">{{ $r->nro_cuotas!==null ? $r->nro_cuotas : '' }}</td>
-                <td class="nowrap text-mono">{{ $r->fecha_promesa }}</td>
-                <td>Web/&gt;</td>
-                <td class="nowrap">{{ $r->gestor }}</td>
-                <td class="nowrap">{{ $r->cartera_final }}</td>
+                <td class="nowrap text-mono">{{ \Carbon\Carbon::parse($r->fecha)->format('Y-m-d H:i:s') }}</td>
+                <td class="nowrap">{{ $r->cliente }}</td>
+                <td class="nowrap">{{ $r->telefono }}</td>
+                <td class="nowrap text-mono">{{ $r->nrodoc }}</td>
+                <td class="nowrap">{{ $r->negociador }}</td>
+                <td class="nowrap">{{ $r->situacion }}</td>
+                <td class="nowrap text-mono">{{ $r->operacion }}</td>
+                <td class="nowrap">{{ $r->moneda }}</td>
+                <td class="text-end text-mono">{{ $r->deuda_act!==null ? number_format((float)$r->deuda_act,2) : '' }}</td>
+                <td class="text-end text-mono">{{ $r->capital_act!==null ? number_format((float)$r->capital_act,2) : '' }}</td>
+                <td class="text-end text-mono">{{ $r->cuotas!==null ? (int)$r->cuotas : '' }}</td>
+                <td class="nowrap text-mono">{{ $r->fec_pag }}</td>
+                <td class="text-end text-mono">{{ $r->pago_ini!==null ? number_format((float)$r->pago_ini,2) : '' }}</td>
+                <td class="nowrap">{{ $r->glosa_neg }}</td>
               </tr>
             @empty
-              <tr><td colspan="18" class="text-secondary">Sin resultados.</td></tr>
+              <tr><td colspan="16" class="text-secondary">Sin resultados.</td></tr>
             @endforelse
             </tbody>
           </table>
@@ -236,3 +214,4 @@
 })();
 </script>
 @endpush
+
