@@ -56,20 +56,12 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('clientes')->group(function () {
-        Route::get('/suggest', [ClientsControllers::class,'suggest'])
-            ->name('clientes.suggest');
+        Route::get('/suggest', [ClientsControllers::class,'suggest'])->name('clientes.suggest');
+        Route::get('/lookup',  [ClientsControllers::class,'quickLookup'])->name('clientes.quick');
+        Route::get('/{dni}',   [ClientsControllers::class,'show'])->name('clientes.show');
 
-        Route::get('/lookup', [ClientsControllers::class,'quickLookup'])
-            ->name('clientes.quick');
-
-        Route::get('/{dni}', [ClientsControllers::class,'show'])
-            ->name('clientes.show');
-
-        Route::post('/{dni}/promesas', [ClientsControllers::class,'storePromesa'])
-            ->name('clientes.promesas.store');
-
-        Route::post('/{dni}/cnas', [CnaController::class, 'store'])
-            ->name('clientes.cna.store');
+        Route::post('/{dni}/promesas', [ClientsControllers::class,'storePromesa'])->name('clientes.promesas.store');
+        Route::post('/{dni}/cnas',     [CnaController::class, 'store'])->name('clientes.cna.store');
     });
 
     /*
@@ -90,80 +82,59 @@ Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Autorización (Promesas + CNA)
+    | Autorización (Promesas + CNA)  -> SIN acceso para soporte
     |--------------------------------------------------------------------------
     */
-    Route::get('/autorizacion', [AutorizacionController::class,'index'])->name('autorizacion');
-    Route::get('/autorizacion/pagos/{dni}', [AutorizacionController::class, 'pagosDni'])->name('autorizacion.pagos');
+    Route::middleware('role:administrador,supervisor')->group(function () {
+        Route::get('/autorizacion', [AutorizacionController::class,'index'])->name('autorizacion');
+        Route::get('/autorizacion/pagos/{dni}', [AutorizacionController::class, 'pagosDni'])->name('autorizacion.pagos');
 
-    Route::middleware('role:supervisor')->group(function () {
+        // Acciones de promesas
         Route::post('/autorizacion/{promesa}/preaprobar',   [AutorizacionController::class,'preaprobar'])->name('autorizacion.preaprobar');
         Route::post('/autorizacion/{promesa}/rechazar-sup', [AutorizacionController::class,'rechazarSup'])->name('autorizacion.rechazar.sup');
-    });
-
-    Route::middleware('role:administrador')->group(function () {
         Route::post('/autorizacion/{promesa}/aprobar',        [AutorizacionController::class,'aprobar'])->name('autorizacion.aprobar');
         Route::post('/autorizacion/{promesa}/rechazar-admin', [AutorizacionController::class,'rechazarAdmin'])->name('autorizacion.rechazar.admin');
-    });
 
-    Route::middleware('auth')->get(
-        '/promesas/{promesa}/acuerdo',
-        [PromesaPdfController::class, 'acuerdo']
-    )->name('promesas.acuerdo');
-
-    /*
-    |--------------------------------------------------------------------------
-    | CNA – Flujo de aprobación
-    |--------------------------------------------------------------------------
-    */
-    Route::middleware('role:supervisor')->group(function () {
+        // CNA acciones
         Route::post('/cna/{cna}/preaprobar',   [CnaController::class,'preaprobar'])->name('cna.preaprobar');
         Route::post('/cna/{cna}/rechazar-sup', [CnaController::class,'rechazarSup'])->name('cna.rechazar.sup');
-    });
-
-    Route::middleware('role:administrador')->group(function () {
         Route::post('/cna/{cna}/aprobar',        [CnaController::class,'aprobar'])->name('cna.aprobar');
         Route::post('/cna/{cna}/rechazar-admin', [CnaController::class,'rechazarAdmin'])->name('cna.rechazar.admin');
     });
 
-    Route::middleware('role:administrador,supervisor,asesor')->group(function () {
+    // Ver acuerdo PDF (para cualquiera autenticado)
+    Route::get('/promesas/{promesa}/acuerdo', [PromesaPdfController::class, 'acuerdo'])
+        ->name('promesas.acuerdo');
+
+    // CNA PDFs/Docx (lectura)
+    Route::middleware('role:administrador,supervisor,asesor,soporte')->group(function () {
         Route::get('/cna/{id}/pdf',  [CnaController::class, 'pdf'])->name('cna.pdf');
         Route::get('/cna/{id}/docx', [CnaController::class, 'docx'])->name('cna.docx');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | Admin (Integración + Administración)
+    | Admin (Integración + Administración) -> incluye soporte
     |--------------------------------------------------------------------------
     */
-    // Antes: Route::middleware('role:administrador')->group(function () {
-    Route::middleware('role:administrador,supervisor')->group(function () {
+    Route::middleware('role:administrador,supervisor,soporte')->group(function () {
 
         // INTEGRACIÓN: Data maestro de clientes
-        Route::view('/integracion/data', 'placeholders.integracion-data')
-            ->name('integracion.data');
-        Route::get('/integracion/data/clientes/template', [ClientesCargaController::class, 'templateClientesMaster'])
-            ->name('integracion.data.clientes.template');
-        Route::post('/integracion/data/clientes/import',  [ClientesCargaController::class, 'importClientesMaster'])
-            ->name('integracion.data.clientes.import');
-        
+        Route::view('/integracion/data', 'placeholders.integracion-data')->name('integracion.data');
+        Route::get('/integracion/data/clientes/template', [ClientesCargaController::class, 'templateClientesMaster'])->name('integracion.data.clientes.template');
+        Route::post('/integracion/data/clientes/import',  [ClientesCargaController::class, 'importClientesMaster'])->name('integracion.data.clientes.import');
+
         // INTEGRACIÓN: CCD
-        Route::get('/integracion/ccd', [IntegracionCcdController::class, 'index'])
-            ->name('integracion.ccd');
-        Route::get('/integracion/ccd/template', [IntegracionCcdController::class, 'template'])
-            ->name('integracion.ccd.template');
-        Route::post('/integracion/ccd/import', [IntegracionCcdController::class, 'import'])
-            ->name('integracion.ccd.import');
+        Route::get('/integracion/ccd',           [IntegracionCcdController::class, 'index'])->name('integracion.ccd');
+        Route::get('/integracion/ccd/template',  [IntegracionCcdController::class, 'template'])->name('integracion.ccd.template');
+        Route::post('/integracion/ccd/import',   [IntegracionCcdController::class, 'import'])->name('integracion.ccd.import');
 
         // INTEGRACIÓN: Pagos
-        Route::get('/integracion/pagos',          [PlaceholdersPagosController::class, 'index'])
-            ->name('integracion.pagos');
-        Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])
-            ->name('integracion.pagos.import');
-        Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])
-            ->name('integracion.pagos.template');
+        Route::get('/integracion/pagos',          [PlaceholdersPagosController::class, 'index'])->name('integracion.pagos');
+        Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])->name('integracion.pagos.import');
+        Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])->name('integracion.pagos.template');
 
-        // ADMINISTRACIÓN DE USUARIOS
+        // ADMINISTRACIÓN DE USUARIOS (crear supervisores/asesores, etc.)
         Route::get('/administracion',                           [AdminUsersController::class, 'index'])->name('administracion');
         Route::post('/administracion/supervisores',             [AdminUsersController::class, 'storeSupervisor'])->name('administracion.supervisores.store');
         Route::post('/administracion/asesores',                 [AdminUsersController::class, 'storeAsesor'])->name('administracion.asesores.store');
@@ -172,7 +143,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/administracion/usuarios/{user}/password', [AdminUsersController::class,'updatePassword'])->name('administracion.usuarios.password');
     });
 
-    // Zonas por rol (opcional)
+    // Zonas por rol (opcionales)
     Route::middleware('role:administrador')->get('/admin', fn () => 'Zona Admin');
     Route::middleware('role:supervisor')->get('/supervisor', fn () => 'Zona Supervisor');
 });

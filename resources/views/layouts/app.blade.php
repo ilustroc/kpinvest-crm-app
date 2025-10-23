@@ -201,33 +201,66 @@
       </div>
 
       <nav class="navy">
-        <div class="lab">GENERAL</div>
-        <a href="{{ route('panel') }}" class="{{ request()->routeIs('panel') ? 'active' : '' }}"><i class="bi bi-grid"></i><span>Resumen</span></a>
-        <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-graph-up"></i><span>Estadísticas</span></a>
-
         @auth
-          @if(in_array(strtolower(auth()->user()->role),['supervisor','administrador','sistemas']))
-            <div class="lab">SUPERVISOR</div>
-            <a class="{{ request()->is('reportes/pagos') ? 'active' : '' }}" href="{{ url('/reportes/pagos') }}"><i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span></a>
-            <a class="{{ request()->is('reportes/gestiones') ? 'active' : '' }}" href="{{ url('/reportes/gestiones') }}"><i class="bi bi-chat-dots"></i><span>Reporte de Gestiones</span></a>
-            <a class="{{ request()->is('reportes/pdp') ? 'active' : '' }}" href="{{ url('/reportes/pdp') }}"><i class="bi bi-flag"></i><span>Reporte de Promesas</span></a>
-            <a class="{{ request()->is('autorizacion') ? 'active' : '' }}" href="{{ url('/autorizacion') }}"><i class="bi bi-check2-square"></i><span>Autorización</span></a>
+          @php($role = strtolower(auth()->user()->role ?? ''))
+
+          {{-- GENERAL --}}
+          <div class="lab">GENERAL</div>
+          <a href="{{ route('panel') }}"
+            class="{{ request()->routeIs('panel') ? 'active' : '' }}">
+            <i class="bi bi-grid"></i><span>Resumen</span>
+          </a>
+          <a href="{{ route('dashboard') }}"
+            class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
+            <i class="bi bi-graph-up"></i><span>Estadísticas</span>
+          </a>
+
+          {{-- REPORTES (supervisor, admin, sistemas, soporte) --}}
+          @if(in_array($role, ['supervisor','administrador','sistemas','soporte']))
+            <div class="lab">REPORTES</div>
+            <a href="{{ route('reportes.pagos') }}"
+              class="{{ request()->routeIs('reportes.pagos*') ? 'active' : '' }}">
+              <i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span>
+            </a>
+            <a href="{{ route('reportes.gestiones') }}"
+              class="{{ request()->routeIs('reportes.gestiones*') ? 'active' : '' }}">
+              <i class="bi bi-chat-dots"></i><span>Reporte de Gestiones</span>
+            </a>
+            <a href="{{ route('reportes.pdp') }}"
+              class="{{ request()->routeIs('reportes.pdp*') ? 'active' : '' }}">
+              <i class="bi bi-flag"></i><span>Reporte de Promesas</span>
+            </a>
           @endif
 
-          @php($role = strtolower(trim(auth()->user()->role ?? '')))
-          @if(in_array($role,['administrador','supervisor','sistemas']))
+          {{-- AUTORIZACIÓN (solo admin y supervisor — soporte NO la ve) --}}
+          @if(in_array($role, ['supervisor','administrador']))
+            <div class="lab">APROBACIONES</div>
+            <a href="{{ route('autorizacion') }}"
+              class="{{ request()->is('autorizacion*') ? 'active' : '' }}">
+              <i class="bi bi-check2-square"></i><span>Autorización</span>
+            </a>
+          @endif
+
+          {{-- ADMIN / SUPERVISIÓN (admin, supervisor, soporte, sistemas) --}}
+          @if(in_array($role, ['administrador','supervisor','soporte','sistemas']))
             <div class="lab">ADMIN / SUPERVISIÓN</div>
-            <a class="{{ request()->is('integracion/pagos') ? 'active' : '' }}" href="{{ url('/integracion/pagos') }}"><i class="bi bi-upload"></i><span>Integración ▸ Subir Pagos</span></a>
-            <a class="{{ request()->is('integracion/ccd') ? 'active' : '' }}" href="{{ url('/integracion/ccd') }}"><i class="bi bi-database"></i><span>Integración ▸ Subir CCD</span></a>
-            <a class="{{ request()->is('integracion/data') ? 'active' : '' }}" href="{{ url('/integracion/data') }}"><i class="bi bi-cloud-upload"></i><span>Integración ▸ Subir Data</span></a>
-            <a class="{{ request()->is('administracion') ? 'active' : '' }}" href="{{ url('/administracion') }}"><i class="bi bi-gear"></i><span>Administración</span></a>
+            <a href="{{ route('integracion.pagos') }}"
+              class="{{ request()->is('integracion/pagos*') ? 'active' : '' }}">
+              <i class="bi bi-upload"></i><span>Integración ▸ Subir Pagos</span>
+            </a>
+            <a href="{{ route('integracion.ccd') }}"
+              class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
+              <i class="bi bi-database"></i><span>Integración ▸ Subir CCD</span>
+            </a>
+            <a href="{{ route('integracion.data') }}"
+              class="{{ request()->is('integracion/data*') ? 'active' : '' }}">
+              <i class="bi bi-cloud-upload"></i><span>Integración ▸ Subir Data</span>
+            </a>
+            <a href="{{ route('administracion') }}"
+              class="{{ request()->routeIs('administracion') ? 'active' : '' }}">
+              <i class="bi bi-gear"></i><span>Administración</span>
+            </a>
           @endif
-
-          <div class="lab">CUENTA</div>
-          <form method="POST" action="{{ route('logout') }}" class="px-2">
-            @csrf
-            <button class="btn btn-outline-primary w-100"><i class="bi bi-box-arrow-right me-1"></i> Salir</button>
-          </form>
         @endauth
       </nav>
 
