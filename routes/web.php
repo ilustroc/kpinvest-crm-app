@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientsControllers;
 use App\Http\Controllers\PanelController;
-use App\Http\Controllers\ReporteGestionesController;
+use App\Http\Controllers\ReporteCnaController;
 use App\Http\Controllers\ReportePagosController;
 use App\Http\Controllers\AdminUsersController;
 use App\Http\Controllers\PlaceholdersPagosController;
@@ -70,8 +70,8 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('reportes')->group(function () {
-        Route::get('/gestiones',        [ReporteGestionesController::class, 'index'])->name('reportes.gestiones');
-        Route::get('/gestiones/export', [ReporteGestionesController::class, 'export'])->name('reportes.gestiones.export');
+        Route::get('/cna',        [ReporteCnaController::class, 'index'])->name('reportes.cna');
+        Route::get('/cna/export', [ReporteCnaController::class, 'export'])->name('reportes.cna.export');
 
         Route::get('/pagos',        [ReportePagosController::class, 'index'])->name('reportes.pagos');
         Route::get('/pagos/export', [ReportePagosController::class, 'export'])->name('reportes.pagos.export');

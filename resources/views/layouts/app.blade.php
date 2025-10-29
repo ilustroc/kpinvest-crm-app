@@ -93,6 +93,35 @@
       background: linear-gradient(180deg, var(--brand), var(--brand-ink)); border-radius:8px;
     }
 
+    /* ======= Botón de acordeón (padre) ======= */
+    .navy .accordion-btn{
+      width:100%; text-align:left; background:transparent; border:1px solid transparent;
+      display:flex; align-items:center; gap:.6rem; padding:8px 10px; border-radius:12px;
+      font-weight:600; color:inherit; cursor:pointer;
+    }
+    .navy .accordion-btn:hover{
+      background: color-mix(in oklab, var(--brand) 10%, transparent);
+      border-color: color-mix(in oklab, var(--brand) 26%, transparent);
+    }
+    .navy .accordion-btn i{
+      color:var(--brand);
+      background: color-mix(in oklab, var(--brand) 16%, transparent);
+      width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
+      font-size:1rem;
+    }
+    .navy .accordion-btn .chev{
+      margin-left:auto; transition:transform .18s ease;
+    }
+    .navy .accordion-btn[aria-expanded="true"] .chev{ transform:rotate(180deg) }
+
+    /* Submenú */
+    .navy .submenu{
+      padding:6px 0 8px 42px; /* sangría para alinear */
+    }
+    .navy .submenu a{
+      padding:7px 10px; border-radius:10px; font-weight:500;
+    }
+
     .rail-foot{margin-top:auto; padding:12px; border-top:1px solid var(--border)}
     .rail-foot .small{ color:var(--muted); }
 
@@ -184,6 +213,13 @@
   @stack('head')
 </head>
 <body>
+  @php
+    $route = request()->route();
+    $role  = strtolower(auth()->user()->role ?? '');
+    $isReportes     = request()->routeIs('reportes.*');
+    $isIntegracion  = request()->is('integracion/*');
+  @endphp
+
   <div class="shell">
     <!-- Sidebar -->
     <aside id="rail" class="rail">
@@ -202,41 +238,54 @@
 
       <nav class="navy">
         @auth
-          @php($role = strtolower(auth()->user()->role ?? ''))
-
           {{-- GENERAL --}}
           <div class="lab">GENERAL</div>
-          <a href="{{ route('panel') }}"
-            class="{{ request()->routeIs('panel') ? 'active' : '' }}">
+          <a href="{{ route('panel') }}" class="{{ request()->routeIs('panel') ? 'active' : '' }}">
             <i class="bi bi-grid"></i><span>Resumen</span>
           </a>
-          <a href="{{ route('dashboard') }}"
-            class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
+          <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <i class="bi bi-graph-up"></i><span>Estadísticas</span>
           </a>
 
           {{-- REPORTES (supervisor, admin, sistemas, soporte) --}}
           @if(in_array($role, ['supervisor','administrador','sistemas','soporte']))
             <div class="lab">REPORTES</div>
-            <a href="{{ route('reportes.pagos') }}"
-              class="{{ request()->routeIs('reportes.pagos*') ? 'active' : '' }}">
-              <i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span>
-            </a>
-            <a href="{{ route('reportes.gestiones') }}"
-              class="{{ request()->routeIs('reportes.gestiones*') ? 'active' : '' }}">
-              <i class="bi bi-chat-dots"></i><span>Reporte de Gestiones</span>
-            </a>
-            <a href="{{ route('reportes.pdp') }}"
-              class="{{ request()->routeIs('reportes.pdp*') ? 'active' : '' }}">
-              <i class="bi bi-flag"></i><span>Reporte de Promesas</span>
-            </a>
+
+            <!-- Botón padre -->
+            <button
+              class="accordion-btn {{ $isReportes ? 'active' : '' }}"
+              data-bs-toggle="collapse"
+              data-bs-target="#menuReportes"
+              aria-expanded="{{ $isReportes ? 'true' : 'false' }}"
+              aria-controls="menuReportes">
+              <i class="bi bi-bar-chart-line"></i>
+              <span>Reportes</span>
+              <i class="bi bi-chevron-down chev"></i>
+            </button>
+
+            <!-- Submenú -->
+            <div id="menuReportes" class="collapse {{ $isReportes ? 'show' : '' }}">
+              <div class="submenu">
+                <a href="{{ route('reportes.pagos') }}"
+                   class="{{ request()->routeIs('reportes.pagos*') ? 'active' : '' }}">
+                  <i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span>
+                </a>
+                <a href="{{ route('reportes.cna') }}"
+                   class="{{ request()->routeIs('reportes.cna*') ? 'active' : '' }}">
+                  <i class="bi bi-chat-dots"></i><span>Reporte de Cna</span>
+                </a>
+                <a href="{{ route('reportes.pdp') }}"
+                   class="{{ request()->routeIs('reportes.pdp*') ? 'active' : '' }}">
+                  <i class="bi bi-flag"></i><span>Reporte de Promesas</span>
+                </a>
+              </div>
+            </div>
           @endif
 
-          {{-- AUTORIZACIÓN (solo admin y supervisor — soporte NO la ve) --}}
+          {{-- APROBACIONES (admin y supervisor) --}}
           @if(in_array($role, ['supervisor','administrador']))
             <div class="lab">APROBACIONES</div>
-            <a href="{{ route('autorizacion') }}"
-              class="{{ request()->is('autorizacion*') ? 'active' : '' }}">
+            <a href="{{ route('autorizacion') }}" class="{{ request()->is('autorizacion*') ? 'active' : '' }}">
               <i class="bi bi-check2-square"></i><span>Autorización</span>
             </a>
           @endif
@@ -244,20 +293,38 @@
           {{-- ADMIN / SUPERVISIÓN (admin, supervisor, soporte, sistemas) --}}
           @if(in_array($role, ['administrador','supervisor','soporte','sistemas']))
             <div class="lab">ADMIN / SUPERVISIÓN</div>
-            <a href="{{ route('integracion.pagos') }}"
-              class="{{ request()->is('integracion/pagos*') ? 'active' : '' }}">
-              <i class="bi bi-upload"></i><span>Integración ▸ Subir Pagos</span>
-            </a>
-            <a href="{{ route('integracion.ccd') }}"
-              class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
-              <i class="bi bi-database"></i><span>Integración ▸ Subir CCD</span>
-            </a>
-            <a href="{{ route('integracion.data') }}"
-              class="{{ request()->is('integracion/data*') ? 'active' : '' }}">
-              <i class="bi bi-cloud-upload"></i><span>Integración ▸ Subir Data</span>
-            </a>
-            <a href="{{ route('administracion') }}"
-              class="{{ request()->routeIs('administracion') ? 'active' : '' }}">
+
+            <!-- Botón padre Integración -->
+            <button
+              class="accordion-btn {{ $isIntegracion ? 'active' : '' }}"
+              data-bs-toggle="collapse"
+              data-bs-target="#menuIntegracion"
+              aria-expanded="{{ $isIntegracion ? 'true' : 'false' }}"
+              aria-controls="menuIntegracion">
+              <i class="bi bi-hdd-network"></i>
+              <span>Integración</span>
+              <i class="bi bi-chevron-down chev"></i>
+            </button>
+
+            <!-- Submenú Integración -->
+            <div id="menuIntegracion" class="collapse {{ $isIntegracion ? 'show' : '' }}">
+              <div class="submenu">
+                <a href="{{ route('integracion.pagos') }}"
+                   class="{{ request()->is('integracion/pagos*') ? 'active' : '' }}">
+                  <i class="bi bi-upload"></i><span>Subir Pagos</span>
+                </a>
+                <a href="{{ route('integracion.ccd') }}"
+                   class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
+                  <i class="bi bi-database"></i><span>Subir CCD</span>
+                </a>
+                <a href="{{ route('integracion.data') }}"
+                   class="{{ request()->is('integracion/data*') ? 'active' : '' }}">
+                  <i class="bi bi-cloud-upload"></i><span>Subir Data</span>
+                </a>
+              </div>
+            </div>
+
+            <a href="{{ route('administracion') }}" class="{{ request()->routeIs('administracion') ? 'active' : '' }}">
               <i class="bi bi-gear"></i><span>Administración</span>
             </a>
           @endif
@@ -265,7 +332,16 @@
       </nav>
 
       <div class="rail-foot">
-        <div class="small">© {{ date('Y') }} KP INVEST</div>
+        @auth
+          <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button class="btn btn-outline-primary w-100">
+              <i class="bi bi-box-arrow-right me-1"></i> Salir
+            </button>
+          </form>
+        @endauth
+
+        <div class="small mt-2">© {{ date('Y') }} KP INVEST</div>
       </div>
     </aside>
 
