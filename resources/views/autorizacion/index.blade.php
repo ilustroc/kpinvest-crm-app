@@ -557,7 +557,7 @@
                   <button class="accordion-button ${idx>0?'collapsed':''}" type="button"
                           data-bs-toggle="collapse" data-bs-target="#${id}_c"
                           aria-expanded="${idx===0?'true':'false'}" aria-controls="${id}_c">
-                    Operación ${c?.operacion || '—'} · ${c?.entidad || '—'} · ${c?.producto || '—'}
+                    Operación ${c?.operacion || '—'} · ${c?.entidad || '—'} · ${c?.producto || '—'} · ${c?.cosecha || '—'}
                   </button>
                 </h2>
                 <div id="${id}_c" class="accordion-collapse collapse ${idx===0?'show':''}"
@@ -569,6 +569,7 @@
                         <tr><th>Año Castigo</th><td>${anioCastigo}</td></tr>
                         <tr><th>Entidad</th><td>${c?.entidad || '—'}</td></tr>
                         <tr><th>Producto</th><td>${c?.producto || '—'}</td></tr>
+                        <tr><th>Cosecha</th><td>${c?.cosecha || '—'}</td></tr>
                         <tr><th>Capital</th><td>S/ ${fmt(c?.saldo_capital)}</td></tr>
                         <tr><th>Deuda Total</th><td>S/ ${fmt(c?.deuda_total)}</td></tr>
                       </tbody>

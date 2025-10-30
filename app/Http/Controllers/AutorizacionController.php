@@ -81,6 +81,7 @@ class AutorizacionController extends Controller
                     'numdoc as dni',
                     'nombre as titular',
                     'entidad',
+                    'cosecha',
                     'producto',
                     'deuda_capital',
                     'deuda_total',
@@ -118,6 +119,7 @@ class AutorizacionController extends Controller
                 $cuentas[] = [
                     'operacion'     => (string)$cc->operacion,
                     'entidad'       => (string)($cc->entidad ?? ''),
+                    'cosecha'       => (string)($cc->cosecha ?? ''),
                     'producto'      => (string)($cc->producto ?? ''),
                     'saldo_capital' => (float)($cc->deuda_capital ?? 0),
                     'deuda_total'   => (float)($cc->deuda_total   ?? 0),
