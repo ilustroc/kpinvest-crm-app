@@ -352,8 +352,9 @@ class ClientsControllers extends Controller
         if (in_array($tipo, ['convenio','convenio_balon'], true)) {
             $n = max(1, (int)$r->input('nro_cuotas'));
 
-            // Si es balón, esperamos n + 1 filas; si no, n filas.
-            $esperadas = $n + ($tipo === 'convenio_balon' ? 1 : 0);
+            // En cuota balón también son N filas (la balón cuenta dentro de N)
+            $esperadas = $n;
+
             if (count($cronFechas) !== $esperadas || count($cronMontos) !== $esperadas) {
                 $cronFechas = array_slice($cronFechas, 0, $esperadas);
                 $cronMontos = array_slice($cronMontos, 0, $esperadas);
@@ -361,23 +362,22 @@ class ClientsControllers extends Controller
                 while (count($cronMontos) < $esperadas) $cronMontos[] = 0;
             }
 
-            // Validación de suma: regular == monto_convenio (excluye la cuota balón)
-            $suma = array_sum(array_map('floatval', $cronMontos));
-            $sumaReg = $suma;
-
+            // Si viene índice de balón, solo valida rango (no se excluye del total)
             if ($tipo === 'convenio_balon') {
-                // Corregimos índice y validamos rango
-                if ($cronBalon < 1 || $cronBalon > count($cronMontos)) {
+                if ($cronBalon < 1 || $cronBalon > $esperadas) {
                     return back()->withErrors('Índice de cuota balón inválido.')->withInput();
                 }
-                $sumaReg -= (float)$cronMontos[$cronBalon - 1];
             } else {
-                $cronBalon = 0; // no hay balón
+                $cronBalon = 0;
             }
 
-            if (abs($sumaReg - (float)$r->input('monto_convenio')) > 0.01) {
+            // La suma de TODAS las cuotas debe ser igual al monto del convenio
+            $totalCuotas    = round(array_reduce($cronMontos, fn($a,$b)=>$a + (float)$b, 0.0), 2);
+            $montoConvenio  = round((float)$r->input('monto_convenio'), 2);
+
+            if (abs($totalCuotas - $montoConvenio) > 0.01) {
                 return back()
-                    ->withErrors('La suma de las cuotas regulares debe coincidir con el Monto convenio.')
+                    ->withErrors('La suma de las cuotas debe coincidir con el Monto convenio.')
                     ->withInput();
             }
         }
