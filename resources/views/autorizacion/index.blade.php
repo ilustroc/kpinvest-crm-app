@@ -317,102 +317,88 @@
           <thead>
             <tr>
               <th class="text-center">DNI</th>
-              <th class="text-center">No. Carta</th>
               <th>Producto</th>
               <th class="text-center">Operación</th>
               <th class="text-center">Fecha</th>
-              <th>Observación</th>
-              <th class="text-end">Acciones</th>
+              <th class="text-end col-actions">Acciones</th>
             </tr>
           </thead>
-            <tbody>
-            @forelse($cnaRows as $cna)
-              @php
-                $ops = collect((array)($cna->operaciones ?? []))
-                          ->map(fn($x)=>trim((string)$x))
-                          ->filter()
-                          ->values();
+          <tbody>
+          @forelse($cnaRows as $cna)
+            @php
+              $ops = collect((array)($cna->operaciones ?? []))
+                        ->map(fn($x)=>trim((string)$x))
+                        ->filter()
+                        ->values();
 
-                $productos = $ops->map(fn($op) => $prodByOp[(string)$op] ?? null)
-                                ->filter()
-                                ->unique()
-                                ->values();
+              $productos = $ops->map(fn($op) => $prodByOp[(string)$op] ?? null)
+                              ->filter()
+                              ->unique()
+                              ->values();
 
-                $opsBadges = $ops->map(fn($op) =>
-                  '<span class="badge rounded-pill text-bg-light border">'.$op.'</span>'
-                )->implode(' ');
-              @endphp
+              $productoTxt = $productos->isEmpty()
+                ? '—'
+                : ($productos->count()===1 ? $productos->first() : $productos->implode(' · '));
 
-              <tr>
-                <td class="text-center text-nowrap">{{ $cna->dni }}</td>
-                <td class="text-center text-nowrap">{{ $cna->nro_carta }}</td>
+              $opTxt = $ops->isEmpty() ? '—' : $ops->implode(', ');
+            @endphp
 
-                {{-- Producto: uno o varios --}}
-                <td class="text-nowrap">
-                  @if($productos->isEmpty())
-                    —
-                  @elseif($productos->count() === 1)
-                    {{ $productos->first() }}
-                  @else
-                    {{ $productos->implode(' · ') }}
-                  @endif
-                </td>
+            <tr>
+              <td class="text-center text-nowrap">{{ $cna->dni }}</td>
+              <td class="text-nowrap">{{ $productoTxt }}</td>
+              <td class="text-center text-nowrap">{{ $opTxt }}</td>
+              <td class="text-center text-nowrap">{{ optional($cna->created_at)->format('Y-m-d') }}</td>
 
-                {{-- Operaciones --}}
-                <td class="text-center text-nowrap">
-                  {!! $opsBadges ?: '—' !!}
-                </td>
+              <td class="text-end">
+                {{-- Ficha CNA (con pagos) --}}
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm me-1 js-ver-cna"
+                        data-dni="{{ $cna->dni }}"
+                        data-nrocarta="{{ $cna->nro_carta }}"
+                        data-producto="{{ $productoTxt }}"
+                        data-operaciones='@json($ops)'
+                        data-fecha="{{ optional($cna->created_at)->format('Y-m-d') }}"
+                        data-fecha-pago="{{ $cna->fecha_pago_realizado }}"
+                        data-monto-pagado="{{ (float)($cna->monto_pagado ?? 0) }}"
+                        data-observacion="{{ $cna->observacion }}"
+                        data-pagos='@json($pagosByDni[$cna->dni] ?? [])'
+                        data-bs-toggle="modal" data-bs-target="#modalCnaFicha">
+                  Ficha
+                </button>
 
-                <td class="text-center text-nowrap">{{ optional($cna->created_at)->format('Y-m-d') }}</td>
-
-                {{-- Observación --}}
-                <td class="text-truncate" style="max-width:420px" title="{{ $cna->observacion }}">
-                  {{ $cna->observacion ?: '—' }}
-                </td>
-                <td class="text-end">
+                @if($isSupervisor)
                   <button type="button"
-                          class="btn btn-outline-secondary btn-sm me-1 js-ver-pagos"
-                          data-dni="{{ $cna->dni }}"
-                          data-pagos='@json($pagosByDni[$cna->dni] ?? [])'
-                          data-bs-toggle="modal" data-bs-target="#modalPagos">
-                    Ver pagos
+                          class="btn btn-primary btn-sm js-open-nota"
+                          data-title="Pre-aprobar CNA"
+                          data-action="{{ route('cna.preaprobar', $cna) }}">
+                    Pre-aprobar
                   </button>
-
-                  @if($isSupervisor)
-                    <button type="button"
-                            class="btn btn-primary btn-sm js-open-nota"
-                            data-title="Pre-aprobar CNA"
-                            data-action="{{ route('cna.preaprobar', $cna) }}">
-                      Pre-aprobar
-                    </button>
-
-                    <button type="button"
-                            class="btn btn-outline-danger btn-sm js-open-rechazo"
-                            data-action="{{ route('cna.rechazar.sup', $cna) }}"
-                            data-bs-toggle="modal" data-bs-target="#modalRechazo">
-                      Rechazar
-                    </button>
-                  @else
-                    <button type="button"
-                            class="btn btn-primary btn-sm js-open-nota"
-                            data-title="Aprobar CNA"
-                            data-action="{{ route('cna.aprobar', $cna) }}">
-                      Aprobar
-                    </button>
-
-                    <button type="button"
-                            class="btn btn-outline-danger btn-sm js-open-rechazo"
-                            data-action="{{ route('cna.rechazar.admin', $cna) }}"
-                            data-bs-toggle="modal" data-bs-target="#modalRechazo">
-                      Rechazar
-                    </button>
-                  @endif
-                </td>
-              </tr>
-            @empty
-              <tr><td colspan="7" class="text-center text-muted py-4">Sin solicitudes de CNA.</td></tr>
-            @endforelse
-            </tbody>
+                  <button type="button"
+                          class="btn btn-outline-danger btn-sm js-open-rechazo"
+                          data-action="{{ route('cna.rechazar.sup', $cna) }}"
+                          data-bs-toggle="modal" data-bs-target="#modalRechazo">
+                    Rechazar
+                  </button>
+                @else
+                  <button type="button"
+                          class="btn btn-primary btn-sm js-open-nota"
+                          data-title="Aprobar CNA"
+                          data-action="{{ route('cna.aprobar', $cna) }}">
+                    Aprobar
+                  </button>
+                  <button type="button"
+                          class="btn btn-outline-danger btn-sm js-open-rechazo"
+                          data-action="{{ route('cna.rechazar.admin', $cna) }}"
+                          data-bs-toggle="modal" data-bs-target="#modalRechazo">
+                    Rechazar
+                  </button>
+                @endif
+              </td>
+            </tr>
+          @empty
+            <tr><td colspan="5" class="text-center text-muted py-4">Sin solicitudes de CNA.</td></tr>
+          @endforelse
+          </tbody>
         </table>
       </div>
       <div class="p-2">
@@ -422,17 +408,50 @@
   </div>
   {{-- ====== /Solicitudes de CNA ====== --}}
 
-  {{-- Modal: Ver pagos (adaptado a pagos_propia nuevo) --}}
-  <div class="modal fade" id="modalPagos" tabindex="-1" aria-hidden="true">
+  {{-- Modal: Ficha CNA + pagos --}}
+  <div class="modal fade" id="modalCnaFicha" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <h6 class="modal-title">
-            Pagos del DNI <span id="pagos_dni">—</span>
+            CNA — DNI <span id="cna_dni">—</span> · Carta <span id="cna_carta">—</span>
           </h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
+
         <div class="modal-body">
+          {{-- Datos solicitud CNA --}}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <table class="table table-sm mb-0">
+                <tbody>
+                  <tr><th style="width:220px">Fecha solicitud</th><td id="cna_fecha">—</td></tr>
+                  <tr><th>Operación(es)</th><td id="cna_ops">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <table class="table table-sm mb-0">
+                <tbody>
+                  <tr><th style="width:220px">Fecha pago realizado</th><td id="cna_fecha_pago">—</td></tr>
+                  <tr><th>Monto pagado (S/)</th><td id="cna_monto_pagado">0.00</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="col-12">
+              <div class="fw-semibold mb-1">Observación</div>
+              <div id="cna_obs" class="border rounded p-2 small" style="background:#fafbfc">—</div>
+            </div>
+          </div>
+
+          {{-- Total de pagos (destacado al centro) --}}
+          <div class="my-3 text-center">
+            <div class="fw-bold">Total de pagos del cliente</div>
+            <div id="cna_total_pagos" class="display-6" style="font-size:1.75rem">S/ 0.00</div>
+          </div>
+
+          {{-- Tabla de pagos del cliente --}}
+          <h6 class="mt-3">Pagos realizados</h6>
           <div class="table-responsive">
             <table class="table table-sm align-middle">
               <thead class="position-sticky top-0 bg-body">
@@ -446,17 +465,18 @@
                   <th class="text-nowrap">Cuenta recaudo</th>
                 </tr>
               </thead>
-              <tbody id="pagos_tbody"></tbody>
+              <tbody id="cna_pagos_tbody"></tbody>
             </table>
           </div>
         </div>
+
         <div class="modal-footer">
           <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cerrar</button>
         </div>
       </div>
     </div>
   </div>
-  {{-- /Modal: Ver pagos --}}
+
 @endsection
 
 @push('scripts')
@@ -632,68 +652,78 @@
     });
   });
 
-  // ============================ Ver PAGOS ==============================
+  // ============================ FICHA CNA (fetch pagos como el modal antiguo) ======================
   (function(){
-    const modalEl = document.getElementById('modalPagos');
-    if (!modalEl) return;
-    const modal   = new bootstrap.Modal(modalEl);
-    const spanDni = document.getElementById('pagos_dni');
-    const tbody   = document.getElementById('pagos_tbody');
+    const money = (v)=> Number(String(v ?? 0).replaceAll(',','')).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const $ = (id)=> document.getElementById(id);
+    const tbody = $('cna_pagos_tbody');
 
-    // Ruta: { pagos: [{ operacion, fecha, monto_pagado, gestor, entidad, cosecha, cuenta_recaudo, nombre_cliente? }] }
+    // Usa la misma ruta que tu modal de pagos anterior
     const RUTA_PAGOS = @json(route('autorizacion.pagos', '__DNI__')); // placeholder
 
-    const money = (v)=> Number(v ?? 0).toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
-
-    function setRowsLoading(){
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Cargando…</td></tr>';
-    }
     function setRowsEmpty(){
+      if (!tbody) return;
       tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin pagos registrados.</td></tr>';
     }
-    function addRow(p){
-      const oper     = p.operacion ?? p.oper ?? '—';
-      const fechaStr = p.fecha ? new Date(p.fecha).toLocaleDateString('es-PE') : '';
-      const monto    = p.monto_pagado ?? p.monto ?? 0;
-      const gestor   = p.gestor ?? '—';
-      const entidad  = p.entidad ?? '—';
-      const cosecha  = p.cosecha ?? '—';
-      const cuenta   = p.cuenta_recaudo ?? p.cuenta ?? '—';
-      const cliente  = p.nombre_cliente ?? ''; // opcional
-
+    function addPagoRow(p){
       const tr = document.createElement('tr');
+      const fechaStr = p.fecha ? new Date(p.fecha).toLocaleDateString('es-PE') : '—';
       tr.innerHTML = `
-        <td class="text-nowrap" title="${cliente}">${oper}</td>
+        <td class="text-nowrap">${p.operacion ?? p.oper ?? '—'}</td>
         <td class="text-nowrap">${fechaStr}</td>
-        <td class="text-end text-nowrap">${money(monto)}</td>
-        <td class="text-nowrap">${gestor}</td>
-        <td class="text-nowrap">${entidad}</td>
-        <td class="text-nowrap">${cosecha}</td>
-        <td class="text-nowrap">${cuenta}</td>
+        <td class="text-end text-nowrap">${money(p.monto_pagado ?? p.monto ?? 0)}</td>
+        <td class="text-nowrap">${p.gestor ?? '—'}</td>
+        <td class="text-nowrap">${p.entidad ?? '—'}</td>
+        <td class="text-nowrap">${p.cosecha ?? '—'}</td>
+        <td class="text-nowrap">${p.cuenta_recaudo ?? p.cuenta ?? '—'}</td>
       `;
       tbody.appendChild(tr);
     }
 
-    document.querySelectorAll('.js-ver-pagos').forEach(btn=>{
+    document.querySelectorAll('.js-ver-cna').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
-        const dni = String(btn.dataset.dni || '').trim();
-        spanDni.textContent = dni || '—';
-        setRowsLoading();
-        modal.show();
+        const dni = (btn.dataset.dni || '').trim();
 
+        // Cabecera
+        $('cna_dni').textContent    = dni || '—';
+        $('cna_carta').textContent  = btn.dataset.nrocarta || '—';
+
+        // Datos solicitud básicos
+        $('cna_fecha').textContent       = btn.dataset.fecha || '—';
+
+        // Operaciones (del data-atributo)
+        let ops = [];
+        try { ops = JSON.parse(btn.getAttribute('data-operaciones')||'[]'); } catch(_){}
+        $('cna_ops').textContent         = ops.length ? ops.join(', ') : '—';
+
+        // cna_solicitudes
+        $('cna_fecha_pago').textContent   = (btn.dataset.fechaPago || '').trim() || '—';
+        $('cna_monto_pagado').textContent = money(btn.dataset.montoPagado);
+        $('cna_obs').textContent          = (btn.dataset.observacion || '—');
+
+        // Pagos por DNI (fetch como tu modal antiguo)
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-3">Cargando…</td></tr>';
+        let total = 0;
         try{
           const url = RUTA_PAGOS.replace('__DNI__', encodeURIComponent(dni || ''));
           const r   = await fetch(url, { headers: { 'Accept': 'application/json' } });
           if (!r.ok) throw new Error('HTTP '+r.status);
           const j   = await r.json();
           const arr = Array.isArray(j.pagos) ? j.pagos : [];
-          if (!arr.length) { setRowsEmpty(); return; }
-          tbody.innerHTML = '';
-          arr.forEach(addRow);
+
+          if (!arr.length){ setRowsEmpty(); }
+          else{
+            tbody.innerHTML = '';
+            arr.forEach(p=>{
+              total += Number(String(p.monto_pagado ?? p.monto ?? 0).toString().replaceAll(',','')) || 0;
+              addPagoRow(p);
+            });
+          }
         }catch(e){
+          console.error('CNA pagos fetch error:', e);
           tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3">Error cargando pagos.</td></tr>';
-          console.error('Pagos DNI error:', e);
         }
+        $('cna_total_pagos').textContent = 'S/ ' + money(total);
       });
     });
   })();
