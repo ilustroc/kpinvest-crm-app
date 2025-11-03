@@ -683,13 +683,23 @@
     document.querySelectorAll('.js-ver-cna').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const dni = (btn.dataset.dni || '').trim();
-
+        // Helper: "2025-10-31 00:00:00" o "2025-10-31" -> "31/10/2025"
+        const toDMY = (val) => {
+          if (!val) return '—';
+          const s = String(val).trim();
+          const datePart = s.split(' ')[0];          // "2025-10-31"
+          const sep = datePart.includes('-') ? '-' : '/';
+          const [y, m, d] = datePart.split(sep);
+          if (y && m && d) return `${d.padStart(2,'0')}/${m.padStart(2,'0')}/${y}`;
+          return s;
+        };
+        
         // Cabecera
         $('cna_dni').textContent    = dni || '—';
         $('cna_carta').textContent  = btn.dataset.nrocarta || '—';
 
         // Datos solicitud básicos
-        $('cna_fecha').textContent       = btn.dataset.fecha || '—';
+        $('cna_fecha').textContent       = toDMY(btn.dataset.fecha)
 
         // Operaciones (del data-atributo)
         let ops = [];
@@ -697,7 +707,7 @@
         $('cna_ops').textContent         = ops.length ? ops.join(', ') : '—';
 
         // cna_solicitudes
-        $('cna_fecha_pago').textContent   = (btn.dataset.fechaPago || '').trim() || '—';
+        $('cna_fecha_pago').textContent  = toDMY(btn.dataset.fechaPago); 
         $('cna_monto_pagado').textContent = money(btn.dataset.montoPagado);
         $('cna_obs').textContent          = (btn.dataset.observacion || '—');
 
