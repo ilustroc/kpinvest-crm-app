@@ -134,13 +134,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/integracion/pagos/import',  [PlaceholdersPagosController::class, 'import'])->name('integracion.pagos.import');
         Route::get('/integracion/pagos/template', [PlaceholdersPagosController::class, 'template'])->name('integracion.pagos.template');
 
-        // ADMINISTRACIÓN DE USUARIOS (crear supervisores/asesores, etc.)
-        Route::get('/administracion',                           [AdminUsersController::class, 'index'])->name('administracion');
-        Route::post('/administracion/supervisores',             [AdminUsersController::class, 'storeSupervisor'])->name('administracion.supervisores.store');
-        Route::post('/administracion/asesores',                 [AdminUsersController::class, 'storeAsesor'])->name('administracion.asesores.store');
-        Route::patch('/administracion/asesores/{id}/reasignar', [AdminUsersController::class, 'reassignAsesor'])->name('administracion.asesores.reassign');
-        Route::patch('/administracion/usuarios/{user}/toggle',   [AdminUsersController::class,'toggleActive'])->name('administracion.usuarios.toggle');
-        Route::patch('/administracion/usuarios/{user}/password', [AdminUsersController::class,'updatePassword'])->name('administracion.usuarios.password');
+        // ADMINISTRACIÓN DE USUARIOS
+        Route::get('/administracion', [AdminUsersController::class, 'index'])
+        ->name('administracion');
+
+        Route::post('/administracion/usuarios', [AdminUsersController::class, 'store'])
+            ->name('administracion.usuarios.store');
+
+        Route::patch('/administracion/usuarios/{user}/toggle', [AdminUsersController::class,'toggle'])
+            ->name('administracion.usuarios.toggle');
+
+        Route::patch('/administracion/usuarios/{user}/password', [AdminUsersController::class,'updatePassword'])
+            ->name('administracion.usuarios.password');
     });
 
     // Zonas por rol (opcionales)

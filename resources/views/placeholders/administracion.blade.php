@@ -11,14 +11,12 @@
 
   .admin-compact .form-control,
   .admin-compact .form-select{ font-size:.92rem; padding:.35rem .6rem; height:auto }
-  .admin-compact .btn{ --bs-btn-padding-y:.32rem; --bs-btn-padding-x:.6rem; --bs-btn-border-radius:.45rem; font-size:.92rem }
+  .admin-compact .btn{
+    --bs-btn-padding-y:.32rem; --bs-btn-padding-x:.6rem; --bs-btn-border-radius:.45rem; font-size:.92rem
+  }
   .admin-compact .btn-sm{ --bs-btn-padding-y:.25rem; --bs-btn-padding-x:.5rem; font-size:.9rem }
 
-  .admin-compact .chip{ padding:10px 12px; border-radius:12px }
-  .admin-compact .chip .t i{ width:28px; height:28px; border-radius:8px; font-size:.95rem }
-  .admin-compact .chip .s{ font-size:.88rem }
-
-  .admin-compact .struct .table> :not(caption)>*>*{ padding:.55rem .65rem }
+  .admin-compact .struct .table> :not(caption)>*>*{ padding:.50rem .60rem }
   .admin-compact .struct .table thead th{
     font-size:.78rem; letter-spacing:.3px;
     background: color-mix(in oklab, var(--accent) 8%, #fff);
@@ -34,279 +32,299 @@
     background: color-mix(in oklab, var(--brand) 10%, transparent);
   }
 
-  .admin-compact .assignee{ padding:.45rem .55rem; border-radius:10px; gap:.45rem; display:flex; align-items:center; background:#fff; border:1px solid var(--border) }
-
-  /* Icon-only buttons */
-  .btn-icon{
-    --size: 36px;
-    width:var(--size); height:var(--size);
-    padding:0; display:inline-flex; align-items:center; justify-content:center;
-    border-radius:10px;
+  /* ======= BARRA DE FILTROS (fix layout) ======= */
+  .filters{
+    display:flex; gap:.8rem; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; /* permite que en móviles se parta */
   }
-  .btn-icon i{ font-size:1.05rem; }
+  .filters form{
+    display:flex; gap:.8rem; align-items:center;
+    flex:1 1 620px; min-width:460px; /* evita que los botones bajen */
+    margin:0;
+  }
+  .filters .form-check{ margin:0 }
+  .filters .input-icon{
+    flex:1 1 320px; min-width:280px; /* search crece y mantiene mínimo */
+  }
+  .filters .btn{ white-space:nowrap }  /* que los botones no se rompan */
+  /* sección derecha (Nuevo usuario) no necesita estilos extra */
+
+  /* ======= EMAIL TRUNCADO ======= */
+  .td-email{ max-width: 340px }
+  @media (max-width: 1400px){ .td-email{ max-width: 260px } }
+  @media (max-width: 1200px){ .td-email{ max-width: 200px } }
+
+  /* ======= CHIPS DE ESTADO (más pequeños) ======= */
+  .state-chip{
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:.72rem; line-height:1; letter-spacing:.2px;
+    padding:.12rem .48rem; border-radius:999px; font-weight:700;
+    border:1px solid transparent; user-select:none;
+  }
+  .state-ok{
+    color:#0f5132;
+    background: color-mix(in oklab, #198754 14%, transparent);
+    border-color: color-mix(in oklab, #198754 30%, transparent);
+  }
+  .state-off{
+    color:#842029;
+    background: color-mix(in oklab, #dc3545 12%, transparent);
+    border-color: color-mix(in oklab, #dc3545 30%, transparent);
+  }
+
+  /* ======= ACCIONES EN UNA SOLA FILA ======= */
+  .col-actions{ width:220px; text-align:right; white-space:nowrap }
+  .actions-wrap{
+    display:flex; gap:.45rem; align-items:center; justify-content:flex-end; flex-wrap:nowrap;
+  }
+  .actions-wrap form{ display:inline; margin:0 }
+  .btn-icon{
+    --size:32px; width:var(--size); height:var(--size);
+    padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
+  }
+  .btn-icon i{ font-size:1rem }
+
+  /* ======= MÓVIL ======= */
+  @media (max-width: 768px){
+    .filters{ flex-direction:column; align-items:stretch }
+    .filters form{ width:100%; min-width:0; flex:1 1 auto }
+    .filters .input-icon{ flex:1 1 auto; min-width:0 }
+  }
 </style>
+
 @endpush
 
 @section('content')
-  <div class="admin-compact">
+<div class="admin-compact">
 
-    {{-- ALERTAS --}}
-    @if(session('ok'))
-      <div class="alert alert-success d-flex align-items-center" role="alert">
-        <i class="bi bi-check-circle me-2"></i>
-        <div>{{ session('ok') }}</div>
-      </div>
-    @endif
-    @if($errors->any())
-      <div class="alert alert-danger d-flex align-items-center" role="alert">
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        <div>{{ $errors->first() }}</div>
-      </div>
-    @endif
+  {{-- ALERTAS --}}
+  @if(session('ok'))
+    <div class="alert alert-success d-flex align-items-center" role="alert">
+      <i class="bi bi-check-circle me-2"></i>
+      <div>{{ session('ok') }}</div>
+    </div>
+  @endif
+  @if($errors->any())
+    <div class="alert alert-danger d-flex align-items-center" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <div>{{ $errors->first() }}</div>
+    </div>
+  @endif
 
-    {{-- Botones abrir modales --}}
-    <div class="card pad mb-2">
-      <div class="d-flex flex-wrap gap-2">
-        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalAsesor">
-          <i class="bi bi-person-plus me-1"></i> Nuevo asesor
+  {{-- Barra superior: filtro + búsqueda + crear --}}
+  <div class="card pad mb-2">
+    <div class="filters">
+      <form method="GET" action="{{ route('administracion') }}">
+        <div class="form-check form-switch m-0">
+          <input class="form-check-input" type="checkbox" id="swInactivos" name="inactivos" value="1" {{ request('inactivos') ? 'checked' : '' }}>
+          <label class="form-check-label" for="swInactivos">Mostrar inactivos</label>
+        </div>
+
+        <div class="input-icon" style="min-width:260px; flex:1">
+          <input type="search" class="form-control" name="q" value="{{ request('q') }}" placeholder="Buscar nombre o email…">
+        </div>
+
+        <button class="btn btn-outline-primary" type="submit">
+          <i class="bi bi-filter-right me-1"></i> Aplicar
+        </button>
+        <a class="btn btn-outline-primary" href="{{ route('administracion') }}">
+          Limpiar
+        </a>
+      </form>
+
+      <div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateUser">
+          <i class="bi bi-person-plus me-1"></i> Nuevo usuario
         </button>
       </div>
     </div>
-
-    {{-- Estructura --}}
-    <div class="card pad struct">
-      <h5 class="mb-3 d-flex align-items-center gap-2">
-        <i class="bi bi-diagram-3" style="color:var(--accent)"></i> <span>Estructura</span>
-      </h5>
-
-      @if($supervisores->isEmpty())
-        <div class="text-secondary">Aún no hay supervisores creados.</div>
-      @else
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead>
-              <tr>
-                <th>Supervisor</th>
-                <th>Email</th>
-                <th class="text-center"># Asesores</th>
-                <th>Asesores (reasignables)</th>
-                <th class="text-end">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              @foreach($supervisores as $sup)
-                <tr>
-                  <td class="fw-semibold">{{ $sup->name }}</td>
-                  <td class="text-secondary">{{ $sup->email }}</td>
-                  <td class="text-center">
-                    <span class="badge"
-                      style="border-radius:999px; background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent); border:1px solid color-mix(in oklab, var(--accent) 28%, transparent)">
-                      {{ $sup->asesores_count }}
-                    </span>
-                  </td>
-                  <td>
-                    @if($sup->asesores->isEmpty())
-                      <span class="text-secondary">—</span>
-                    @else
-                      <div class="vstack gap-2">
-                        @foreach($sup->asesores as $asesor)
-                          <div class="assignee">
-                            <i class="bi bi-person-badge"></i>
-                            <span class="me-2">
-                              {{ $asesor->name }}
-                              <span class="text-secondary">({{ $asesor->email }})</span>
-                            </span>
-
-                            <div class="ms-auto d-inline-flex gap-2">
-                              {{-- Reasignar (modal) --}}
-                              <button
-                                class="btn btn-outline-primary btn-icon"
-                                data-bs-toggle="tooltip" title="Reasignar"
-                                data-bs-target="#reassign-{{ $asesor->id }}" data-bs-toggle-second="modal"
-                                onclick="document.getElementById('reassign-{{ $asesor->id }}-open').click(); return false;">
-                                <i class="bi bi-arrow-left-right"></i>
-                              </button>
-                              <button id="reassign-{{ $asesor->id }}-open" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#reassign-{{ $asesor->id }}"></button>
-
-                              {{-- Password --}}
-                              <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" title="Contraseña"
-                                      data-bs-target="#pw-usr-{{ $asesor->id }}" data-bs-toggle-second="modal"
-                                      onclick="document.getElementById('pw-open-{{ $asesor->id }}').click(); return false;">
-                                <i class="bi bi-key"></i>
-                              </button>
-                              <button id="pw-open-{{ $asesor->id }}" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $asesor->id }}"></button>
-                            </div>
-                          </div>
-
-                          {{-- Modal password asesor --}}
-                          <div class="modal fade" id="pw-usr-{{ $asesor->id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog">
-                              <form method="POST" action="{{ route('administracion.usuarios.password', $asesor) }}" class="modal-content">
-                                @csrf @method('PATCH')
-                                <div class="modal-header">
-                                  <h6 class="modal-title"><i class="bi bi-key me-1"></i> Cambiar contraseña — {{ $asesor->name }}</h6>
-                                  <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                                </div>
-                                <div class="modal-body">
-                                  <div class="mb-2">
-                                    <label class="form-label">Nueva contraseña</label>
-                                    <input type="password" name="password" class="form-control" minlength="6" required>
-                                  </div>
-                                  <div>
-                                    <label class="form-label">Confirmar contraseña</label>
-                                    <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
-                                  </div>
-                                </div>
-                                <div class="modal-footer">
-                                  <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-                                  <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Guardar</button>
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-
-                          {{-- Modal reasignar asesor --}}
-                          <div class="modal fade" id="reassign-{{ $asesor->id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog">
-                              <form method="POST" action="{{ route('administracion.asesores.reassign', $asesor->id) }}" class="modal-content">
-                                @csrf @method('PATCH')
-                                <div class="modal-header">
-                                  <h6 class="modal-title"><i class="bi bi-arrow-left-right me-1"></i> Reasignar — {{ $asesor->name }}</h6>
-                                  <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                                </div>
-                                <div class="modal-body">
-                                  <label class="form-label">Supervisor destino</label>
-                                  <select name="supervisor_id" class="form-select" required>
-                                    @foreach($todosSupervisores as $sid => $sname)
-                                      <option value="{{ $sid }}" @selected($asesor->supervisor_id == $sid)>{{ $sname }}</option>
-                                    @endforeach
-                                  </select>
-                                </div>
-                                <div class="modal-footer">
-                                  <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-                                  <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Reasignar</button>
-                                </div>
-                              </form>
-                            </div>
-                          </div>
-                        @endforeach
-                      </div>
-                    @endif
-                  </td>
-
-                  {{-- Acciones supervisor (iconos) --}}
-                  <td class="text-end">
-                    <div class="d-inline-flex gap-2">
-                      <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="tooltip" title="Contraseña"
-                              data-bs-target="#pw-usr-{{ $sup->id }}" data-bs-toggle-second="modal"
-                              onclick="document.getElementById('pw-sup-open-{{ $sup->id }}').click(); return false;">
-                        <i class="bi bi-key"></i>
-                      </button>
-                      <button id="pw-sup-open-{{ $sup->id }}" type="button" class="d-none" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $sup->id }}"></button>
-                    </div>
-
-                    {{-- Modal password supervisor --}}
-                    <div class="modal fade" id="pw-usr-{{ $sup->id }}" tabindex="-1" aria-hidden="true">
-                      <div class="modal-dialog">
-                        <form method="POST" action="{{ route('administracion.usuarios.password', $sup) }}" class="modal-content">
-                          @csrf @method('PATCH')
-                          <div class="modal-header">
-                            <h6 class="modal-title"><i class="bi bi-key me-1"></i> Cambiar contraseña — {{ $sup->name }}</h6>
-                            <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                          </div>
-                          <div class="modal-body">
-                            <div class="mb-2">
-                              <label class="form-label">Nueva contraseña</label>
-                              <input type="password" name="password" class="form-control" minlength="6" required>
-                            </div>
-                            <div>
-                              <label class="form-label">Confirmar contraseña</label>
-                              <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
-                            </div>
-                          </div>
-                          <div class="modal-footer">
-                            <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-                            <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Guardar</button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              @endforeach
-            </tbody>
-          </table>
-        </div>
-      @endif
-    </div>
   </div>
 
-  {{-- Modal: Crear asesor --}}
-  <div class="modal fade" id="modalAsesor" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <form method="POST" action="{{ route('administracion.asesores.store') }}" class="modal-content" autocomplete="off">
-        @csrf
-        <div class="modal-header">
-          <h6 class="modal-title"><i class="bi bi-person-plus me-1"></i> Crear asesor</h6>
-          <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-        </div>
-        <div class="modal-body vstack gap-3">
-          <div>
-            <label class="form-label">Nombre</label>
-            <input name="name" class="form-control" required placeholder="Ej: Carlos López">
-          </div>
-          <div>
-            <label class="form-label">Email</label>
-            <input name="email" type="email" class="form-control" required placeholder="asesor@empresa.com">
-          </div>
-          <div>
-            <label class="form-label">Contraseña</label>
-            <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-          </div>
-          <div>
-            <label class="form-label">Supervisor</label>
-            <select name="supervisor_id" class="form-select" required>
+  {{-- Tabla de usuarios --}}
+  <div class="card pad struct">
+    <h5 class="mb-3 d-flex align-items-center gap-2">
+      <i class="bi bi-people" style="color:var(--accent)"></i> <span>Usuarios</span>
+    </h5>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th class="text-center">Rol</th>
+            <th class="text-center">Estado</th>
+            <th class="col-actions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+        @forelse($users as $u)
+          @php
+            $me = auth()->user();
+            $canManage = $me->role === 'administrador'
+                      || ($me->role === 'supervisor' && in_array($u->role, ['asesor','soporte']))
+                      || ($me->role === 'soporte'    && in_array($u->role, ['usuario']));
+          @endphp
+          <tr>
+            <td class="fw-semibold">{{ $u->name }}</td>
+            <td class="text-secondary td-email">
+              <div class="text-truncate" title="{{ $u->email }}">{{ $u->email }}</div>
+            </td>
+            <td class="text-center">
+              <span class="badge rounded-pill text-bg-light border">{{ strtoupper($u->role) }}</span>
+            </td>
+            <td class="text-center">
+              @if($u->active)
+                <span class="state-chip state-ok">ACTIVO</span>
+              @else
+                <span class="state-chip state-off">INACTIVO</span>
+              @endif
+            </td>
+            <td class="col-actions">
+              <div class="actions-wrap">
+                {{-- Cambiar contraseña --}}
+                @if($canManage || $me->role === 'administrador' || $me->id === $u->id)
+                  <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $u->id }}" title="Contraseña">
+                    <i class="bi bi-key"></i>
+                  </button>
+                @endif
+
+                {{-- Activar / Desactivar --}}
+                @if($canManage && $me->id !== $u->id)
+                  <form method="POST" action="{{ route('administracion.usuarios.toggle',$u) }}"
+                        onsubmit="return confirm('¿Confirmas {{ $u->active ? 'desactivar' : 'activar' }} esta cuenta?')">
+                    @csrf @method('PATCH')
+                    <button class="btn btn-outline-{{ $u->active ? 'danger' : 'success' }} btn-icon" title="{{ $u->active ? 'Desactivar' : 'Activar' }}">
+                      <i class="bi bi-{{ $u->active ? 'person-x' : 'person-check' }}"></i>
+                    </button>
+                  </form>
+                @endif
+              </div>
+
+              {{-- Modal password (centrado + labels alineados) --}}
+              <div class="modal fade" id="pw-usr-{{ $u->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                  <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}" class="modal-content">
+                    @csrf @method('PATCH')
+                    <div class="modal-header">
+                      <h6 class="modal-title w-100 text-center">
+                        <i class="bi bi-key me-1"></i> Cambiar contraseña — {{ $u->name }}
+                      </h6>
+                      <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="row g-3 align-items-center">
+                        <div class="col-12 col-md-4 text-md-end">
+                          <label class="form-label mb-0">Nueva contraseña</label>
+                        </div>
+                        <div class="col-12 col-md-8">
+                          <div class="input-group">
+                            <input type="password" name="password" class="form-control" minlength="6" required>
+                            <button class="btn btn-outline-secondary btn-eye" type="button" data-eye-target="password-{{ $u->id }}"><i class="bi bi-eye"></i></button>
+                          </div>
+                        </div>
+
+                        <div class="col-12 col-md-4 text-md-end">
+                          <label class="form-label mb-0">Confirmar contraseña</label>
+                        </div>
+                        <div class="col-12 col-md-8">
+                          <div class="input-group">
+                            <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
+                            <button class="btn btn-outline-secondary btn-eye" type="button" data-eye-target="confirm-{{ $u->id }}"><i class="bi bi-eye"></i></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="modal-footer justify-content-between">
+                      <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+                      <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Guardar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </td>
+          </tr>
+        @empty
+          <tr><td colspan="6" class="text-center text-muted py-4">Sin usuarios.</td></tr>
+        @endforelse
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-2">
+      {{ $users->withQueryString()->links('pagination::bootstrap-5') }}
+    </div>
+  </div>
+</div>
+
+{{-- Modal: Crear usuario --}}
+@php
+  $me = auth()->user();
+  $roleOptions = match($me->role){
+    'administrador' => ['supervisor'=>'Supervisor','asesor'=>'Asesor','soporte'=>'Soporte','usuario'=>'Usuario'],
+    'supervisor'    => ['asesor'=>'Asesor','soporte'=>'Soporte'],
+    'soporte'       => ['usuario'=>'Usuario'],
+    default         => [],
+  };
+@endphp
+<div class="modal fade" id="modalCreateUser" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ route('administracion.usuarios.store') }}" class="modal-content" autocomplete="off">
+      @csrf
+      <div class="modal-header">
+        <h6 class="modal-title w-100 text-center"><i class="bi bi-person-plus me-1"></i> Crear usuario</h6>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body vstack gap-3">
+        <div class="row g-3 align-items-center">
+          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Nombre</label></div>
+          <div class="col-12 col-md-8"><input name="name" class="form-control" required placeholder="Ej: Carlos López"></div>
+
+          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Email</label></div>
+          <div class="col-12 col-md-8"><input name="email" type="email" class="form-control" required placeholder="usuario@empresa.com"></div>
+
+          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Rol</label></div>
+          <div class="col-12 col-md-8">
+            <select name="role" class="form-select" required>
               <option value="">Selecciona…</option>
-              @foreach($supervisores as $sup)
-                <option value="{{ $sup->id }}">{{ $sup->name }} — {{ $sup->email }}</option>
+              @foreach($roleOptions as $val=>$label)
+                <option value="{{ $val }}">{{ $label }}</option>
               @endforeach
             </select>
           </div>
+
+          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Contraseña</label></div>
+          <div class="col-12 col-md-8">
+            <div class="input-group">
+              <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
+              <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
+            </div>
+          </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-          <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
-        </div>
-      </form>
-    </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
+      </div>
+    </form>
   </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
-  // Tooltips (iconos)
+  // Tooltips
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 
-  // Ojo/ocultar en inputs password (modales)
-  document.addEventListener('shown.bs.modal', (e)=>{
-    e.target.querySelectorAll('input[type="password"]').forEach(inp=>{
-      if (inp.dataset.hasToggle) return;
-      inp.dataset.hasToggle = '1';
-      const group = document.createElement('div');
-      group.className = 'input-group';
-      inp.parentNode.insertBefore(group, inp);
-      group.appendChild(inp);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn btn-outline-secondary';
-      btn.innerHTML = '<i class="bi bi-eye"></i>';
-      btn.addEventListener('click', ()=>{
-        const show = inp.type === 'password';
-        inp.type = show ? 'text' : 'password';
-        btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-      });
-      group.appendChild(btn);
-    });
-  });
+  // Botón "ojo": alternar password/visible en input-group
+  document.addEventListener('click', function(e){
+    const btn = e.target.closest('.btn-eye');
+    if(!btn) return;
+    const input = btn.parentElement.querySelector('input');
+    if(!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+  }, false);
 </script>
 @endpush

@@ -17,8 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'supervisor_id',
-        'equipo_id',
+        'active'
     ];
 
     protected $hidden = [
@@ -30,14 +29,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'active' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
-
-    // Relaciones
-    public function supervisor() { return $this->belongsTo(User::class, 'supervisor_id'); }
-    public function asesores()   { return $this->hasMany(User::class, 'supervisor_id')->where('role','asesor'); }
 
     // Scopes
     public function scopeSupervisores($q){ return $q->where('role','supervisor'); }
