@@ -41,7 +41,7 @@ Route::post('/logout', [AuthController::class, 'logout'])
 | Autenticados
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth','active'])->group(function () {
 
     // Panel
     Route::get('/', [PanelController::class, 'index'])->name('panel');
