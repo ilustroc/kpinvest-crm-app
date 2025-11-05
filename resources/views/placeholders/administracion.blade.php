@@ -153,6 +153,7 @@
             <th>Nombre</th>
             <th>Email</th>
             <th class="text-center">Rol</th>
+            <th class="text-center">Supervisor</th>
             <th class="text-center">Estado</th>
             <th class="col-actions">Acciones</th>
           </tr>
@@ -172,6 +173,13 @@
             </td>
             <td class="text-center">
               <span class="badge rounded-pill text-bg-light border">{{ strtoupper($u->role) }}</span>
+            </td>
+            <td class="text-center">
+              @if($u->supervisor)
+                <span class="text-secondary">{{ $u->supervisor->name }}</span>
+              @else
+                <span class="text-muted">—</span>
+              @endif
             </td>
             <td class="text-center">
               @if($u->active)
@@ -313,18 +321,160 @@
 
 @push('scripts')
 <script>
-  // Tooltips
+  // ===== Tooltips globales
   document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 
-  // Botón "ojo": alternar password/visible en input-group
+  // ===== Botón "ojo": alternar password/visible en input-group
   document.addEventListener('click', function(e){
     const btn = e.target.closest('.btn-eye');
     if(!btn) return;
-    const input = btn.parentElement.querySelector('input');
+    const input = btn.parentElement.querySelector('input[type="password"], input[type="text"]');
     if(!input) return;
     const show = input.type === 'password';
     input.type = show ? 'text' : 'password';
     btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
   }, false);
+
+  // ===== Filtro "Mostrar inactivos" autosubmit
+  (function(){
+    const sw = document.getElementById('swInactivos');
+    if(!sw) return;
+    sw.addEventListener('change', ()=> {
+      // Submitea el form de filtros (padre más cercano)
+      const form = sw.closest('form');
+      if(form) form.submit();
+    });
+  })();
+
+  // ===== Atajo Ctrl+K para enfocar búsqueda
+  (function(){
+    const input = document.querySelector('.filters input[name="q"]');
+    if(!input) return;
+    window.addEventListener('keydown', (e)=>{
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+  })();
+
+  // ===== Modal: Crear usuario (rol ↔ supervisor)
+  (function(){
+    const ME_ROLE = @json(auth()->user()->role ?? 'usuario');
+    const ME_ID   = @json(auth()->id() ?? null);
+
+    // Supervisores activos para el <select> (id, name, email)
+    const SUPERVISORES = @json(
+      ($supervisores ?? collect())->map(fn($s) => [
+        'id'    => $s->id,
+        'label' => $s->name.' — '.$s->email
+      ])
+    );
+
+    const modalEl   = document.getElementById('modalCreateUser');
+    if(!modalEl) return;
+
+    const modal     = new bootstrap.Modal(modalEl);
+    const form      = modalEl.querySelector('form');
+    const roleSel   = modalEl.querySelector('select[name="role"]');
+
+    // Crea contenedor y select de supervisor si no existe aún
+    let supRow      = modalEl.querySelector('[data-sup-row]');
+    let supSel      = modalEl.querySelector('select[name="supervisor_id"]');
+
+    if(!supRow){
+      // Inserta después de la fila de "Rol"
+      const ref = roleSel.closest('.row');
+      supRow = document.createElement('div');
+      supRow.className = 'row g-3 align-items-center';
+      supRow.setAttribute('data-sup-row','');
+      supRow.innerHTML = `
+        <div class="col-12 col-md-4 text-md-end">
+          <label class="form-label mb-0">Supervisor</label>
+        </div>
+        <div class="col-12 col-md-8">
+          <select name="supervisor_id" class="form-select"></select>
+        </div>
+      `;
+      ref.after(supRow);
+      supSel = supRow.querySelector('select[name="supervisor_id"]');
+    }
+
+    // Poblar opciones de supervisores
+    function fillSupervisorOptions(){
+      supSel.innerHTML = '<option value="">Selecciona…</option>';
+      SUPERVISORES.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = s.label;
+        supSel.appendChild(opt);
+      });
+    }
+
+    // Mostrar/ocultar campo supervisor según reglas
+    function updateSupervisorField(){
+      const role = roleSel.value;
+      const necesitaSup = (role === 'asesor' || role === 'soporte');
+
+      if(!necesitaSup){
+        supRow.classList.add('d-none');
+        supSel.removeAttribute('required');
+        supSel.value = '';
+        return;
+      }
+
+      // Si quien crea es supervisor: se auto-asigna y oculta el control
+      if(ME_ROLE === 'supervisor'){
+        supRow.classList.add('d-none');
+        // Asegura un input hidden con el valor del supervisor
+        ensureHiddenSup(ME_ID);
+      } else {
+        // Admin / Sistemas: mostrar selector y exigirlo
+        removeHiddenSup();
+        fillSupervisorOptions();
+        supRow.classList.remove('d-none');
+        supSel.setAttribute('required','required');
+      }
+    }
+
+    // Helpers para inyectar/eliminar hidden supervisor_id
+    function ensureHiddenSup(id){
+      let hid = form.querySelector('input[type="hidden"][name="supervisor_id"]');
+      if(!hid){
+        hid = document.createElement('input');
+        hid.type = 'hidden'; hid.name = 'supervisor_id';
+        form.appendChild(hid);
+      }
+      hid.value = id ?? '';
+      // también limpia el select visible por si quedó algo
+      if(supSel){ supSel.value = ''; supSel.removeAttribute('required'); }
+    }
+    function removeHiddenSup(){
+      const hid = form.querySelector('input[type="hidden"][name="supervisor_id"]');
+      if(hid) hid.remove();
+    }
+
+    // Reset bonito al abrir
+    modalEl.addEventListener('show.bs.modal', ()=>{
+      form.reset();
+      removeHiddenSup();
+      // Rol vacío por defecto
+      if(roleSel){ roleSel.value=''; }
+      // Oculta supervisor hasta que elija un rol
+      supRow.classList.add('d-none');
+      supSel.removeAttribute('required');
+
+      // Autofocus nombre
+      const first = modalEl.querySelector('input[name="name"]');
+      setTimeout(()=> first?.focus(), 120);
+    });
+
+    // Reaccionar al cambio de rol
+    roleSel.addEventListener('change', updateSupervisorField);
+
+    // Exponer función global opcional para abrir el modal
+    window.openCreateUserModal = ()=> modal.show();
+  })();
 </script>
 @endpush
+

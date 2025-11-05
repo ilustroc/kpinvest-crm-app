@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PromesaPago;
 use App\Models\CnaSolicitud;
 use App\Models\PagoPropia as Pago;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,11 +21,13 @@ class AutorizacionController extends Controller
         $user   = Auth::user();
         $q      = trim((string)($req->q ?? ''));
         $status = $req->status;
+        $teamIds = $this->myTeamUserIds();
 
         // ===== PROMESAS
         $promesas = PromesaPago::query()
             ->with(['operaciones'])
             ->leftJoin('users as u','u.id','=','promesas_pago.user_id')
+            ->when(!empty($teamIds), fn($w) => $w->whereIn('promesas_pago.user_id', $teamIds)) // ← filtro equipo
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function ($x) use ($q) {
                     $x->where('promesas_pago.dni','like',"%{$q}%")
@@ -163,6 +166,7 @@ class AutorizacionController extends Controller
 
         // ===== CNA (bandeja)
         $cnaBase = CnaSolicitud::query()
+            ->when(!empty($teamIds), fn($w) => $w->whereIn('user_id', $teamIds)) // ← filtro equipo
             ->when($q !== '', function ($w) use ($q) {
                 $w->where(function($x) use ($q){
                     $x->where('dni','like',"%{$q}%")
@@ -209,6 +213,26 @@ class AutorizacionController extends Controller
             'q'            => $q,
             'isSupervisor' => strtolower($user->role) === 'supervisor',
         ]);
+    }
+    // Devuelve IDs del supervisor + su equipo (asesores/soporte).
+    private function myTeamUserIds(): array
+    {
+        $me = auth()->user();
+
+        // Admin / Sistemas ven todo → devolvemos null para no filtrar
+        if (in_array(strtolower($me->role), ['administrador', 'sistemas'])) {
+            return [];
+        }
+
+        // Supervisor: él mismo + usuarios con supervisor_id = $me->id
+        if (strtolower($me->role) === 'supervisor') {
+            $ids = User::where('supervisor_id', $me->id)->pluck('id')->all();
+            $ids[] = $me->id;
+            return $ids;
+        }
+
+        // Otros roles: solo ellos mismos
+        return [$me->id];
     }
 
     // ===== SUPERVISOR =====

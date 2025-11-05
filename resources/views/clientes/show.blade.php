@@ -7,9 +7,9 @@
 <style>
   /* ====== Marca KP: verde primario + azul acento (fallback si el layout está cacheado) ====== */
   :root{
-    --brand:#00a81c;        /* verde KP */
-    --brand-ink:#008517;    /* hover/ink */
-    --accent:#0b4ea2;       /* azul KP */
+    --brand:#00a81c;
+    --brand-ink:#008517;
+    --accent:#0b4ea2;
     --accent-ink:#093f82;
 
     --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
