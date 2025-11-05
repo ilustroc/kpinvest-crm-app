@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Support\WorkflowMailer;
 use App\Models\PromesaPago;
@@ -185,8 +186,11 @@ class ClientsControllers extends Controller
             });
 
             /* ===== PROMESAS ===== */
+            $teamIds = $this->myTeamUserIds(); // ← nuevo
+
             $promesas = PromesaPago::query()
                 ->where('dni', $dni)
+                ->when(!empty($teamIds), fn($q) => $q->whereIn('user_id', $teamIds)) // ← filtro equipo
                 ->when(method_exists(PromesaPago::class, 'scopeWithDecisionRefs'), fn($q) => $q->withDecisionRefs())
                 ->with('operaciones')
                 ->orderByDesc('fecha_promesa')
@@ -389,7 +393,7 @@ class ClientsControllers extends Controller
             $base = [
                 'dni'                 => $dni,
                 'nota'                => $r->input('nota'),
-                'tipo'                => $tipo, // se guarda 'convenio' o 'convenio_balon'
+                'tipo'                => $tipo, // 'convenio' o 'convenio_balon'
                 'telefono'            => $telefono,
                 'workflow_estado'     => 'pendiente',
                 'cumplimiento_estado' => 'pendiente',
@@ -398,7 +402,7 @@ class ClientsControllers extends Controller
 
             if (in_array($tipo, ['convenio','convenio_balon'], true)) {
                 $firstDate = Carbon::parse($cronFechas[0] ?? now());
-                $nReg = max(1, (int)$r->input('nro_cuotas'));                 // nro de cuotas regulares
+                $nReg = max(1, (int)$r->input('nro_cuotas'));
                 $sumaReg = ($tipo === 'convenio_balon' && $cronBalon)
                     ? array_sum($cronMontos) - (float)$cronMontos[$cronBalon - 1]
                     : array_sum($cronMontos);
@@ -425,13 +429,12 @@ class ClientsControllers extends Controller
             /** @var \App\Models\PromesaPago $promesa */
             $promesa = PromesaPago::create($data);
 
-            // Operaciones (relación)
+            // Operaciones (relación + campo plano)
             $promesa->operacion = implode(', ', $opsSel);
             $promesa->save();
 
             $now = now();
 
-            // Detalle operaciones
             if ($opsSel) {
                 $rowsOps = [];
                 foreach ($opsSel as $op) {
@@ -462,10 +465,52 @@ class ClientsControllers extends Controller
                 PromesaCuota::insert($rows);
             }
 
+            // ===== AUTO-FLUJO SEGÚN ROL =====
+            $me     = $r->user();
+            $meRole = strtolower((string)($me->role ?? ''));
+            $now    = now();
+
+            if (in_array($meRole, ['administrador','sistemas'], true)) {
+                // Admin/Sistemas: salta a PREAPROBADA y APROBADA
+                $promesa->workflow_estado = 'aprobada';
+                $promesa->pre_aprobado_por = $me->id;
+                $promesa->pre_aprobado_at  = $now;
+                $promesa->aprobado_por     = $me->id;
+                $promesa->aprobado_at      = $now;
+                $promesa->save();
+            } elseif ($meRole === 'supervisor') {
+                // Supervisor: salta a PREAPROBADA
+                $promesa->workflow_estado = 'preaprobada';
+                $promesa->pre_aprobado_por = $me->id;
+                $promesa->pre_aprobado_at  = $now;
+                $promesa->save();
+            }
+
             DB::commit();
 
-            WorkflowMailer::promesaPendiente($promesa);
-            return back()->with('ok', 'Propuesta registrada y enviada para autorización.');
+            // ===== NOTIFICACIONES (seguras)
+            try {
+                if (in_array($meRole, ['administrador','sistemas'], true)) {
+                    WorkflowMailer::promesaResuelta($promesa, true);
+                } elseif ($meRole === 'supervisor') {
+                    WorkflowMailer::promesaPreaprobada($promesa);
+                } else {
+                    WorkflowMailer::promesaPendiente($promesa);
+                }
+            } catch (Throwable $mailErr) {
+                Log::error('WorkflowMailer error (storePromesa)', [
+                    'msg' => $mailErr->getMessage(), 'promesa_id' => $promesa->id
+                ]);
+            }
+
+            $msg = match (true) {
+                in_array($meRole, ['administrador','sistemas'], true) => 'Propuesta registrada y APROBADA.',
+                $meRole === 'supervisor' => 'Propuesta registrada y PRE-APROBADA.',
+                default                  => 'Propuesta registrada y enviada para autorización.',
+            };
+            return back()->with('ok', $msg);
+
+
         } catch (Throwable $e) {
             DB::rollBack();
             return back()->withErrors($e->getMessage())->withInput();
@@ -563,4 +608,29 @@ class ClientsControllers extends Controller
         return $n;
     }
 
+    /**
+     * IDs del usuario autenticado + su equipo.
+     * - admin/sistemas: [] (sin filtro = ven todo)
+     * - supervisor: él + sus usuarios (asesor/soporte)
+     * - otros: solo él
+     */
+    private function myTeamUserIds(): array
+    {
+        $me = Auth::user();
+        if (!$me) return [];
+
+        $role = strtolower((string)$me->role);
+
+        if (in_array($role, ['administrador', 'sistemas'])) {
+            return []; // sin filtro
+        }
+
+        if ($role === 'supervisor') {
+            $ids = \App\Models\User::where('supervisor_id', $me->id)->pluck('id')->all();
+            $ids[] = $me->id;
+            return $ids;
+        }
+
+        return [$me->id];
+    }
 }
