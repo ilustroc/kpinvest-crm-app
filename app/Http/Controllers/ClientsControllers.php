@@ -621,8 +621,9 @@ class ClientsControllers extends Controller
 
         $role = strtolower((string)$me->role);
 
-        if (in_array($role, ['administrador', 'sistemas'])) {
-            return []; // sin filtro
+        // ⬅️ agrega 'soporte' aquí
+        if (in_array($role, ['administrador', 'sistemas', 'soporte'])) {
+            return []; // sin filtro => ve TODO lo del cliente
         }
 
         if ($role === 'supervisor') {
@@ -631,6 +632,7 @@ class ClientsControllers extends Controller
             return $ids;
         }
 
+        // asesor (u otros): solo lo suyo
         return [$me->id];
     }
 }
