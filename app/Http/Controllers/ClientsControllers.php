@@ -186,13 +186,16 @@ class ClientsControllers extends Controller
             });
 
             /* ===== PROMESAS ===== */
-            $teamIds = $this->myTeamUserIds(); // ← nuevo
+            $teamIds = $this->myTeamUserIds(); // si ya lo usas para visibilidad
 
             $promesas = PromesaPago::query()
                 ->where('dni', $dni)
-                ->when(!empty($teamIds), fn($q) => $q->whereIn('user_id', $teamIds)) // ← filtro equipo
+                ->when(!empty($teamIds), fn($q) => $q->whereIn('user_id', $teamIds))
                 ->when(method_exists(PromesaPago::class, 'scopeWithDecisionRefs'), fn($q) => $q->withDecisionRefs())
-                ->with('operaciones')
+                ->with([
+                    'operaciones',
+                    'cuotas' => fn($q) => $q->orderBy('nro')
+                ])
                 ->orderByDesc('fecha_promesa')
                 ->get();
 

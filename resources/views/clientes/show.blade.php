@@ -415,176 +415,122 @@
           <thead>
             <tr>
               <th>Fecha</th>
-              <th class="text-nowrap">Tipo</th>
-              <th class="text-end">Monto</th>
-              <th class="text-nowrap">Operación(es)</th>
-              <th>Plan</th>
-              <th>Compromiso</th>
-              <th class="text-nowrap">Decisión / Nota</th>
-              <th class="text-end">Acciones</th>
+              <th>Tipo</th>
+              <th>Operación(es)</th>
+              <th class="text-end">Monto negociación</th>
+              <th class="text-center">Nota</th>
+              <th class="text-center">Campaña</th>
+              <th>Usuario creación</th>
+              <th>Estado aprobación</th>
             </tr>
           </thead>
           <tbody>
-            @forelse($promesas as $pp)
-              @php
-                $notaDec  = $pp->decision_nota;
-                $autorDec = $pp->decision_user_name;
-                $fechaFmt = $pp->decision_at?->format('d/m/Y H:i');
-                $state    = $pp->workflow_estado ?? 'pendiente';
-                $rowClass = 'pp-state-'.str_replace(['pre-aprobada',' '], ['preaprobada',''], strtolower($state));
-              @endphp
+          @forelse($promesas as $pp)
+            @php
+              $tipoLabel = match($pp->tipo){
+                'convenio_balon' => 'Convenio [Cuota Balón]',
+                'convenio'       => 'Convenio',
+                'cancelacion'    => 'Cancelación',
+                default          => strtoupper((string)$pp->tipo)
+              };
 
-              <tr class="{{ $rowClass }}">
-                {{-- Fecha --}}
-                <td class="text-nowrap">{{ optional($pp->fecha_promesa)->format('d/m/Y') ?? '—' }}</td>
+              $ops = $pp->relationLoaded('operaciones') && $pp->operaciones->count()
+                ? $pp->operaciones->pluck('operacion')->all()
+                : array_filter(array_map('trim', explode(',', (string)($pp->operacion ?? ''))));
 
-                {{-- Tipo --}}
-                <td>
-                  <span class="badge badge-pill {{ $pp->tipo_badge_class }}">
-                    {{ $pp->tipo_label }}
-                  </span>
-                </td>
+              // Monto negociación: si es 0, toma la primera cuota
+              $montoNeg = (float)($pp->monto ?? 0);
+              if ($montoNeg <= 0) {
+                $montoNeg = (float)($pp->cuotas->first()->monto ?? 0);
+              }
 
-                {{-- Monto --}}
-                <td class="text-end text-nowrap">
-                  @php $m = (float)(($pp->monto ?? 0) > 0 ? $pp->monto : ($pp->monto_convenio ?? 0)); @endphp
-                  S/ {{ number_format($m, 2) }}
-                </td>
+              $estado = ucfirst(str_replace('_',' ', (string)($pp->workflow_estado ?? 'pendiente')));
+              $nota   = trim((string)($pp->nota ?? ''));
 
-                {{-- Operaciones --}}
-                <td class="text-nowrap">
-                  @php
-                    $ops = $pp->relationLoaded('operaciones') ? $pp->operaciones->pluck('operacion')->all() : [];
-                    if (empty($ops) && !empty($pp->operacion)) $ops = [$pp->operacion];
-                  @endphp
-                  @if($ops)
-                    @foreach($ops as $o)
-                      <span class="badge rounded-pill text-bg-light border me-1">{{ $o }}</span>
-                    @endforeach
-                  @else
-                    <span class="text-secondary">—</span>
-                  @endif
-                </td>
+              // Dataset para el modal reutilizable
+              $ds = [
+                'tipo'   => (string)$pp->tipo,
+                'cuotas' => $pp->tipo === 'cancelacion'
+                            ? [[ 'nro' => 1, 'fecha' => optional($pp->fecha_pago)->format('Y-m-d'), 'monto' => (float)($pp->monto ?? 0), 'es_balon' => 0 ]]
+                            : $pp->cuotas->map(fn($c)=>[
+                                'nro'      => (int)$c->nro,
+                                'fecha'    => optional($c->fecha)->format('Y-m-d'),
+                                'monto'    => (float)$c->monto,
+                                'es_balon' => (int)($c->es_balon ?? 0),
+                              ])->values(),
+              ];
+            @endphp
 
-                {{-- Plan --}}
-                <td class="small">
-                  @if($pp->tipo === 'convenio')
-                    {{ (int)($pp->nro_cuotas ?? 0) }} cuota(s)
-                    @if($pp->monto_cuota)     · Cuota: S/ {{ number_format((float)$pp->monto_cuota,2) }} @endif
-                    @if($pp->monto_convenio)  · Convenio: S/ {{ number_format((float)$pp->monto_convenio,2) }} @endif
-                    @if($pp->fecha_pago)      · 1ª: {{ optional($pp->fecha_pago)->format('d/m/Y') }} @endif
-                  @else
-                    <span class="text-secondary">—</span>
-                  @endif
-                </td>
-
-                {{-- Compromiso --}}
-                <td class="small">
-                  @if($pp->fecha_pago)
-                    <div>{{ optional($pp->fecha_pago)->format('d/m/Y') }}</div>
-                  @endif
-
-                  @if($pp->tipo === 'cancelacion')
-                    <div>Cancelación: S/ {{ number_format((float)($pp->monto ?? 0),2) }}</div>
-                  @elseif($pp->tipo === 'convenio' && $pp->monto_cuota)
-                    <div>Convenio: S/ {{ number_format((float)$pp->monto_cuota,2) }}</div>
-                  @endif
-                </td>
-
-                {{-- Decisión / Nota --}}
-                <td class="decision-cell">
-                  <div class="d-flex flex-column gap-2">
-                    <span class="badge badge-pill {{ $pp->workflow_badge_class }}">
-                      {{ $pp->workflow_estado_label }}
-                    </span>
-
-                    @if($notaDec)
-                      {{-- Hay decisión (pre-aprobada/aprobada/rechazada) --}}
-                      <div class="decision-box {{ $pp->decision_css_class }}">
-                        <div class="small text-secondary nota-clamp" title="{{ $notaDec }}">{{ $notaDec }}</div>
-                        <div class="meta mt-1">
-                          @if($autorDec)<i class="bi bi-person"></i> {{ $autorDec }} @endif
-                          @if($autorDec && $fechaFmt) · @endif
-                          @if($fechaFmt)<i class="bi bi-clock"></i> {{ $fechaFmt }}@endif
-                        </div>
-                      </div>
-                      <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-secondary"
-                                type="button"
-                                data-bs-toggle="modal" data-bs-target="#modalNota"
-                                data-nota-json='@json($notaDec)'>
-                          <i class="bi bi-journal-text me-1"></i> Ver nota
-                        </button>
-                        @if(($pp->nota ?? null) && trim($pp->nota) !== '')
-                          <button class="btn btn-sm btn-outline-secondary"
-                                  type="button"
-                                  data-bs-toggle="modal" data-bs-target="#modalNota"
-                                  data-nota-json='@json($pp->nota)'>
-                            Ver propuesta
-                          </button>
-                        @endif
-                      </div>
-                    @else
-                      {{-- Sin decisión aún (pendiente) --}}
-                      @php $notaProp = trim((string)($pp->nota ?? '')); @endphp
-                      @if($notaProp !== '')
-                        <div class="small mt-1">
-                          <span class="badge rounded-pill text-bg-light border me-1">Propuesta</span>
-                          <span class="text-secondary nota-clamp">{{ $notaProp }}</span>
-                        </div>
-                        <div class="mt-1">
-                          <button class="btn btn-sm btn-outline-secondary"
-                                  type="button"
-                                  data-bs-toggle="modal" data-bs-target="#modalNota"
-                                  data-nota-json='@json($notaProp)'>
-                            <i class="bi bi-eye me-1"></i> Ver nota
-                          </button>
-                        </div>
-                      @else
-                        <span class="text-secondary small">—</span>
-                      @endif
-                    @endif
-                  </div>
-                </td>
-
-                {{-- Acciones --}}
-                <td class="text-end">
-                  @php $estado = strtolower($pp->workflow_estado ?? ''); @endphp
-                  @if($estado === 'aprobada')
-                    <a class="btn btn-outline-primary btn-sm"
-                      href="{{ route('promesas.acuerdo', $pp) }}"
-                      target="_blank" data-bs-toggle="tooltip" title="Descargar acuerdo en PDF">
-                      <i class="bi bi-filetype-pdf me-1"></i> PDF
-                    </a>
-                  @elseif($estado === 'preaprobada')
-                    <span class="text-secondary small" title="Disponible cuando se apruebe la promesa">—</span>
-                  @else
-                    <span class="text-secondary small">—</span>
-                  @endif
-                </td>
-              </tr>
-            @empty
-              <tr><td colspan="8" class="text-secondary">Sin promesas</td></tr>
-            @endforelse
+            <tr class="cursor-pointer"
+                data-open-cronograma="1"
+                data-promesa-id="{{ $pp->id }}"
+                data-dataset='@json($ds)'>
+              <td class="text-nowrap">{{ optional($pp->created_at)->format('d/m/Y') ?? '—' }}</td>
+              <td class="text-nowrap">{{ $tipoLabel }}</td>
+              <td class="text-nowrap">
+                @if($ops) {{ implode(', ', $ops) }} @else <span class="text-secondary">—</span> @endif
+              </td>
+              <td class="text-end text-nowrap">S/ {{ number_format($montoNeg, 2) }}</td>
+              <td class="text-center">
+                @if($nota !== '')
+                  <i class="bi bi-journal-text" data-bs-toggle="tooltip" title="{{ $nota }}"></i>
+                @else
+                  <span class="text-secondary">—</span>
+                @endif
+              </td>
+              <td class="text-center">
+                @if(strtolower($pp->workflow_estado ?? '') === 'aprobada')
+                  <a class="btn btn-outline-primary btn-sm"
+                    href="{{ route('promesas.acuerdo', $pp) }}"
+                    target="_blank" data-bs-toggle="tooltip" title="Descargar acuerdo en PDF">
+                    <i class="bi bi-filetype-pdf"></i>
+                  </a>
+                @else
+                  <span class="text-secondary">—</span>
+                @endif
+              </td>
+              <td class="text-nowrap">{{ $pp->user->name ?? '—' }}</td>
+              <td class="text-nowrap">{{ $estado }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="8" class="text-secondary">Sin promesas</td></tr>
+          @endforelse
           </tbody>
         </table>
       </div>
     </div>
   </div>
 
-  {{-- Modal Nota --}}
-  <div class="modal fade" id="modalNota" tabindex="-1" aria-hidden="true">
+  {{-- MODAL: Cronograma de pagos --}}
+  <div class="modal fade" id="cronModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-journal-text me-1"></i> Nota</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          <h6 class="modal-title">Cronograma</h6>
+          <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="modal-body"><div id="notaFull" class="mb-0" style="white-space:pre-wrap"></div></div>
-        <div class="modal-footer"><button class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button></div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th class="text-end" style="width:60px">#</th>
+                  <th>Fecha de pago</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-center d-none" id="thBalon">¿Balón?</th>
+                </tr>
+              </thead>
+              <tbody id="cronTbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
       </div>
     </div>
   </div>
+
 
   {{-- MODAL: Generar Propuesta --}}
   <div class="modal fade" id="modalPropuesta" tabindex="-1" aria-hidden="true">
@@ -791,6 +737,54 @@
 
 @push('scripts')
 <script>
+  (function(){
+    const tbl = document.getElementById('tblPromesas');
+    const cronModal = document.getElementById('cronModal');
+    const modal = cronModal ? new bootstrap.Modal(cronModal) : null;
+    const tb = document.getElementById('cronTbody');
+    const thBalon = document.getElementById('thBalon');
+
+    function fmtFecha(iso){ if(!iso) return '—';
+      const d = new Date(iso + 'T00:00:00'); 
+      return isNaN(d) ? '—' : d.toLocaleDateString('es-PE', {day:'2-digit', month:'2-digit', year:'numeric'});
+    }
+    function fmtMonto(n){ n = Number(n)||0; return 'S/ ' + n.toFixed(2); }
+
+    tbl?.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr[data-open-cronograma]');
+      if(!tr || !modal) return;
+
+      const ds = tr.getAttribute('data-dataset');
+      if(!ds) return;
+
+      let data;
+      try { data = JSON.parse(ds); } catch { data = null; }
+      if(!data) return;
+
+      // header
+      const title = cronModal.querySelector('.modal-title');
+      title.textContent = 'Cronograma — ' + (data.tipo === 'convenio_balon' ? 'Convenio [Cuota Balón]' :
+                                            data.tipo === 'convenio' ? 'Convenio' : 'Cancelación');
+
+      // cuerpo
+      tb.innerHTML = '';
+      const showBalon = (data.tipo === 'convenio_balon');
+      thBalon.classList.toggle('d-none', !showBalon);
+
+      (data.cuotas || []).forEach((c) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="text-end">${c.nro ?? ''}</td>
+          <td>${fmtFecha(c.fecha)}</td>
+          <td class="text-end">${fmtMonto(c.monto)}</td>
+          ${showBalon ? `<td class="text-center">${(c.es_balon==1)?'<span class="badge text-bg-warning">Balón</span>':''}</td>` : ''}
+        `;
+        tb.appendChild(tr);
+      });
+
+      modal.show();
+    });
+  })();
   (function () {
     /* ========= Refs ========= */
     const tipoSel   = document.getElementById('tipoPropuesta');
