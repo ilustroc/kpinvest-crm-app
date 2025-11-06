@@ -222,29 +222,27 @@
             {{-- === CELDA CNA === --}}
             <td class="text-nowrap">
               @php
-                // CNAs agrupadas por CUENTA
                 $cnas = collect($cnasByCuenta[$c->cuenta] ?? []);
-                // Última por fecha
-                $last = $cnas->sortByDesc(fn($x) => $x->created_at)->first();
+                $last   = $cnas->sortByDesc(fn($x) => $x->created_at)->first();
                 $estado = strtolower((string)($last->workflow_estado ?? ''));
               @endphp
 
-              @if($last && str_contains($estado,'aprob')) 
-                {{-- Aprobada: descarga (pdf con fallback a docx) --}}
-                <a href="{{ route('cna.pdf', $last->id) }}" 
-                  class="btn btn-sm btn-outline-danger" 
-                  title="Descargar CNA aprobada (PDF)">
-                  <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
-                  <span class="visually-hidden">Descargar CNA</span>
-                </a>
-
-              @elseif($last && (str_contains($estado,'pend') || str_contains($estado,'pre')))
+              @if($last && (str_contains($estado,'pend') || str_contains($estado,'pre')))
                 {{-- En proceso: spinner y deshabilitado --}}
                 <button type="button" class="btn btn-sm btn-outline-secondary" disabled
                         title="CNA en proceso de aprobación">
                   <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                   <span class="d-none d-md-inline">En proceso</span>
                 </button>
+
+              @elseif($last && str_contains($estado,'aprob') && !str_contains($estado,'pre'))
+                {{-- Aprobada: descarga (pdf con fallback a docx) --}}
+                <a href="{{ route('cna.pdf', $last->id) }}"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Descargar CNA aprobada (PDF)">
+                  <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+                  <span class="visually-hidden">Descargar CNA</span>
+                </a>
 
               @else
                 {{-- Sin CNA o última rechazada: martillo para generar --}}
