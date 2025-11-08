@@ -3,7 +3,9 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ClientsControllers;
+use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\ClienteLookupController;
+use App\Http\Controllers\PromesaController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\ReporteCnaController;
 use App\Http\Controllers\ReportePagosController;
@@ -56,11 +58,11 @@ Route::middleware(['auth','active'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('clientes')->group(function () {
-        Route::get('/suggest', [ClientsControllers::class,'suggest'])->name('clientes.suggest');
-        Route::get('/lookup',  [ClientsControllers::class,'quickLookup'])->name('clientes.quick');
-        Route::get('/{dni}',   [ClientsControllers::class,'show'])->name('clientes.show');
-
-        Route::post('/{dni}/promesas', [ClientsControllers::class,'storePromesa'])->name('clientes.promesas.store');
+        Route::get('/suggest', [ClienteLookupController::class,'suggest'])->name('clientes.suggest');
+        Route::get('/lookup',  [ClienteLookupController::class,'quickLookup'])->name('clientes.quick');
+        Route::get('/{dni}',   [ClienteController::class,'show'])->name('clientes.show');
+    
+        Route::post('/{dni}/promesas', [PromesaController::class,'store'])->name('clientes.promesas.store');
         Route::post('/{dni}/cnas',     [CnaController::class, 'store'])->name('clientes.cna.store');
     });
 

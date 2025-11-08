@@ -531,12 +531,11 @@
     </div>
   </div>
 
-
   {{-- MODAL: Generar Propuesta --}}
   <div class="modal fade" id="modalPropuesta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
-        <form method="POST" action="{{ route('clientes.promesas.store', $dni) }}" id="formPropuesta">
+        <form method="POST" action="{{ route('clientes.promesas.store', $dni) }}" id="formPropuesta" data-one>
           @csrf
 
           <div class="modal-header">
@@ -583,7 +582,6 @@
                   pattern="^\+?\d[\d\s\-]{5,}$"
                   title="Ingresa un teléfono válido"
                   required>
-                <div class="form-text">Será el teléfono principal de contacto para esta propuesta.</div>
               </div>
 
               <div class="col-md-4">
@@ -603,7 +601,7 @@
                 <input type="number" step="0.01" min="0.01" name="monto_convenio" id="cvTotal" class="form-control" required>
               </div>
               <div class="col-md-3">
-                <label class="form-label">Monto de cuota (S/) (sugerido)</label>
+                <label class="form-label">Monto de cuota (S/)</label>
                 <input type="number" step="0.01" min="0.01" name="monto_cuota" id="cvCuota" class="form-control">
               </div>
               <div class="col-md-3">
@@ -682,7 +680,7 @@
   {{-- ===== Modal: Solicitar Carta de No Adeudo (CNA) ===== --}}
   <div class="modal fade" id="modalCna" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content" method="POST" action="{{ route('clientes.cna.store', $dni) }}">
+      <form class="modal-content" method="POST" action="{{ route('clientes.cna.store', $dni) }}" data-one>
         @csrf
         <div class="modal-header">
           <h6 class="modal-title d-flex align-items-center gap-2">
@@ -1218,6 +1216,51 @@
         i.type = 'hidden'; i.name = 'operaciones[]'; i.value = op;
         opsHidden.appendChild(i);
       });
+    });
+  })();
+  (() => {
+    // Evita doble click / enter / submit repetido en TODOS los forms con data-once
+    document.querySelectorAll('form[data-once]').forEach(form => {
+      let locked = false;
+
+      // Al hacer click en el botón submit: valida y bloquea inmediatamente
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          if (locked) { ev.preventDefault(); return false; }
+          // Si el form no pasa validación HTML5, no bloqueamos
+          if (!form.checkValidity()) { return; }
+          lock();
+        }, { capture:true });
+      });
+
+      // Por si el submit se dispara por Enter u otro submitter
+      form.addEventListener('submit', (ev) => {
+        if (locked) { ev.preventDefault(); return false; }
+        // Si algo evita el submit (HTML5), no bloqueamos
+        if (!form.checkValidity()) { return; }
+        lock();
+      }, { capture:true });
+
+      function lock(){
+        locked = true;
+        form.setAttribute('aria-busy', 'true');
+
+        // Deshabilita todos los controles
+        form.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = true);
+
+        // Cambia texto del/los botones submit por spinner
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
+          if (btn.tagName === 'BUTTON') {
+            btn.dataset.prev = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...';
+          }
+        });
+
+        // Bloquea Enter adicional
+        form.addEventListener('keydown', (e) => {
+          if (locked && e.key === 'Enter') e.preventDefault();
+        });
+      }
     });
   })();
 </script>

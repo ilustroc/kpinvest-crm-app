@@ -6,65 +6,79 @@ use App\Models\PromesaPago;
 use App\Models\CnaSolicitud;
 use App\Models\PagoPropia as Pago;
 use App\Models\User;
+use App\Services\PromesaWorkflowService;
+use App\Support\Traits\HasTeamVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
-use App\Support\WorkflowMailer;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class AutorizacionController extends Controller
 {
+    use HasTeamVisibility;
+
+    /**
+     * Bandeja de autorización (Promesas + CNA).
+     */
     public function index(Request $req)
     {
-        $user   = Auth::user();
-        $q      = trim((string)($req->q ?? ''));
-        $status = $req->status;
-        $teamIds = $this->myTeamUserIds();
+        $user    = Auth::user();
+        $q       = trim((string)($req->q ?? ''));
+        $status  = $req->status;
+        $teamIds = $this->teamUserIds($user);
 
         // ===== PROMESAS
         $promesas = PromesaPago::query()
             ->with(['operaciones'])
-            ->leftJoin('users as u','u.id','=','promesas_pago.user_id')
-            ->when(!empty($teamIds), fn($w) => $w->whereIn('promesas_pago.user_id', $teamIds)) // ← filtro equipo
-            ->when($q !== '', function ($w) use ($q) {
-                $w->where(function ($x) use ($q) {
-                    $x->where('promesas_pago.dni','like',"%{$q}%")
-                    ->orWhere('promesas_pago.nota','like',"%{$q}%")
-                    ->orWhere('promesas_pago.operacion','like',"%{$q}%")
-                    ->orWhereHas('operaciones', fn($qq)=>$qq->where('operacion','like',"%{$q}%"));
-                });
-            });
+            ->leftJoin('users as u', 'u.id', '=', 'promesas_pago.user_id');
 
-        if (strtolower($user->role) === 'supervisor') {
-            $promesas->where('promesas_pago.workflow_estado','pendiente');
-        } else {
-            $promesas->where('promesas_pago.workflow_estado','preaprobada');
+        // Filtro por equipo
+        if (!empty($teamIds)) {
+            $promesas->whereIn('promesas_pago.user_id', $teamIds);
         }
+
+        // Búsqueda
+        if ($q !== '') {
+            $promesas->where(function ($x) use ($q) {
+                $x->where('promesas_pago.dni', 'like', "%{$q}%")
+                  ->orWhere('promesas_pago.nota', 'like', "%{$q}%")
+                  ->orWhere('promesas_pago.operacion', 'like', "%{$q}%")
+                  ->orWhereHas('operaciones', fn($qq) => $qq->where('operacion', 'like', "%{$q}%"));
+            });
+        }
+
+        // Estado según rol (por defecto)
+        if (strtolower($user->role) === 'supervisor') {
+            $promesas->where('promesas_pago.workflow_estado', 'pendiente');
+        } else {
+            $promesas->where('promesas_pago.workflow_estado', 'preaprobada');
+        }
+
+        // Filtro explícito de estado (si se envía)
         if (!empty($status)) {
             $promesas->where('promesas_pago.workflow_estado', $status);
         }
 
-        $rows = $promesas->select('promesas_pago.*','u.name as creador_nombre')
-                        ->orderByDesc('promesas_pago.fecha_promesa')
-                        ->get();
+        $rows = $promesas->select('promesas_pago.*', 'u.name as creador_nombre')
+            ->orderByDesc('promesas_pago.fecha_promesa')
+            ->get();
 
-        // ===== Prefetch por DNI (fallback). clientes_cuentas usa numdoc
+        // ===== Prefetch por DNI (fallback de operaciones). clientes_cuentas usa numdoc
         $dnis = $rows->pluck('dni')->filter()->unique()->values()->all();
         $opsByDni = [];
         if ($dnis) {
             $opsByDni = DB::table('clientes_cuentas')
-                ->select(['numdoc as dni','operacion'])
+                ->select(['numdoc as dni', 'operacion'])
                 ->whereIn('numdoc', $dnis)
                 ->get()
                 ->groupBy('dni')
-                ->map(fn($g)=>$g->pluck('operacion')->filter()->values()->all())
+                ->map(fn($g) => $g->pluck('operacion')->filter()->values()->all())
                 ->all();
         }
 
-        // ===== Cuentas por operación (ajustado a columnas vigentes)
-        $opsAll = $rows->flatMap(function($p) use ($opsByDni){
+        // ===== Cargar info de cuentas por operación (incluye fecha_castigo)
+        $opsAll = $rows->flatMap(function ($p) use ($opsByDni) {
                 if ($p->relationLoaded('operaciones') && $p->operaciones->count()) {
                     return $p->operaciones->pluck('operacion');
                 }
@@ -75,7 +89,6 @@ class AutorizacionController extends Controller
             })
             ->filter()->unique()->values()->all();
 
-        // ===== Cuentas por operación (incluye fecha_castigo) =====
         $ccByOp = [];
         if (!empty($opsAll)) {
             $ccByOp = DB::table('clientes_cuentas')
@@ -95,13 +108,15 @@ class AutorizacionController extends Controller
                 ->keyBy('operacion');
         }
 
-        // ===== Enriquecer filas (removidas columnas obsoletas) =====
-        $rows = $rows->map(function($p) use ($opsByDni,$ccByOp) {
+        // ===== Enriquecer filas de promesas
+        $rows = $rows->map(function ($p) use ($opsByDni, $ccByOp) {
 
             $ops = $p->relationLoaded('operaciones') && $p->operaciones->count()
-                ? $p->operaciones->pluck('operacion')->map(fn($x)=>(string)$x)->values()
+                ? $p->operaciones->pluck('operacion')->map(fn($x) => (string)$x)->values()
                 : collect(array_filter(array_map('trim', explode(',', (string)($p->operacion ?? '')))));
-            if ($ops->isEmpty()) $ops = collect($opsByDni[$p->dni] ?? []);
+            if ($ops->isEmpty()) {
+                $ops = collect($opsByDni[$p->dni] ?? []);
+            }
 
             $p->operacion = $ops->implode(', ');
             $p->ops_list  = $ops->values();
@@ -139,21 +154,21 @@ class AutorizacionController extends Controller
             return $p;
         });
 
-        // ===== Cronogramas (si existe tabla)
+        // ===== Cronogramas (si existe tabla promesa_cuotas)
         $ids = $rows->pluck('id')->filter()->all();
         $cuotasById = collect();
         if (!empty($ids) && Schema::hasTable('promesa_cuotas')) {
             $cuotasById = DB::table('promesa_cuotas')
-                ->select('promesa_id','nro','fecha','monto','es_balon')
+                ->select('promesa_id', 'nro', 'fecha', 'monto', 'es_balon')
                 ->whereIn('promesa_id', $ids)
                 ->orderBy('promesa_id')->orderBy('nro')
                 ->get()
                 ->groupBy('promesa_id');
         }
-        $rows = $rows->map(function($p) use ($cuotasById){
+        $rows = $rows->map(function ($p) use ($cuotasById) {
             $list = $cuotasById[$p->id] ?? collect();
             $p->has_balon   = (int)$list->contains('es_balon', 1);
-            $p->cuotas_json = $list->map(function($c){
+            $p->cuotas_json = $list->map(function ($c) {
                 return [
                     'nro'      => (int)($c->nro ?? 0),
                     'fecha'    => (string)($c->fecha ?? '—'),
@@ -164,22 +179,26 @@ class AutorizacionController extends Controller
             return $p;
         });
 
-        // ===== CNA (bandeja)
-        $cnaBase = CnaSolicitud::query()
-            ->when(!empty($teamIds), fn($w) => $w->whereIn('user_id', $teamIds)) // ← filtro equipo
-            ->when($q !== '', function ($w) use ($q) {
-                $w->where(function($x) use ($q){
-                    $x->where('dni','like',"%{$q}%")
-                    ->orWhere('nro_carta','like',"%{$q}%")
-                    ->orWhere('producto','like',"%{$q}%")
-                    ->orWhere('observacion','like',"%{$q}%");
-                });
+        // ===== CNA (bandeja paginada)
+        $cnaBase = CnaSolicitud::query();
+
+        if (!empty($teamIds)) {
+            $cnaBase->whereIn('user_id', $teamIds);
+        }
+
+        if ($q !== '') {
+            $cnaBase->where(function ($x) use ($q) {
+                $x->where('dni', 'like', "%{$q}%")
+                  ->orWhere('nro_carta', 'like', "%{$q}%")
+                  ->orWhere('producto', 'like', "%{$q}%")
+                  ->orWhere('observacion', 'like', "%{$q}%");
             });
+        }
 
         if (strtolower($user->role) === 'supervisor') {
-            $cnaBase->where('workflow_estado','pendiente');
+            $cnaBase->where('workflow_estado', 'pendiente');
         } else {
-            $cnaBase->where('workflow_estado','preaprobada');
+            $cnaBase->where('workflow_estado', 'preaprobada');
         }
         if (!empty($status)) {
             $cnaBase->where('workflow_estado', $status);
@@ -188,18 +207,18 @@ class AutorizacionController extends Controller
         $cnaRows = $cnaBase->orderByDesc('created_at')
             ->paginate(10, ['*'], 'page_cna');
 
-        /** @var LengthAwarePaginator $cnaRows */
+        /** @var \Illuminate\Pagination\LengthAwarePaginator $cnaRows */
         $cnaRows->withQueryString();
 
-        // Producto por operación (opcional)
+        // Producto por operación (para la bandeja CNA)
         $opsAllCna = collect($cnaRows->items())
             ->flatMap(fn($c) => (array)($c->operaciones ?? []))
-            ->filter()->map(fn($op)=>(string)$op)->unique()->values()->all();
+            ->filter()->map(fn($op) => (string)$op)->unique()->values()->all();
 
         $prodByOp = [];
         if (!empty($opsAllCna)) {
             $prodByOp = DB::table('clientes_cuentas')
-                ->select('operacion','producto')
+                ->select('operacion', 'producto')
                 ->whereIn('operacion', $opsAllCna)
                 ->get()
                 ->mapWithKeys(fn($r) => [(string)$r->operacion => (string)($r->producto ?? '—')])
@@ -207,130 +226,77 @@ class AutorizacionController extends Controller
         }
 
         return view('autorizacion.index', [
-            'rows'         => $rows,
-            'cnaRows'      => $cnaRows,
+            'rows'         => $rows,           // Promesas (colección enriquecida)
+            'cnaRows'      => $cnaRows,        // CNA (paginado)
             'prodByOp'     => $prodByOp,
             'q'            => $q,
             'isSupervisor' => strtolower($user->role) === 'supervisor',
         ]);
     }
-    // Devuelve IDs del supervisor + su equipo (asesores/soporte).
-    private function myTeamUserIds(): array
-    {
-        $me = auth()->user();
 
-        // Admin / Sistemas ven todo → devolvemos null para no filtrar
-        if (in_array(strtolower($me->role), ['administrador', 'sistemas'])) {
-            return [];
-        }
-
-        // Supervisor: él mismo + usuarios con supervisor_id = $me->id
-        if (strtolower($me->role) === 'supervisor') {
-            $ids = User::where('supervisor_id', $me->id)->pluck('id')->all();
-            $ids[] = $me->id;
-            return $ids;
-        }
-
-        // Otros roles: solo ellos mismos
-        return [$me->id];
-    }
-
-    // ===== SUPERVISOR =====
+    /**
+     * SUPERVISOR: Pre-aprobar promesa.
+     */
     public function preaprobar(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('supervisor');
 
-        if (($promesa->workflow_estado ?? 'pendiente') !== 'pendiente') {
-            return back()->withErrors('Solo se puede pre-aprobar una promesa Pendiente.');
+        try {
+            PromesaWorkflowService::preaprobar($promesa, $req->input('nota_estado'));
+            return back()->with('ok', 'Promesa pre-aprobada.');
+        } catch (\Throwable $e) {
+            return back()->withErrors($e->getMessage());
         }
-
-        $promesa->update([
-            'workflow_estado'     => 'preaprobada',
-            'pre_aprobado_por'    => Auth::id(),
-            'pre_aprobado_at'     => now(),
-            'nota_preaprobacion'  => trim((string)$req->input('nota_estado')) ?: null,
-            'rechazado_por'       => null,
-            'rechazado_at'        => null,
-            'nota_rechazo'        => null,
-        ]);
-
-        $this->sendMailSafely(fn()=>WorkflowMailer::promesaPreaprobada($promesa), 'promesaPreaprobada', ['promesa_id'=>$promesa->id]);
-        return back()->with('ok', 'Promesa pre-aprobada.');
     }
 
+    /**
+     * SUPERVISOR: Rechazar promesa (estado Pendiente).
+     */
     public function rechazarSup(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('supervisor');
 
-        if (($promesa->workflow_estado ?? 'pendiente') !== 'pendiente') {
-            return back()->withErrors('Solo se puede rechazar una promesa Pendiente.');
+        try {
+            PromesaWorkflowService::rechazarSup($promesa, $req->input('nota_estado'));
+            return back()->with('ok', 'Promesa rechazada por supervisor.');
+        } catch (\Throwable $e) {
+            return back()->withErrors($e->getMessage());
         }
-
-        $promesa->update([
-            'workflow_estado' => 'rechazada_sup',
-            'rechazado_por'   => Auth::id(),
-            'rechazado_at'    => now(),
-            'nota_rechazo'    => substr((string)$req->input('nota_estado'), 0, 500),
-        ]);
-
-        $this->sendMailSafely(
-            fn()=>WorkflowMailer::promesaRechazadaSup($promesa, $req->input('nota_estado')),
-            'promesaRechazadaSup',
-            ['promesa_id'=>$promesa->id]
-        );
-        return back()->with('ok', 'Promesa rechazada por supervisor.');
     }
 
-    // ===== ADMIN =====
+    /**
+     * ADMIN: Aprobar promesa (estado Pre-aprobada).
+     */
     public function aprobar(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('administrador');
 
-        if (($promesa->workflow_estado ?? '') !== 'preaprobada') {
-            return back()->withErrors('Solo se puede aprobar una promesa Pre-aprobada.');
+        try {
+            PromesaWorkflowService::aprobar($promesa, $req->input('nota_estado'));
+            return back()->with('ok', 'Promesa APROBADA.');
+        } catch (\Throwable $e) {
+            return back()->withErrors($e->getMessage());
         }
-
-        $promesa->update([
-            'workflow_estado'    => 'aprobada',
-            'aprobado_por'       => Auth::id(),
-            'aprobado_at'        => now(),
-            'nota_aprobacion'    => trim((string)$req->input('nota_estado')) ?: null,
-            'rechazado_por'      => null,
-            'rechazado_at'       => null,
-            'nota_rechazo'       => null,
-        ]);
-
-        $this->sendMailSafely(
-            fn()=>WorkflowMailer::promesaResuelta($promesa, true, $req->input('nota_estado')),
-            'promesaResuelta.aprobar',
-            ['promesa_id'=>$promesa->id]
-        );
-        return back()->with('ok', 'Promesa APROBADA.');
     }
 
+    /**
+     * ADMIN: Rechazar promesa (estado Pre-aprobada).
+     */
     public function rechazarAdmin(Request $req, PromesaPago $promesa)
     {
         $this->authorizeActionFor('administrador');
 
-        if (($promesa->workflow_estado ?? '') !== 'preaprobada') {
-            return back()->withErrors('Solo se puede rechazar una promesa Pre-aprobada.');
+        try {
+            PromesaWorkflowService::rechazarAdmin($promesa, $req->input('nota_estado'));
+            return back()->with('ok', 'Promesa rechazada por administrador.');
+        } catch (\Throwable $e) {
+            return back()->withErrors($e->getMessage());
         }
-
-        $promesa->update([
-            'workflow_estado' => 'rechazada',
-            'rechazado_por'   => Auth::id(),
-            'rechazado_at'    => now(),
-            'nota_rechazo'    => substr((string)$req->input('nota_estado'), 0, 500),
-        ]);
-
-        $this->sendMailSafely(
-            fn()=>WorkflowMailer::promesaResuelta($promesa, false, $req->input('nota_estado')),
-            'promesaResuelta.rechazar',
-            ['promesa_id'=>$promesa->id]
-        );
-        return back()->with('ok', 'Promesa rechazada por administrador.');
     }
 
+    /**
+     * Autorización por rol (admin/sistemas o supervisor).
+     */
     private function authorizeActionFor(string $role)
     {
         $user = Auth::user();
@@ -339,7 +305,9 @@ class AutorizacionController extends Controller
         }
     }
 
-    // ===== LISTA PAGOS POR DNI (unificada, pagos_propia nuevo esquema)
+    /**
+     * API: Pagos por DNI (esquema pagos_propia nuevo).
+     */
     public function pagosDni(string $dni)
     {
         try {
@@ -347,8 +315,8 @@ class AutorizacionController extends Controller
 
             $rows = Pago::query()
                 ->where('dni', $dni)
-                ->orderByDesc('lote_id')   // lote más reciente
-                ->orderByDesc('fecha')     // y fecha más reciente
+                ->orderByDesc('lote_id')
+                ->orderByDesc('fecha')
                 ->get([
                     'operacion',
                     'fecha',
@@ -383,23 +351,6 @@ class AutorizacionController extends Controller
                 'pagos' => [],
                 'error' => 'No se pudo obtener los pagos',
             ], 500);
-        }
-    }
-
-    /* =========================
-     * Helpers (mailer seguro)
-     * ========================= */
-    private function sendMailSafely(callable $fn, string $context, array $extra = []): void
-    {
-        try {
-            $fn();
-        } catch (\Throwable $e) {
-            Log::error('WorkflowMailer error: '.$context, $extra + [
-                'msg'  => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-            // No interrumpimos la UX si falla el correo
         }
     }
 }
