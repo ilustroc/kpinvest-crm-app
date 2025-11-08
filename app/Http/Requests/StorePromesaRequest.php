@@ -3,10 +3,47 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Carbon\Carbon;
 
 class StorePromesaRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
+
+    protected function prepareForValidation(): void
+    {
+        // DNI desde la ruta
+        $dni = (string) $this->route('dni');
+
+        // Teléfono limpio
+        $tel = preg_replace('/[^0-9\+]/', '', (string) $this->input('telefono',''));
+
+        // Mapear fecha de cancelación => fecha_pago
+        $fecha = $this->input('fecha_pago') ?: $this->input('fecha_pago_cancel');
+
+        // Normalizar fecha (soporta dd/mm/yyyy)
+        if (is_string($fecha) && $fecha !== '') {
+            $fecha = trim($fecha);
+            if (preg_match('~^(\d{1,2})/(\d{1,2})/(\d{4})$~', $fecha, $m)) {
+                $fecha = sprintf('%04d-%02d-%02d', (int)$m[3], (int)$m[2], (int)$m[1]);
+            } else {
+                try { $fecha = Carbon::parse($fecha, 'America/Lima')->toDateString(); } catch (\Throwable $e) {}
+            }
+        }
+
+        // Normalizar arrays para evitar nulls
+        $ops   = array_values(array_filter((array) $this->input('operaciones', [])));
+        $cF    = array_values((array) $this->input('cron_fecha', []));
+        $cM    = array_values((array) $this->input('cron_monto', []));
+
+        $this->merge([
+            'dni'         => $dni,
+            'telefono'    => $tel,
+            'fecha_pago'  => $fecha,   // ⬅️ clave para que pase la regla required en cancelación
+            'operaciones' => $ops,
+            'cron_fecha'  => $cF,
+            'cron_monto'  => $cM,
+        ]);
+    }
 
     public function rules(): array
     {
@@ -32,9 +69,11 @@ class StorePromesaRequest extends FormRequest
         ];
     }
 
-    protected function prepareForValidation(): void
+    public function messages(): array
     {
-        $tel = preg_replace('/[^0-9\+]/', '', (string)($this->input('telefono','')));
-        $this->merge(['telefono'=>$tel]);
+        return [
+            'dni.required'        => 'No se recibió el DNI.',
+            'fecha_pago.required' => 'La fecha de pago es obligatoria en cancelación.',
+        ];
     }
 }
