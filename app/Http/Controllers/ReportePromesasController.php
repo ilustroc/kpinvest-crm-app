@@ -14,22 +14,21 @@ use Carbon\Carbon;
 class ReportePromesasController extends Controller
 {
     // Tablas
-    private string $table    = 'promesas_pago';          // principal (alias pp)
-    private string $opsTable = 'promesa_operaciones';    // detalle   (alias po)
+    private string $table       = 'promesas_pago';        // principal (alias pp)
+    private string $opsTable    = 'promesa_operaciones';  // detalle   (alias po)
+    private string $cuotasTable = 'promesa_cuotas';       // cuotas    (alias pc)
 
     public function index(Request $r)
     {
         $qb   = $this->baseQuery($r);
         $rows = $qb->paginate(25)->withQueryString();
 
-        // Filtros para la vista (si la usas)
-        $from        = $r->query('from', Carbon::today()->startOfMonth()->toDateString());
-        $to          = $r->query('to',   Carbon::today()->toDateString());
-        $estado      = $r->query('estado', '');
-        $negociador  = $r->query('negociador', '');
-        $q           = $r->query('q', '');
+        $from       = $r->query('from', Carbon::today()->startOfMonth()->toDateString());
+        $to         = $r->query('to',   Carbon::today()->toDateString());
+        $estado     = $r->query('estado', '');
+        $negociador = $r->query('negociador', '');
+        $q          = $r->query('q', '');
 
-        // Ajusta el nombre de la vista si corresponde
         return view('reportes.pdp', compact('rows','from','to','estado','negociador','q'));
     }
 
@@ -51,7 +50,7 @@ class ReportePromesasController extends Controller
             $sheet->fromArray([
                 (string)$r2->tipo_neg,
                 (string)$r2->entidad,
-                (string)$r2->fecha,         // Y-m-d H:i:s
+                (string)$r2->fecha,
                 (string)$r2->cliente,
                 (string)$r2->telefono,
                 (string)$r2->nrodoc,
@@ -62,17 +61,15 @@ class ReportePromesasController extends Controller
                 $r2->deuda_act   !== null ? (float)$r2->deuda_act   : '',
                 $r2->capital_act !== null ? (float)$r2->capital_act : '',
                 $r2->cuotas      !== null ? (int)$r2->cuotas        : '',
-                (string)$r2->fec_pag,       // Y-m-d
+                (string)$r2->fec_pag,
                 $r2->pago_ini    !== null ? (float)$r2->pago_ini    : '',
                 (string)$r2->glosa_neg,
             ], null, "A{$row}");
 
-            // Nrodoc como texto (conservar ceros)
             $sheet->setCellValueExplicit("F{$row}", (string)$r2->nrodoc, DataType::TYPE_STRING);
             $row++;
         }
 
-        // Auto-size
         $lastCol = Coordinate::stringFromColumnIndex(count($headers));
         for ($c='A'; $c <= $lastCol; $c++) $sheet->getColumnDimension($c)->setAutoSize(true);
 
@@ -91,7 +88,7 @@ class ReportePromesasController extends Controller
     }
 
     /**
-     * Query base: UNA FILA POR OPERACIÓN con las columnas solicitadas.
+     * Query base: UNA FILA POR OPERACIÓN.
      */
     private function baseQuery(Request $r)
     {
@@ -99,13 +96,25 @@ class ReportePromesasController extends Controller
             abort(500, "No existe la tabla {$this->table}.");
         }
 
+        // Subquery: primera cuota por promesa (por nro mínimo)
+        $subSql = "
+            SELECT pc.promesa_id,
+                   pc.fecha AS first_fecha,
+                   pc.monto AS first_monto
+            FROM {$this->cuotasTable} pc
+            JOIN (
+                SELECT promesa_id, MIN(nro) AS min_nro
+                FROM {$this->cuotasTable}
+                GROUP BY promesa_id
+            ) x ON x.promesa_id = pc.promesa_id AND x.min_nro = pc.nro
+        ";
+
         $qb = DB::table("{$this->table} as pp")
             ->leftJoin("{$this->opsTable} as po", 'po.promesa_id', '=', 'pp.id')
-            // operación efectiva: detalle si existe, si no el legacy de pp
             ->leftJoin('clientes_cuentas as cc', DB::raw('COALESCE(po.operacion, pp.operacion)'), '=', 'cc.operacion')
-            ->leftJoin('users as us', 'us.id', '=', 'pp.user_id');
+            ->leftJoin('users as us', 'us.id', '=', 'pp.user_id')
+            ->leftJoin(DB::raw("({$subSql}) as fq"), 'fq.promesa_id', '=', 'pp.id');
 
-        // SELECT — nombres/orden exactamente como el layout pedido
         $qb->selectRaw("
             pp.tipo                                                as tipo_neg,
             COALESCE(cc.entidad,'')                               as entidad,
@@ -120,21 +129,35 @@ class ReportePromesasController extends Controller
             cc.deuda_total                                        as deuda_act,
             cc.deuda_capital                                      as capital_act,
             pp.nro_cuotas                                         as cuotas,
-            DATE_FORMAT(pp.fecha_pago, '%Y-%m-%d')                as fec_pag,
+
+            /* ===== Fecha de pago según tipo ===== */
             CASE
-              WHEN COALESCE(pp.monto,0) > 0 THEN pp.monto
-              ELSE pp.monto_cuota
+              WHEN pp.tipo = 'cancelacion'
+                   THEN DATE_FORMAT(pp.fecha_pago, '%Y-%m-%d')
+              WHEN pp.tipo IN ('convenio','convenio_balon')
+                   THEN DATE_FORMAT(fq.first_fecha, '%Y-%m-%d')
+              ELSE DATE_FORMAT(COALESCE(fq.first_fecha, pp.fecha_pago), '%Y-%m-%d')
+            END                                                   as fec_pag,
+
+            /* ===== Monto según tipo ===== */
+            CASE
+              WHEN pp.tipo = 'cancelacion'
+                   THEN pp.monto
+              WHEN pp.tipo IN ('convenio','convenio_balon')
+                   THEN fq.first_monto
+              ELSE COALESCE(fq.first_monto, COALESCE(pp.monto, pp.monto_cuota))
             END                                                   as pago_ini,
+
             COALESCE(pp.nota,'')                                  as glosa_neg,
             pp.created_at                                         as pp_created_at
         ");
 
         // ===== Filtros =====
-        $from       = $r->query('from');
-        $to         = $r->query('to');
-        $estado     = trim((string)$r->query('estado',''));
-        $negoc      = trim((string)$r->query('negociador',''));
-        $q          = trim((string)$r->query('q',''));
+        $from   = $r->query('from');
+        $to     = $r->query('to');
+        $estado = trim((string)$r->query('estado',''));
+        $negoc  = trim((string)$r->query('negociador',''));
+        $q      = trim((string)$r->query('q',''));
 
         if ($from) $qb->whereDate('pp.created_at','>=',$from);
         if ($to)   $qb->whereDate('pp.created_at','<=',$to);
@@ -143,7 +166,6 @@ class ReportePromesasController extends Controller
             $qb->where('pp.workflow_estado','like',"%{$estado}%");
         }
 
-        // Filtro por negociador (usuario creador)
         if ($negoc !== '') {
             $qb->where(function($w) use ($negoc){
                 $w->where('us.name','like',"%{$negoc}%")
@@ -162,7 +184,6 @@ class ReportePromesasController extends Controller
             });
         }
 
-        // Orden por fecha de creación y id (desc)
         $qb->orderByDesc('pp.created_at')->orderByDesc('pp.id');
 
         return $qb;
