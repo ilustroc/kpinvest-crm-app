@@ -265,12 +265,42 @@
 
             {{-- === CELDA CCD === --}}
             <td class="text-nowrap">
-              @php $docs = $docsCcd; @endphp
+              @php
+                // Normalizador robusto: sólo letras y números
+                $norm = fn($s) => preg_replace('/[^A-Z0-9]+/','', strtoupper(trim((string)$s)));
 
-              @if($docs->count() === 1)
+                // 0) Datos de esta fila
+                $orig = (string)($cta->cosecha ?? '');
+                $key  = $ccdCosechaKeys[$orig] ?? $norm($orig); // p.ej. CONFIANZA_4 -> CONFIANZA4
+
+                // 1) Intento principal: índice por cosecha
+                $docs = collect($ccdByCosecha[$key] ?? []);
+
+                // 2) Intento flexible: escanear todos los CCD de este DNI buscando match cercano por cosecha
+                if ($docs->isEmpty()) {
+                  $allDocs = collect(($ccdByDni[$dni] ?? collect())->values());
+                  if ($allDocs->isNotEmpty()) {
+                    $docs = $allDocs->filter(function($d) use ($norm, $key) {
+                      $v = $norm($d->cosecha ?? '');
+                      if ($v === '') return false;
+                      // igualdad exacta, prefijo o substring (cubre "COMPARTAMOS14" vs "COMPARTAMOS1")
+                      return $v === $key || str_starts_with($v, $key) || str_starts_with($key, $v) || str_contains($v, $key);
+                    })->values();
+                  }
+                }
+
+                // 3) Fallback: por código (operación), si existe la columna 'codigo' agrupada
+                if ($docs->isEmpty() && !empty($cta->operacion ?? null) && !empty($ccdByCodigo ?? null)) {
+                  $docs = collect(($ccdByCodigo[$cta->operacion] ?? collect())->values());
+                }
+              @endphp
+
+              @if($docs->isEmpty())
+                <span class="text-secondary">—</span>
+
+              @elseif($docs->count() === 1)
                 @php
                   $d = $docs->first();
-                  // href: usa link si viene; si pdf es URL absoluta úsala; si no, asset() a storage
                   $href = $d->link
                     ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
                 @endphp
@@ -282,7 +312,7 @@
                   <span class="text-secondary">—</span>
                 @endif
 
-              @elseif($docs->count() > 1)
+              @else
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="bi bi-filetype-pdf me-1"></i> CCD ({{ $docs->count() }})
@@ -292,7 +322,6 @@
                       @php
                         $href = $d->link
                           ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
-                        // Nombre legible SOLO con campos existentes: pdf/cosecha/id
                         $name = $d->pdf
                           ? pathinfo((string)$d->pdf, PATHINFO_FILENAME)
                           : ( ($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id );
@@ -303,11 +332,10 @@
                     @endforeach
                   </ul>
                 </div>
-              @else
-                <span class="text-secondary">—</span>
               @endif
             </td>
             {{-- === /CELDA CCD === --}}
+
 
             <td class="text-nowrap">
               <span class="badge rounded-pill text-bg-light border">{{ $cnt }} pago(s)</span>

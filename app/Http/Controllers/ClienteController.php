@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,13 +38,34 @@ class ClienteController extends Controller
 
             // === CCD
             $ccdDocs = collect(); $ccdByDni = collect(); $ccdByCodigo = collect();
+            $ccdByCosecha = collect();   // << nuevo
+            $ccdCosechaKeys = [];        // << nuevo
+
             if (Schema::hasTable('ccd_clientes')) {
                 $colsCcd = DB::getSchemaBuilder()->getColumnListing('ccd_clientes');
                 $selCcd  = collect(['id','numdoc','pdf','cosecha','link','codigo'])
-                            ->filter(fn($c)=>in_array($c,$colsCcd))->all();
-                $ccdDocs = CcdCliente::query()->where('numdoc',$dni)->orderByDesc('id')->get($selCcd);
+                    ->filter(fn($c)=>in_array($c,$colsCcd))->all();
+
+                $ccdDocs = CcdCliente::query()
+                    ->where('numdoc',$dni)
+                    ->orderByDesc('id')
+                    ->get($selCcd);
+
                 $ccdByDni = collect([$dni => $ccdDocs->values()]);
                 if (in_array('codigo',$colsCcd)) $ccdByCodigo = $ccdDocs->groupBy('codigo');
+
+                // normalizador (mismo para ambos lados)
+                $norm = fn($s) => preg_replace('/[\s_]+/','', strtoupper(trim((string)$s)));
+
+                // índice por cosecha en CCD
+                $ccdByCosecha = $ccdDocs->groupBy(fn($d) => $norm($d->cosecha));
+
+                // llave de cosecha para cada cuenta
+                foreach ($cuentas as $cta) {
+                    $orig = (string)($cta->cosecha ?? '');
+                    $key  = $this->mapCosechaClientesToCcd($orig); // p.ej. CONFIANZA_4 -> CONFIANZA4, CAJAAQP4 -> AQP4
+                    $ccdCosechaKeys[$orig] = $norm($key);
+                }
             }
 
             // === Mapas de pagos
@@ -121,8 +140,9 @@ class ClienteController extends Controller
 
             return view('clientes.show', compact(
                 'dni','titular','cuentas','pagos','promesas',
-                'ccdDocs','ccdByDni','ccdByCodigo','cnasByCuenta','cnasByOperacion',
-                'pagosGrouped','nextNroCarta','totPagos'
+                'ccdDocs','ccdByDni','ccdByCodigo',
+                'ccdByCosecha','ccdCosechaKeys',
+                'cnasByCuenta','cnasByOperacion','pagosGrouped','nextNroCarta','totPagos'
             ));
         } catch (Throwable $e) {
             if ($e instanceof HttpExceptionInterface) throw $e;
@@ -142,5 +162,31 @@ class ClienteController extends Controller
             $ids[] = $me->id; return $ids;
         }
         return [$me->id];
+    }
+    // Helpers (ponlo dentro del controller)
+    private function mapCosechaClientesToCcd(?string $c): ?string {
+        if (!$c) return null;
+        $c = strtoupper(trim($c));
+
+        // === Mapeos explícitos (BBVA y casos especiales)
+        $direct = [
+            'BBVA1' => 'BBVA_1_2', 'BBVA2' => 'BBVA_1_2',
+            'BBVA3' => 'BBVA_3_4', 'BBVA4' => 'BBVA_3_4',
+            'BBVA5' => 'BBVA_5',
+            'BBVA6' => 'BBVA_6',
+            'BBVA7' => 'BBVA_7_8', 'BBVA8' => 'BBVA_7_8',
+        ];
+        if (isset($direct[$c])) return $direct[$c];
+
+        // CONFIANZA_4  -> CONFIANZA4
+        if (preg_match('/^CONFIANZA_(\d{1,2})$/', $c, $m)) return 'CONFIANZA'.$m[1];
+
+        // COMPARTAMOS_1 -> COMPARTAMOS1
+        if (preg_match('/^COMPARTAMOS_(\d{1,2})$/', $c, $m)) return 'COMPARTAMOS'.$m[1];
+
+        // CAJAAQP1 -> AQP1
+        if (preg_match('/^CAJAAQP(\d{1,2})$/', $c, $m)) return 'AQP'.$m[1];
+
+        return $c; // fallback
     }
 }

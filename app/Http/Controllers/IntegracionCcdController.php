@@ -40,64 +40,61 @@ class IntegracionCcdController extends Controller
     // ======= Lógica principal =======
     private function doImport(string $filepath): array
     {
-        $fh = fopen($filepath,'r');
-        if(!$fh) return [0,0,['No se pudo abrir el archivo']];
+        $fh = fopen($filepath, 'r');
+        if (!$fh) return [0, 0, ['No se pudo abrir el archivo']];
 
+        // Detecta delimitador , o ;
         $first = fgets($fh);
-        if($first===false){ fclose($fh); return [0,0,['Archivo vacío']]; }
-        $del = (substr_count($first,';') > substr_count($first,',')) ? ';' : ',';
+        if ($first === false) { fclose($fh); return [0, 0, ['Archivo vacío']]; }
+        $del = (substr_count($first, ';') > substr_count($first, ',')) ? ';' : ',';
         rewind($fh);
 
+        // Lee encabezados
         $headers = fgetcsv($fh, 0, $del);
-        if(!$headers){ fclose($fh); return [0,0,['Sin encabezados']]; }
+        if (!$headers) { fclose($fh); return [0, 0, ['Sin encabezados']]; }
 
-        // --- Normalizador ---
-        $norm = fn(string $s): string =>
-            trim(preg_replace('/[^A-Z0-9]+/','_',strtr(strtoupper(trim(
-                str_replace(["\xEF\xBB\xBF","\xC2\xA0"],' ',$s)
-            )), ['Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ü'=>'U','Ñ'=>'N'])), '_');
+        $clean = function ($s) {
+            $s = str_replace(["\xEF\xBB\xBF", "\xC2\xA0"], '', (string)$s); // BOM/nbsp
+            return strtoupper(trim($s));
+        };
 
-        $map = [];
-        foreach ($headers as $i=>$h) $map[$i] = $norm($h);
+        // Mapa de columnas
+        $idx = [];
+        foreach ($headers as $i => $h) {
+            $k = $clean($h);
+            if (in_array($k, ['NUMDOC','DNI'])) $idx['numdoc'] = $i;
+            elseif ($k === 'PDF')           $idx['pdf'] = $i;
+            elseif ($k === 'COSECHA')       $idx['cosecha'] = $i;
+            elseif ($k === 'LINK')          $idx['link'] = $i;
+        }
 
-        // --- Bucle ---
-        $ok=0; $skip=0; $err=[]; $rowNum=1;
+        $ok = 0; $skip = 0; $err = []; $rowNum = 1;
 
-        while(($row=fgetcsv($fh,0,$del))!==false){
-            $rowNum++; $data=[];
+        // Filas
+        while (($row = fgetcsv($fh, 0, $del)) !== false) {
+            $rowNum++;
 
-            foreach($row as $i=>$val){
-                $k = $map[$i] ?? null; if(!$k) continue;
-                $val = trim($val);
+            $numdoc = isset($idx['numdoc']) ? trim((string)($row[$idx['numdoc']] ?? '')) : '';
+            if ($numdoc === '') { $skip++; $err[] = "Fila {$rowNum}: falta NUMDOC."; continue; }
 
-                switch ($k) {
-                    case 'NUMDOC':  $data['numdoc']  = $val; break;
-                    case 'PDF':     $data['pdf']     = $val; break;
-                    case 'COSECHA': $data['cosecha'] = $val; break;
-                    case 'LINK':    $data['link']    = $val; break;
-                }
-            }
-
-            // Validación mínima
-            if (empty($data['numdoc'])) {
-                $skip++; $err[]="Fila {$rowNum}: falta NUMDOC."; continue;
-            }
+            $data = [
+                'numdoc'  => $numdoc,
+                'pdf'     => isset($idx['pdf'])     ? trim((string)($row[$idx['pdf']] ?? '')) : null,
+                'cosecha' => isset($idx['cosecha']) ? trim((string)($row[$idx['cosecha']] ?? '')) : null,
+                'link'    => isset($idx['link'])    ? trim((string)($row[$idx['link']] ?? '')) : null,
+            ];
 
             try {
-                // Inserta o actualiza según numdoc
-                $cliente = CcdCliente::updateOrCreate(
-                    ['numdoc' => $data['numdoc']],
-                    $data
-                );
-
+                // Inserta tal cual (permite repetir numdoc)
+                CcdCliente::insert($data);
                 $ok++;
-            } catch(\Throwable $e){
-                $skip++; $err[]="Fila {$rowNum}: ".$e->getMessage();
+            } catch (\Throwable $e) {
+                $skip++; $err[] = "Fila {$rowNum}: ".$e->getMessage();
             }
         }
 
         fclose($fh);
-        return [$ok,$skip,$err];
+        return [$ok, $skip, $err];
     }
 
     // ======= Vista principal =======
