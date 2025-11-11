@@ -85,12 +85,10 @@ class ClienteController extends Controller
                 return $c;
             });
 
-            // === PROMESAS
-            $teamIds = $this->myTeamUserIds();
+            // === PROMESAS (sin myTeamUserIds)
             $promesas = PromesaPago::query()
-                ->where('dni',$dni)
-                ->when(!empty($teamIds), fn($q)=>$q->whereIn('user_id',$teamIds))
-                ->with(['operaciones','cuotas'=>fn($q)=>$q->orderBy('nro')])
+                ->where('dni', $dni)
+                ->with(['operaciones', 'cuotas' => fn($q) => $q->orderBy('nro')])
                 ->orderByDesc('fecha_promesa')
                 ->get();
 
@@ -151,18 +149,6 @@ class ClienteController extends Controller
         }
     }
 
-    /** Igual a tu helper actual */
-    private function myTeamUserIds(): array
-    {
-        $me = Auth::user(); if (!$me) return [];
-        $role = strtolower((string)$me->role);
-        if (in_array($role,['administrador','sistemas','soporte'])) return [];
-        if ($role === 'supervisor') {
-            $ids = User::where('supervisor_id',$me->id)->pluck('id')->all();
-            $ids[] = $me->id; return $ids;
-        }
-        return [$me->id];
-    }
     // Helpers (ponlo dentro del controller)
     private function mapCosechaClientesToCcd(?string $c): ?string {
         if (!$c) return null;
