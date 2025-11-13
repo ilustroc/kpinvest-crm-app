@@ -85,14 +85,14 @@ class ClienteController extends Controller
                 return $c;
             });
 
-            // === PROMESAS (sin myTeamUserIds)
+            // === PROMESAS
             $promesas = PromesaPago::query()
                 ->where('dni', $dni)
                 ->with(['operaciones', 'cuotas' => fn($q) => $q->orderBy('nro')])
                 ->orderByDesc('fecha_promesa')
                 ->get();
 
-            // === CNA (si existe)
+            // === CNA
             $cnasByCuenta = collect(); $cnasByOperacion = collect();
             if (Schema::hasTable('cna_solicitudes')) {
                 $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
@@ -149,12 +149,12 @@ class ClienteController extends Controller
         }
     }
 
-    // Helpers (ponlo dentro del controller)
+    // Helpers
     private function mapCosechaClientesToCcd(?string $c): ?string {
         if (!$c) return null;
         $c = strtoupper(trim($c));
 
-        // === Mapeos explícitos (BBVA y casos especiales)
+        // === Mapeos explícitos
         $direct = [
             'BBVA1' => 'BBVA_1_2', 'BBVA2' => 'BBVA_1_2',
             'BBVA3' => 'BBVA_3_4', 'BBVA4' => 'BBVA_3_4',
@@ -173,6 +173,6 @@ class ClienteController extends Controller
         // CAJAAQP1 -> AQP1
         if (preg_match('/^CAJAAQP(\d{1,2})$/', $c, $m)) return 'AQP'.$m[1];
 
-        return $c; // fallback
+        return $c;
     }
 }
