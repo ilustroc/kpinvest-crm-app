@@ -18,6 +18,7 @@ use App\Http\Controllers\PromesaPdfController;
 use App\Http\Controllers\CnaController;
 use App\Http\Controllers\ReportePromesasController;
 use App\Http\Controllers\IntegracionCcdController;
+use App\Http\Controllers\IntegracionAsignarController;
 
 /*
 |--------------------------------------------------------------------------
@@ -125,6 +126,11 @@ Route::middleware(['auth','active'])->group(function () {
         Route::view('/integracion/data', 'placeholders.integracion-data')->name('integracion.data');
         Route::get('/integracion/data/clientes/template', [ClientesCargaController::class, 'templateClientesMaster'])->name('integracion.data.clientes.template');
         Route::post('/integracion/data/clientes/import',  [ClientesCargaController::class, 'importClientesMaster'])->name('integracion.data.clientes.import');
+
+        // INTEGRACIÓN: ASIGNAR
+        Route::get('/integracion/asignar',           [IntegracionAsignarController::class, 'index'])->name('integracion.asignar');
+        Route::get('/integracion/asignar/template',  [IntegracionAsignarController::class, 'template'])->name('integracion.asignar.template');
+        Route::post('/integracion/asignar/import',   [IntegracionAsignarController::class, 'import'])->name('integracion.asignar.import');
 
         // INTEGRACIÓN: CCD
         Route::get('/integracion/ccd',           [IntegracionCcdController::class, 'index'])->name('integracion.ccd');

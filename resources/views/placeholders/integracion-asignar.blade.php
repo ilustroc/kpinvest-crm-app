@@ -1,0 +1,46 @@
+@extends('layouts.app')
+@section('title','Integración ▸ Asignar Clientes')
+
+@section('content')
+<h1 class="h4 mb-3">Integración ▸ Asignar Clientes</h1>
+
+{{-- Avisos --}}
+@if(session('ok'))   <div class="alert alert-success">{{ session('ok') }}</div>@endif
+@if(session('warn')) <pre class="alert alert-warning small mb-3">{{ session('warn') }}</pre>@endif
+@if($errors->any())  <div class="alert alert-danger">{{ $errors->first() }}</div>@endif
+
+<div class="card pad">
+  <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <div>
+      <h2 class="h6 mb-1">Asignación de clientes</h2>
+      <div class="text-muted small">
+        Importa asignaciones masivas de clientes a usuarios del sistema. <br>
+        Campos requeridos en el archivo: <code>NUMDOC</code>, <code>OPERACION</code>, <code>NAME</code>.
+      </div>
+    </div>
+    <a class="btn btn-outline-primary"
+       href="{{ route('integracion.asignar.template') }}">
+       Descargar plantilla CSV
+    </a>
+  </div>
+
+  <hr class="my-3">
+
+  <form class="vstack gap-2"
+        method="POST"
+        action="{{ route('integracion.asignar.import') }}"
+        enctype="multipart/form-data">
+    @csrf
+    <div>
+      <label class="form-label">Archivo CSV</label>
+      <input type="file" name="archivo" class="form-control" accept=".csv,text/csv" required>
+      <div class="form-text">
+        Encabezados esperados: <strong>NUMDOC, OPERACION, NAME</strong>
+      </div>
+    </div>
+    <button class="btn btn-primary">
+      Subir y procesar
+    </button>
+  </form>
+</div>
+@endsection

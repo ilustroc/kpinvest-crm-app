@@ -93,38 +93,66 @@ class ClienteController extends Controller
                 ->get();
 
             // === CNA
-            $cnasByCuenta = collect(); $cnasByOperacion = collect();
+            $cnasByCuenta = collect();
+            $cnasByOperacion = collect();
+
             if (Schema::hasTable('cna_solicitudes')) {
                 $colsCna = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
                 $want    = ['id','dni','nro_carta','operaciones','workflow_estado','created_at','pdf_path','docx_path'];
                 $selCna  = collect($want)->filter(fn($c)=>in_array($c,$colsCna))->values()->all();
 
-                $cnas = DB::table('cna_solicitudes')->select($selCna)->where('dni',$dni)->orderByDesc('created_at')->get();
-                $mapCta=[]; $mapOp=[];
-                foreach ($cnas as $row) {
-                    $opsRaw = $row->operaciones ?? '[]';
+                /** @var \Illuminate\Support\Collection<int,object> $cnas */
+                $cnas = DB::table('cna_solicitudes')
+                    ->select($selCna)
+                    ->where('dni', $dni)
+                    ->orderByDesc('created_at')
+                    ->get();
+
+                $mapCta = [];
+                $mapOp  = [];
+
+                /** @var object $cna */
+                foreach ($cnas as $cna) {
+                    $opsRaw = $cna->operaciones ?? '[]';
+
+                    // Acepta JSON (["123","456"]) o CSV ("123,456")
                     $opsArr = is_array($opsRaw) ? $opsRaw : (json_decode($opsRaw, true) ?: []);
-                    if (!is_array($opsArr)) $opsArr = array_filter(array_map('trim', explode(',', (string)$opsRaw)));
+                    if (!is_array($opsArr)) {
+                        $opsArr = array_filter(array_map('trim', explode(',', (string)$opsRaw)));
+                    }
+
                     foreach ($opsArr as $op) {
+                        // Por operación
                         $mapOp[$op] = $mapOp[$op] ?? collect();
                         $mapOp[$op]->push((object)[
-                            'id'=>$row->id,'nro_carta'=>$row->nro_carta ?? $row->id,
-                            'workflow_estado'=>$row->workflow_estado ?? 'pendiente',
-                            'created_at'=>$row->created_at,'pdf_path'=>$row->pdf_path ?? null,'docx_path'=>$row->docx_path ?? null,
+                            'id'              => $cna->id,
+                            'nro_carta'       => $cna->nro_carta ?? $cna->id,
+                            'workflow_estado' => $cna->workflow_estado ?? 'pendiente',
+                            'created_at'      => $cna->created_at,
+                            'pdf_path'        => $cna->pdf_path ?? null,
+                            'docx_path'       => $cna->docx_path ?? null,
                         ]);
-                        $ctaDb = optional($cuentas->firstWhere('operacion',$op))->cuenta;
+
+                        // Por cuenta (elige la cuenta mapeada para esa operación)
+                        $ctaDb = optional($cuentas->firstWhere('operacion', $op))->cuenta;
                         $cta   = (string)($ctaDb ?: ($op2cta[$op] ?? $op));
+
                         $mapCta[$cta] = $mapCta[$cta] ?? collect();
                         $mapCta[$cta]->push((object)[
-                            'id'=>$row->id,'nro_carta'=>$row->nro_carta ?? $row->id,
-                            'workflow_estado'=>$row->workflow_estado ?? 'pendiente',
-                            'created_at'=>$row->created_at,'pdf_path'=>$row->pdf_path ?? null,'docx_path'=>$row->docx_path ?? null,
+                            'id'              => $cna->id,
+                            'nro_carta'       => $cna->nro_carta ?? $cna->id,
+                            'workflow_estado' => $cna->workflow_estado ?? 'pendiente',
+                            'created_at'      => $cna->created_at,
+                            'pdf_path'        => $cna->pdf_path ?? null,
+                            'docx_path'       => $cna->docx_path ?? null,
                         ]);
                     }
                 }
-                $cnasByCuenta = collect($mapCta);
+
+                $cnasByCuenta    = collect($mapCta);
                 $cnasByOperacion = collect($mapOp);
             }
+
 
             // Próximo correlativo (si tuvieses la columna)
             $nextNroCarta = null;
