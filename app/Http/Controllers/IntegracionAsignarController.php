@@ -55,12 +55,19 @@ class IntegracionAsignarController extends Controller
 
         // Detectar delimitador
         $first = fgets($fh);
+        if ($first === false) {
+            fclose($fh);
+            return [0,0,['Archivo vacío']];
+        }
         $del = (substr_count($first,';') > substr_count($first,',')) ? ';' : ',';
         rewind($fh);
 
         // Encabezados
         $headers = fgetcsv($fh, 0, $del);
-        if (!$headers) return [0,0,['Archivo vacío o sin encabezados']];
+        if (!$headers) {
+            fclose($fh);
+            return [0,0,['Sin encabezados']];
+        }
 
         $clean = fn($s) => strtoupper(trim(str_replace(["\xEF\xBB\xBF","\xC2\xA0"],'', (string)$s)));
 
@@ -72,11 +79,76 @@ class IntegracionAsignarController extends Controller
             if ($k === 'NAME')      $idx['name'] = $i;
         }
 
-        if (!isset($idx['numdoc'], $idx['operacion'], $idx['name']))
+        if (!isset($idx['numdoc'], $idx['operacion'], $idx['name'])) {
+            fclose($fh);
             return [0,0,['Encabezados incompletos: se requiere NUMDOC, OPERACION, NAME']];
+        }
 
         $ok = 0; $skip = 0; $err = []; $rowNum = 1;
 
+        // Procesar en bloques para no matar al server
+        $CHUNK_SIZE = 2000;
+        $buffer = [];
+
+        $flushChunk = function() use (&$buffer, &$ok, &$skip, &$err) {
+            if (empty($buffer)) return;
+
+            // Armar set de pares (numdoc, operacion) del bloque
+            $pairs = [];
+            foreach ($buffer as $b) {
+                $key = $b['numdoc'].'|'.$b['operacion'];
+                $pairs[$key] = $b;
+            }
+
+            // Sacar listas para el whereIn
+            $numdocs = array_values(array_unique(array_column($buffer, 'numdoc')));
+            $opers   = array_values(array_unique(array_column($buffer, 'operacion')));
+
+            // Traer solo los pares que existen en clientes_cuentas
+            $validPairs = [];
+            if ($numdocs && $opers) {
+                DB::table('clientes_cuentas')
+                    ->select('numdoc','operacion')
+                    ->whereIn('numdoc', $numdocs)
+                    ->whereIn('operacion', $opers)
+                    ->chunkById(1000, function($rows) use (&$validPairs) {
+                        foreach ($rows as $r) {
+                            $validPairs[$r->numdoc.'|'.$r->operacion] = true;
+                        }
+                    }, 'id'); // si tu tabla tiene id, si no, quita el chunkById y usa get()
+            }
+
+            // Procesar cada fila del bloque usando el mapa en memoria
+            foreach ($buffer as $b) {
+                $rowNum = $b['__row'];
+                $numdoc = $b['numdoc'];
+                $oper   = $b['operacion'];
+                $name   = $b['name'];
+                $key    = $numdoc.'|'.$oper;
+
+                if (!isset($validPairs[$key])) {
+                    $skip++;
+                    $err[] = "Fila {$rowNum}: El cliente {$numdoc} con operación {$oper} NO existe en clientes_cuentas.";
+                    continue;
+                }
+
+                try {
+                    AsignarCliente::updateOrCreate(
+                        ['numdoc'=>$numdoc,'operacion'=>$oper],
+                        ['name'=>$name]
+                    );
+                    $ok++;
+                } catch (\Throwable $e) {
+                    $skip++;
+                    $err[] = "Fila {$rowNum}: ".$e->getMessage();
+                }
+            }
+
+            // Vaciar buffer
+            $buffer = [];
+        };
+
+        // Leer filas
         while (($row = fgetcsv($fh, 0, $del)) !== false) {
             $rowNum++;
 
@@ -84,47 +156,29 @@ class IntegracionAsignarController extends Controller
             $operacion = trim($row[$idx['operacion']] ?? '');
             $name      = trim($row[$idx['name']] ?? '');
 
-            if ($numdoc === '')     { $skip++; $err[]="Fila {$rowNum}: falta NUMDOC"; continue; }
-            if ($operacion === '')  { $skip++; $err[]="Fila {$rowNum}: falta OPERACION"; continue; }
-            if ($name === '')       { $skip++; $err[]="Fila {$rowNum}: falta NAME"; continue; }
+            if ($numdoc === '')    { $skip++; $err[]="Fila {$rowNum}: falta NUMDOC"; continue; }
+            if ($operacion === '') { $skip++; $err[]="Fila {$rowNum}: falta OPERACION"; continue; }
+            if ($name === '')      { $skip++; $err[]="Fila {$rowNum}: falta NAME"; continue; }
 
-            // ============================
-            // VALIDAR QUE EXISTE EN clientes_cuentas
-            // ============================
-            $exists = DB::table('clientes_cuentas')
-                ->where('numdoc', $numdoc)
-                ->where('operacion', $operacion)
-                ->exists();
+            $buffer[] = [
+                '__row'     => $rowNum,
+                'numdoc'    => $numdoc,
+                'operacion' => $operacion,
+                'name'      => $name,
+            ];
 
-            if (!$exists) {
-                $skip++;
-                $err[] = "Fila {$rowNum}: El cliente {$numdoc} con operación {$operacion} NO existe en clientes_cuentas.";
-                continue;
-            }
-
-            // ============================
-            // INSERTAR O ACTUALIZAR
-            // ============================
-            try {
-                AsignarCliente::updateOrCreate(
-                    [
-                        'numdoc'    => $numdoc,
-                        'operacion' => $operacion
-                    ],
-                    [
-                        'name'      => $name
-                    ]
-                );
-                $ok++;
-            } catch (\Throwable $e) {
-                $skip++;
-                $err[] = "Fila {$rowNum}: ".$e->getMessage();
+            if (count($buffer) >= $CHUNK_SIZE) {
+                $flushChunk();
             }
         }
 
+        // Último bloque
+        $flushChunk();
+
         fclose($fh);
-        return [$ok,$skip,$err];
+        return [$ok, $skip, $err];
     }
+
 
     // =======================
     // VISTA PRINCIPAL
