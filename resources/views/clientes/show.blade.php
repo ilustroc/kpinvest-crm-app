@@ -197,10 +197,10 @@
 
             @if($href)
               <a href="{{ $href }}" target="_blank" class="btn btn-sm btn-outline-primary w-100 mt-1">
-                <i class="bi bi-envelope-paper me-1"></i> Ver carta
+                <i class="bi bi-envelope-paper me-1"></i> Ver CCD
               </a>
             @else
-              <div class="value text-muted mt-1">Carta no disponible</div>
+              <div class="value text-muted mt-1">CCD no disponible</div>
             @endif
 
           @else
