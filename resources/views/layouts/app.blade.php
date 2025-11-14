@@ -315,7 +315,7 @@
                 </a>
                 <a href="{{ route('integracion.asignar') }}"
                    class="{{ request()->is('integracion/asignar*') ? 'active' : '' }}">
-                  <i class="bi bi-upload"></i><span>Subir Asignacion</span>
+                  <i class="bi bi-person-check"></i><span>Subir Asignacion</span>
                 </a>
                 <a href="{{ route('integracion.ccd') }}"
                    class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
