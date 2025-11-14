@@ -107,15 +107,16 @@ class IntegracionAsignarController extends Controller
             // Traer solo los pares que existen en clientes_cuentas
             $validPairs = [];
             if ($numdocs && $opers) {
-                DB::table('clientes_cuentas')
+                $rows = DB::table('clientes_cuentas')
                     ->select('numdoc','operacion')
                     ->whereIn('numdoc', $numdocs)
                     ->whereIn('operacion', $opers)
-                    ->chunkById(1000, function($rows) use (&$validPairs) {
-                        foreach ($rows as $r) {
-                            $validPairs[$r->numdoc.'|'.$r->operacion] = true;
-                        }
-                    }, 'id'); // si tu tabla tiene id, si no, quita el chunkById y usa get()
+                    ->get();
+
+                foreach ($rows as $r) {
+                    /** @var \stdClass $r */
+                    $validPairs[$r->numdoc.'|'.$r->operacion] = true;
+                }
             }
 
             // Procesar cada fila del bloque usando el mapa en memoria
