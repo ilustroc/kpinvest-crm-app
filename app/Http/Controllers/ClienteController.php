@@ -10,6 +10,7 @@ use App\Models\PagoPropia as Pago;
 use App\Models\ClienteCuenta;
 use App\Models\CcdCliente;
 use App\Models\PromesaPago;
+use App\Models\AsignarCliente;
 use App\Models\User;
 use Throwable;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -29,6 +30,18 @@ class ClienteController extends Controller
                 ]);
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
+            
+            // === Asesor asignado (por operación)
+            $asesorByOperacion = collect();
+            if (Schema::hasTable('asignar_clientes')) {
+                $asig = AsignarCliente::query()
+                    ->where('numdoc', $dni)
+                    ->orderByDesc('id')
+                    ->get(['numdoc','operacion','name']);
+
+                $asesorByOperacion = $asig->groupBy('operacion')
+                    ->map(fn($grp) => optional($grp->first())->name);
+            }
 
             // === PAGOS
             $pagos = Pago::query()
@@ -75,13 +88,17 @@ class ClienteController extends Controller
             });
             $pagosGrouped = $pagos->groupBy('operacion');
 
-            $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta) {
+            $cuentas = $cuentas->map(function ($c) use ($pagosGrouped, $op2cta, $asesorByOperacion) {
                 $grupo = $pagosGrouped->get($c->operacion) ?? collect();
                 $c->pagos_count = $grupo->count();
                 $c->pagos_sum   = (float) $grupo->sum('monto_pagado');
+
                 $ctaDb  = trim((string)($c->cuenta ?? ''));
                 $ctaMap = trim((string)($op2cta[$c->operacion] ?? ''));
                 $c->cuenta = $ctaDb !== '' ? $ctaDb : ($ctaMap !== '' ? $ctaMap : $c->operacion);
+
+                $c->asesor = $asesorByOperacion->get($c->operacion) ?? null;
+
                 return $c;
             });
 

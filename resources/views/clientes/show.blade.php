@@ -15,7 +15,33 @@
     --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
     --ink:#151a23; --muted:#6d7b8a;
   }
-
+  /* ====== CCD en encabezado ====== */
+  .kpi-ccd .label-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:.35rem;
+    font-size:.83rem;
+    color:var(--muted);
+  }
+  .kpi-ccd .badge-count{
+    border-radius:999px;
+    padding:.1rem .45rem;
+    font-size:.75rem;
+    font-weight:600;
+    background:color-mix(in oklab, var(--accent) 10%, transparent);
+    color:var(--accent-ink);
+    border:1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+  .kpi-ccd .value{
+    font-size:.95rem;
+    font-weight:600;
+  }
+  .kpi-ccd .dropdown-toggle{
+    width:100%;
+    font-size:.8rem;
+    padding:.25rem .45rem;
+  }
   /* ====== Densidad / helpers ====== */
   .tbl-compact.table> :not(caption)>*>*{ padding:.5rem .65rem }
   .max-h-320{ max-height:320px; overflow:auto }
@@ -137,11 +163,76 @@
         $totCapital = (float) $cuentas->sum(fn($x)=>(float)($x->deuda_capital ?? $x->saldo_capital ?? 0));
         $totDeuda   = (float) $cuentas->sum(fn($x)=>(float)($x->deuda_total   ?? 0));
         $totPagos   = (float) $pagos->sum(fn($p)=>(float)($p->monto_pagado ?? $p->monto ?? 0));
+
+        // CCD por DNI (para el bloque del encabezado)
+        $ccdDocs = collect($ccdByDni[$dni] ?? []);
       @endphp
-      <div class="d-flex flex-wrap gap-2">
-        <div class="kpi-mini text-end"><div class="label">Deuda capital</div><div class="value">S/ {{ number_format($totCapital,2) }}</div></div>
-        <div class="kpi-mini text-end"><div class="label">Deuda total</div><div class="value">S/ {{ number_format($totDeuda,2) }}</div></div>
-        <div class="kpi-mini text-end"><div class="label">Pagos registrados</div><div class="value">S/ {{ number_format($totPagos,2) }}</div></div>
+      <div class="d-flex flex-wrap gap-2 align-items-stretch">
+        <div class="kpi-mini text-end">
+          <div class="label">Deuda capital</div>
+          <div class="value">S/ {{ number_format($totCapital,2) }}</div>
+        </div>
+        <div class="kpi-mini text-end">
+          <div class="label">Deuda total</div>
+          <div class="value">S/ {{ number_format($totDeuda,2) }}</div>
+        </div>
+        <div class="kpi-mini text-end">
+          <div class="label">Pagos registrados</div>
+          <div class="value">S/ {{ number_format($totPagos,2) }}</div>
+        </div>
+
+        {{-- ===== CCD en encabezado ===== --}}
+        <div class="kpi-mini kpi-ccd text-start dropdown">
+          @if($ccdDocs->isEmpty())
+            <div class="value text-muted mt-1">Sin cartas</div>
+
+          @elseif($ccdDocs->count() === 1)
+            @php
+              $d    = $ccdDocs->first();
+              $href = $d->link
+                ?: (preg_match('#^https?://#', (string)$d->pdf)
+                    ? $d->pdf
+                    : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
+            @endphp
+
+            @if($href)
+              <a href="{{ $href }}" target="_blank" class="btn btn-sm btn-outline-primary w-100 mt-1">
+                <i class="bi bi-envelope-paper me-1"></i> Ver carta
+              </a>
+            @else
+              <div class="value text-muted mt-1">Carta no disponible</div>
+            @endif
+
+          @else
+            @php $count = $ccdDocs->count(); @endphp
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle w-100 mt-1"
+                    type="button" data-bs-toggle="dropdown">
+              <i class="bi bi-envelope-paper me-1"></i>
+              Cartas ({{ $count }})
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              @foreach($ccdDocs as $d)
+                @php
+                  $href = $d->link
+                    ?: (preg_match('#^https?://#', (string)$d->pdf)
+                        ? $d->pdf
+                        : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
+                  $name = $d->pdf
+                    ? pathinfo((string)$d->pdf, PATHINFO_FILENAME)
+                    : ( ($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id );
+                @endphp
+                @if($href)
+                  <li>
+                    <a class="dropdown-item" href="{{ $href }}" target="_blank">
+                      {{ $name }}
+                    </a>
+                  </li>
+                @endif
+              @endforeach
+            </ul>
+          @endif
+        </div>
+        {{-- ===== /CCD encabezado ===== --}}
       </div>
     </div>
   </div>
@@ -168,14 +259,13 @@
           <tr>
             <th class="text-center" style="width:36px"><input type="checkbox" id="chkAll"></th>
             <th class="text-nowrap">Operación</th>
+            <th class="text-nowrap">Asesor asignado</th>
             <th>Entidad</th>
             <th>Producto</th>
             <th>Cosecha</th>
             <th class="text-end text-nowrap">Deuda capital</th>
-            <th class="text-end text-nowrap">Interés</th>
             <th class="text-end text-nowrap">Deuda total</th>
             <th class="text-nowrap">CNA(s)</th>
-            <th class="text-nowrap">CCD</th>
             <th class="text-nowrap">
               Pagos
               <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Conteo y total de pagos aplicados a esta operación."></i>
@@ -212,11 +302,17 @@
               <input type="checkbox" class="chkOp" value="{{ $c->operacion }}" {{ empty($c->operacion) ? 'disabled' : '' }}>
             </td>
             <td class="text-nowrap">{{ $c->operacion ?? '—' }}</td>
+            <td class="text-nowrap">
+              @if($c->asesor)
+                  {{ $c->asesor }}
+              @else
+                <span class="text-secondary">Sin asignar</span>
+              @endif
+            </td>
             <td>{{ $c->entidad   ?? '—' }}</td>
             <td>{{ $c->producto  ?? '—' }}</td>
             <td>{{ $c->cosecha   ?? '—' }}</td>
             <td class="text-end text-nowrap">{{ number_format((float)($c->deuda_capital ?? $c->saldo_capital ?? 0), 2) }}</td>
-            <td class="text-end text-nowrap">{{ number_format((float)($c->interes ?? 0), 2) }}</td>
             <td class="text-end text-nowrap">{{ number_format((float)($c->deuda_total ?? 0), 2) }}</td>
 
             {{-- === CELDA CNA === --}}
@@ -262,80 +358,6 @@
               @endif
             </td>
             {{-- === /CELDA CNA === --}}
-
-            {{-- === CELDA CCD === --}}
-            <td class="text-nowrap">
-              @php
-                // Normalizador robusto: sólo letras y números
-                $norm = fn($s) => preg_replace('/[^A-Z0-9]+/','', strtoupper(trim((string)$s)));
-
-                // 0) Datos de esta fila
-                $orig = (string)($cta->cosecha ?? '');
-                $key  = $ccdCosechaKeys[$orig] ?? $norm($orig); // p.ej. CONFIANZA_4 -> CONFIANZA4
-
-                // 1) Intento principal: índice por cosecha
-                $docs = collect($ccdByCosecha[$key] ?? []);
-
-                // 2) Intento flexible: escanear todos los CCD de este DNI buscando match cercano por cosecha
-                if ($docs->isEmpty()) {
-                  $allDocs = collect(($ccdByDni[$dni] ?? collect())->values());
-                  if ($allDocs->isNotEmpty()) {
-                    $docs = $allDocs->filter(function($d) use ($norm, $key) {
-                      $v = $norm($d->cosecha ?? '');
-                      if ($v === '') return false;
-                      // igualdad exacta, prefijo o substring (cubre "COMPARTAMOS14" vs "COMPARTAMOS1")
-                      return $v === $key || str_starts_with($v, $key) || str_starts_with($key, $v) || str_contains($v, $key);
-                    })->values();
-                  }
-                }
-
-                // 3) Fallback: por código (operación), si existe la columna 'codigo' agrupada
-                if ($docs->isEmpty() && !empty($cta->operacion ?? null) && !empty($ccdByCodigo ?? null)) {
-                  $docs = collect(($ccdByCodigo[$cta->operacion] ?? collect())->values());
-                }
-              @endphp
-
-              @if($docs->isEmpty())
-                <span class="text-secondary">—</span>
-
-              @elseif($docs->count() === 1)
-                @php
-                  $d = $docs->first();
-                  $href = $d->link
-                    ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
-                @endphp
-                @if($href)
-                  <a href="{{ $href }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Abrir CCD">
-                    <i class="bi bi-filetype-pdf"></i>
-                  </a>
-                @else
-                  <span class="text-secondary">—</span>
-                @endif
-
-              @else
-                <div class="btn-group">
-                  <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-filetype-pdf me-1"></i> CCD ({{ $docs->count() }})
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    @foreach($docs as $d)
-                      @php
-                        $href = $d->link
-                          ?: (preg_match('#^https?://#', (string)$d->pdf) ? $d->pdf : asset('storage/ccd/'.ltrim((string)$d->pdf,'/')));
-                        $name = $d->pdf
-                          ? pathinfo((string)$d->pdf, PATHINFO_FILENAME)
-                          : ( ($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id );
-                      @endphp
-                      @if($href)
-                        <li><a class="dropdown-item" href="{{ $href }}" target="_blank">{{ $name }}</a></li>
-                      @endif
-                    @endforeach
-                  </ul>
-                </div>
-              @endif
-            </td>
-            {{-- === /CELDA CCD === --}}
-
 
             <td class="text-nowrap">
               <span class="badge rounded-pill text-bg-light border">{{ $cnt }} pago(s)</span>
