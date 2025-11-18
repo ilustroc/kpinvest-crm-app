@@ -7,14 +7,13 @@
       <span style="opacity:.8"> — DNI {{ $dni }}@if(!empty($cliente)) - Cliente: {{ $cliente }}@endif</span>
     </td>
   </tr>
-  <tr><td style="border:1px solid #e5e7eb;border-top:none;padding:18px;border-radius:0 0 10px 10px">
+    <tr><td style="border:1px solid #e5e7eb;border-top:none;padding:18px;border-radius:0 0 10px 10px">
     <p>Estimado(a) usuario,</p>
     <p>Se requiere su atención para el siguiente caso:</p>
     <table width="100%" cellpadding="6" cellspacing="0" style="background:#f8fafc;border:1px solid #eef2f7;border-radius:8px">
       <tr><td width="34%"><b>{{ $lblNro }}</b></td><td>{{ $nro }}</td></tr>
       <tr><td><b>Cliente</b></td><td>{{ $cliente }}</td></tr>
       <tr><td><b>Documento</b></td><td>{{ $dni }}</td></tr>
-      <tr><td><b>Procede de</b></td><td>{{ $procede }}</td></tr>
       @if(!empty($operacion))
         <tr><td><b>Operación</b></td><td>{{ $operacion }}</td></tr>
       @endif
