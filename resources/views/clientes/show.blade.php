@@ -1269,36 +1269,35 @@
     });
   })();
   (() => {
-    // Evita doble submit en TODOS los forms con data-once
     document.querySelectorAll('form[data-once]').forEach(form => {
       let locked = false;
 
       form.addEventListener('submit', (ev) => {
-        // Si ya se envió una vez, no permitimos otro submit
         if (locked) {
           ev.preventDefault();
           return false;
         }
 
-        // Si el form no pasa validación HTML5, no bloqueamos
         if (!form.checkValidity()) {
           return;
         }
 
-        // Primera vez: bloqueamos y dejamos que el submit continúe normal
         locked = true;
         form.setAttribute('aria-busy', 'true');
 
-        // Deshabilita todos los controles
+        // Deshabilita TODOS menos _token y _method
         form.querySelectorAll('input, select, textarea, button').forEach(el => {
+          const name = el.getAttribute('name');
+          if (name === '_token' || name === '_method') return;
           el.disabled = true;
         });
 
-        // Cambia texto de los botones submit por spinner
+        // Spinner en botón submit
         form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
           if (btn.tagName === 'BUTTON') {
             btn.dataset.prev = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...';
+            btn.innerHTML =
+              '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...';
           }
         });
       }, { capture: true });
