@@ -585,7 +585,7 @@
   <div class="modal fade" id="modalPropuesta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
-        <form method="POST" action="{{ route('clientes.promesas.store', $dni) }}" id="formPropuesta" data-one>
+        <form method="POST" action="{{ route('clientes.promesas.store', $dni) }}" id="formPropuesta" data-once>
           @csrf
 
           <div class="modal-header">
@@ -730,7 +730,7 @@
   {{-- ===== Modal: Solicitar Carta de No Adeudo (CNA) ===== --}}
   <div class="modal fade" id="modalCna" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <form class="modal-content" method="POST" action="{{ route('clientes.cna.store', $dni) }}" data-one>
+      <form class="modal-content" method="POST" action="{{ route('clientes.cna.store', $dni) }}" data-once>  
         @csrf
         <div class="modal-header">
           <h6 class="modal-title d-flex align-items-center gap-2">
