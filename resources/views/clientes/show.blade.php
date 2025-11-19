@@ -1269,15 +1269,18 @@
     });
   })();
   (() => {
+    // Evita doble submit en formularios con data-once
     document.querySelectorAll('form[data-once]').forEach(form => {
       let locked = false;
 
       form.addEventListener('submit', (ev) => {
+        // Si ya se envió una vez, no dejamos enviar de nuevo
         if (locked) {
           ev.preventDefault();
           return false;
         }
 
+        // Si el form no pasa validación HTML5, no bloqueamos
         if (!form.checkValidity()) {
           return;
         }
@@ -1285,20 +1288,19 @@
         locked = true;
         form.setAttribute('aria-busy', 'true');
 
-        // Deshabilita TODOS menos _token y _method
-        form.querySelectorAll('input, select, textarea, button').forEach(el => {
-          const name = el.getAttribute('name');
-          if (name === '_token' || name === '_method') return;
-          el.disabled = true;
-        });
-
-        // Spinner en botón submit
+        // SOLO deshabilita los botones de submit
         form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
+          btn.disabled = true;
           if (btn.tagName === 'BUTTON') {
             btn.dataset.prev = btn.innerHTML;
             btn.innerHTML =
               '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...';
           }
+        });
+
+        // Bloquear Enter adicional mientras está bloqueado
+        form.addEventListener('keydown', (e) => {
+          if (locked && e.key === 'Enter') e.preventDefault();
         });
       }, { capture: true });
     });
