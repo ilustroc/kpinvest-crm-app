@@ -1269,48 +1269,39 @@
     });
   })();
   (() => {
-    // Evita doble click / enter / submit repetido en TODOS los forms con data-once
+    // Evita doble submit en TODOS los forms con data-once
     document.querySelectorAll('form[data-once]').forEach(form => {
       let locked = false;
 
-      // Al hacer click en el botón submit: valida y bloquea inmediatamente
-      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
-        btn.addEventListener('click', (ev) => {
-          if (locked) { ev.preventDefault(); return false; }
-          // Si el form no pasa validación HTML5, no bloqueamos
-          if (!form.checkValidity()) { return; }
-          lock();
-        }, { capture:true });
-      });
-
-      // Por si el submit se dispara por Enter u otro submitter
       form.addEventListener('submit', (ev) => {
-        if (locked) { ev.preventDefault(); return false; }
-        // Si algo evita el submit (HTML5), no bloqueamos
-        if (!form.checkValidity()) { return; }
-        lock();
-      }, { capture:true });
+        // Si ya se envió una vez, no permitimos otro submit
+        if (locked) {
+          ev.preventDefault();
+          return false;
+        }
 
-      function lock(){
+        // Si el form no pasa validación HTML5, no bloqueamos
+        if (!form.checkValidity()) {
+          return;
+        }
+
+        // Primera vez: bloqueamos y dejamos que el submit continúe normal
         locked = true;
         form.setAttribute('aria-busy', 'true');
 
         // Deshabilita todos los controles
-        form.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = true);
+        form.querySelectorAll('input, select, textarea, button').forEach(el => {
+          el.disabled = true;
+        });
 
-        // Cambia texto del/los botones submit por spinner
+        // Cambia texto de los botones submit por spinner
         form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(btn => {
           if (btn.tagName === 'BUTTON') {
             btn.dataset.prev = btn.innerHTML;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Enviando...';
           }
         });
-
-        // Bloquea Enter adicional
-        form.addEventListener('keydown', (e) => {
-          if (locked && e.key === 'Enter') e.preventDefault();
-        });
-      }
+      }, { capture: true });
     });
   })();
 </script>
