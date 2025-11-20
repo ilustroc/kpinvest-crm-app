@@ -48,6 +48,7 @@ class CnaController extends Controller
 
             // Producto de referencia (opcional)
             $productoAuto = DB::table('clientes_cuentas')
+                ->where('numdoc', $dni)
                 ->whereIn('operacion', $ops)
                 ->whereNotNull('producto')
                 ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
@@ -55,10 +56,20 @@ class CnaController extends Controller
             // Cosecha única + entidad (derivadas de las operaciones)
             $rowsOps = DB::table('clientes_cuentas')
                 ->select('operacion','cosecha','entidad')
+                ->where('numdoc', $dni)
                 ->whereIn('operacion', $ops)
                 ->get();
 
+            $opsEncontradas = $rowsOps->pluck('operacion')->map('strval')->values();
+            $missing = collect($ops)->diff($opsEncontradas);
+            if ($missing->isNotEmpty()) {
+                return back()->withErrors('Las operaciones ('.implode(', ', $missing->all()).') no pertenecen al DNI '.$dni.'.');
+            }
+
             $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
+            if ($cosechas->isEmpty()) {
+                return back()->withErrors('No se encontró información de cosecha para la(s) operación(es) seleccionada(s).');
+            }
             if ($cosechas->count() !== 1) {
                 return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
             }
