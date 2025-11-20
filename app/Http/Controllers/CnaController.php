@@ -29,7 +29,7 @@ class CnaController extends Controller
                 'monto_pagado'          => ['required','numeric','min:0.01','max:999999999.99'],
                 'operaciones'           => ['required','array','min:1'],
                 'operaciones.*'         => ['string','max:50'],
-                'cuenta'                => ['nullable','string','max:50'],
+                'cuenta'                => ['nullable','string','max:50'], // se ignora; solo por compat.
             ], [], [
                 'fecha_pago_realizado'  => 'fecha de pago realizado',
                 'monto_pagado'          => 'monto pagado',
@@ -41,48 +41,51 @@ class CnaController extends Controller
                 return back()->withErrors('Selecciona al menos una operación para la CNA.');
             }
 
-            // Titular (tu tabla no tiene 'titular': usa 'nombre')
+            // Titular (en tu tabla el nombre está en 'nombre')
             $titular = $data['titular'] ?? DB::table('clientes_cuentas')
                 ->where('numdoc', $dni)
                 ->value('nombre');
 
-            // Producto de referencia (opcional)
-            $productoAuto = DB::table('clientes_cuentas')
-                ->where('numdoc', $dni)
-                ->whereIn('operacion', $ops)
-                ->whereNotNull('producto')
-                ->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
-
-            // Cosecha única + entidad (derivadas de las operaciones)
+            // Trae filas del propio DNI para esas operaciones
             $rowsOps = DB::table('clientes_cuentas')
-                ->select('operacion','cosecha','entidad')
+                ->select('operacion','cosecha','entidad','producto')
                 ->where('numdoc', $dni)
                 ->whereIn('operacion', $ops)
                 ->get();
 
+            // Asegura que las ops sí pertenecen al DNI
             $opsEncontradas = $rowsOps->pluck('operacion')->map('strval')->values();
             $missing = collect($ops)->diff($opsEncontradas);
             if ($missing->isNotEmpty()) {
-                return back()->withErrors('Las operaciones ('.implode(', ', $missing->all()).') no pertenecen al DNI '.$dni.'.');
+                return back()->withErrors(
+                    'Las operaciones ('.implode(', ', $missing->all()).') no pertenecen al DNI '.$dni.'.'
+                );
             }
 
-            $cosechas = $rowsOps->pluck('cosecha')->filter()->unique()->values();
-            if ($cosechas->isEmpty()) {
-                return back()->withErrors('No se encontró información de cosecha para la(s) operación(es) seleccionada(s).');
-            }
-            if ($cosechas->count() !== 1) {
-                return back()->withErrors('Todas las operaciones deben ser de la MISMA cosecha.');
-            }
-            $cosecha = (string) $cosechas->first();
+            // Producto de referencia (solo informativo)
+            $productoAuto = $rowsOps->pluck('producto')->filter()->unique()->implode(' / ') ?: null;
 
-            $origen = $this->originFromCosecha($cosecha);
+            // Referencia de cosecha: la más frecuente (no se exige que todas sean iguales)
+            $cosechaRef = $rowsOps->pluck('cosecha')->filter()->countBy()->sortDesc()->keys()->first();
+            $cosechaRef = $cosechaRef ? (string)$cosechaRef : null;
+
+            // Determinar origen para la serie
+            $origen = $cosechaRef ? $this->originFromCosecha($cosechaRef) : null;
             if (!$origen) {
-                return back()->withErrors('Cosecha no reconocida: "'.$cosecha.'".');
+                // Fallback simple por entidad si no hay cosecha clara
+                $entRef = strtoupper((string)($rowsOps->pluck('entidad')->filter()->first() ?? ''));
+                if (str_contains($entRef, 'COMPARTAMOS'))      $origen = 'COMPARTAMOS_1';
+                elseif (str_contains($entRef, 'CONFIANZA'))    $origen = 'CONFIANZA_1';
+                elseif (str_contains($entRef, 'AREQUIPA'))     $origen = 'AQP1';
+                elseif (str_contains($entRef, 'BBVA'))         $origen = 'BBVA_1_2';
+            }
+            if (!$origen) {
+                return back()->withErrors('No se pudo determinar el origen para numeración (cosecha/entidad).');
             }
 
             ['serie' => $serie, 'suffix' => $suffix] = $this->seriesConfig($origen);
 
-            // Crear con correlativo (lock de tabla para evitar colisiones)
+            // Crear con correlativo (lock para evitar colisiones)
             $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
                 DB::table('cna_solicitudes')->lockForUpdate()->get();
                 $next = $this->nextCartaForSerie($serie, $suffix);
@@ -93,7 +96,7 @@ class CnaController extends Controller
                     'dni'                  => $dni,
                     'titular'              => $titular,
                     'producto'             => $productoAuto,
-                    'operaciones'          => $ops, // cast array -> JSON/TEXT
+                    'operaciones'          => $ops, // cast array -> JSON/TEXT en el modelo
                     'nota'                 => $data['nota'] ?? null,
                     'observacion'          => $data['observacion'] ?? null,
                     'fecha_pago_realizado' => $data['fecha_pago_realizado'],
@@ -105,7 +108,6 @@ class CnaController extends Controller
 
             WorkflowMailer::cnaPendiente($solicitud);
 
-            // PRG: vuelve a la ficha del cliente
             return redirect()->route('clientes.show', $dni)
                 ->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
         } catch (\Throwable $e) {
