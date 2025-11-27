@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use App\Models\PagoPropia as Pago;
 use App\Models\ClienteCuenta;
 use App\Models\CcdCliente;
@@ -45,8 +46,9 @@ class ClienteController extends Controller
 
             // === PAGOS
             $pagos = Pago::query()
-                ->where('dni',$dni)->orderByDesc('fecha')
-                ->get(['fecha','dni','operacion','entidad','nombre_cliente','monto_pagado','gestor','cosecha','cuenta_recaudo']);
+                ->where('dni', $dni)
+                ->orderByDesc('fecha')
+                ->get(['id','fecha','dni','operacion','entidad','nombre_cliente','monto_pagado','gestor','cosecha','cuenta_recaudo']);
             $totPagos = (float) $pagos->sum('monto_pagado');
 
             // === CCD
@@ -185,7 +187,8 @@ class ClienteController extends Controller
                 'dni','titular','cuentas','pagos','promesas',
                 'ccdDocs','ccdByDni','ccdByCodigo',
                 'ccdByCosecha','ccdCosechaKeys',
-                'cnasByCuenta','cnasByOperacion','pagosGrouped','nextNroCarta','totPagos'
+                'cnasByCuenta','cnasByOperacion',
+                'pagosGrouped','nextNroCarta','totPagos'
             ));
         } catch (Throwable $e) {
             if ($e instanceof HttpExceptionInterface) throw $e;
@@ -220,4 +223,28 @@ class ClienteController extends Controller
 
         return $c;
     }
+
+    // Acción para eliminar pagos (POST)
+    public function deletePagos(Request $r, string $dni)
+    {
+        $role = strtolower((string) optional(Auth::user())->role);
+        if (!in_array($role, ['administrador','sistemas','supervisor','soporte'])) {
+            abort(403, 'No autorizado');
+        }
+
+        $ids = collect($r->input('ids', []))
+            ->map(fn($v) => (int)$v)
+            ->filter()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return back()->with('error', 'No seleccionaste pagos.');
+        }
+
+        // Borra solo pagos que realmente pertenecen al DNI
+        $count = Pago::whereIn('id', $ids)->where('dni', $dni)->delete();
+
+        return back()->with('msg', "Pagos eliminados: {$count}");
+    }
+
 }

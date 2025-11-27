@@ -65,6 +65,7 @@ Route::middleware(['auth','active'])->group(function () {
     
         Route::post('/{dni}/promesas', [PromesaController::class,'store'])->name('clientes.promesas.store');
         Route::post('/{dni}/cnas',     [CnaController::class, 'store'])->name('clientes.cna.store');
+        Route::post('/{dni}/pagos/delete', [ClienteController::class, 'deletePagos'])->name('clientes.pagos.delete');
     });
 
     /*
