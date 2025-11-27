@@ -289,11 +289,6 @@
                     <th class="text-end" id="crono_total">0.00</th>
                     <th></th>
                   </tr>
-                  <tr id="fila_balon" class="d-none">
-                    <th colspan="2" class="text-end">Cuota balón (Capital – Convenio)</th>
-                    <th class="text-end" id="crono_balon">0.00</th>
-                    <th></th>
-                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -636,19 +631,6 @@
       });
       cronoTotal.textContent = fmt(sum);
       cronoWrap.classList.remove('d-none');
-
-      // “Cuota balón (Capital – Convenio)” SOLO si hasBalon === true
-      const capitalRaw  = parseFloat(btn.dataset.capitalRaw || '0');
-      const convenioRaw = parseFloat(btn.dataset.totalconvenioRaw || String(sum));
-      const balon = Math.max(capitalRaw - convenioRaw, 0);
-
-      if (hasBalon) {
-        filaBalon.classList.remove('d-none');
-        cronoBalon.textContent = fmt(balon);
-      } else {
-        filaBalon.classList.add('d-none');
-        cronoBalon.textContent = '0.00';
-      }
     });
   });
 
