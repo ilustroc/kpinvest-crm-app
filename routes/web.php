@@ -20,11 +20,9 @@ use App\Http\Controllers\ReportePromesasController;
 use App\Http\Controllers\IntegracionCcdController;
 use App\Http\Controllers\IntegracionAsignarController;
 
-/*
-|--------------------------------------------------------------------------
-| Invitados
-|--------------------------------------------------------------------------
-*/
+// --------------------------------------------------------------------------
+// Rutas Web
+// --------------------------------------------------------------------------
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'form'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
