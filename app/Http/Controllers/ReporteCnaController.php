@@ -51,9 +51,9 @@ class ReporteCnaController extends Controller
                 (string)$r->documento,
                 (string)$r->cliente,
                 (string)$r->cna_nro,
-                (string)$r->cna_fec,          // Y-m-d H:i:s
+                (string)$r->cna_fec,
                 (string)$r->fondo_inv,
-                (string)$r->anio_mes,         // YYYY-MM
+                (string)$r->anio_mes,
                 $r->cna_imp !== null ? (float)$r->cna_imp : '',
                 (string)$r->nro_cuenta,
                 (string)$r->nro_operacion,
