@@ -54,11 +54,11 @@ Route::middleware(['auth','active'])->group(function () {
     | Clientes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('clientes')->group(function () {
+    Route::prefix('clientes')->middleware('block.cliente')->group(function () {
         Route::get('/suggest', [ClienteLookupController::class,'suggest'])->name('clientes.suggest');
         Route::get('/lookup',  [ClienteLookupController::class,'quickLookup'])->name('clientes.quick');
         Route::get('/{dni}',   [ClienteController::class,'show'])->name('clientes.show');
-    
+
         Route::post('/{dni}/promesas', [PromesaController::class,'store'])->name('clientes.promesas.store');
         Route::post('/{dni}/cnas',     [CnaController::class, 'store'])->name('clientes.cna.store');
         Route::post('/{dni}/pagos/delete', [ClienteController::class, 'deletePagos'])->name('clientes.pagos.delete');

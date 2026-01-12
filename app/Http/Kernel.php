@@ -22,6 +22,7 @@ class Kernel extends HttpKernel
         'active' => \App\Http\Middleware\EnsureUserIsActive::class,
         'role' => \App\Http\Middleware\RoleMiddleware::class,
         'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+        'block.cliente' => \App\Http\Middleware\BlockClienteAccess::class,
     ];
     
     protected $middlewareGroups = [
