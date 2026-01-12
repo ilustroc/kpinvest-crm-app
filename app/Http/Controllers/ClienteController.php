@@ -212,7 +212,6 @@ class ClienteController extends Controller
         ];
         if (isset($direct[$c])) return $direct[$c];
 
-        // CONFIANZA_4  -> CONFIANZA4
         if (preg_match('/^CONFIANZA_(\d{1,2})$/', $c, $m)) return 'CONFIANZA'.$m[1];
 
         // COMPARTAMOS_1 -> COMPARTAMOS1

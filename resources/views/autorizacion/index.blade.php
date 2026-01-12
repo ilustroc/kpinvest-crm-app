@@ -143,7 +143,7 @@
                   data-nota-gen="{{ $p->nota ?? '' }}"
                   data-crono='@json($crono)'
                   data-hasbalon="{{ $hasBalon ? 1 : 0 }}"
-                  data-cuentas='@json($p->cuentas_json ?? [])'
+                  data-cuentas='@json($p->cuentas_cliente_json ?? [])'
                   data-bs-toggle="modal" data-bs-target="#modalFicha">
                   Ver ficha
                 </button>
@@ -182,7 +182,6 @@
       </div>
     </div>
   </div>
-  {{-- ====== /Promesas ====== --}}
 
   {{-- Modal RECHAZO (nota obligatoria) --}}
   <div class="modal fade" id="modalRechazo" tabindex="-1" aria-hidden="true">
@@ -203,9 +202,8 @@
       </form>
     </div>
   </div>
-  {{-- /Modal RECHAZO --}}
 
-  {{-- Modal de NOTA (para Pre-aprobar / Aprobar) --}}
+  {{-- Modal de NOTA --}}
   <div class="modal fade" id="modalNotaEstado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <form class="modal-content" id="formNotaEstado" method="POST" action="#">
@@ -226,7 +224,7 @@
     </div>
   </div>
 
-  {{-- Modal FICHA (Datos generales + acordeón por cuenta + cronograma) --}}
+  {{-- Modal FICHA --}}
   <div class="modal fade" id="modalFicha" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -301,7 +299,6 @@
       </div>
     </div>
   </div>
-  {{-- /Modal FICHA --}}
 
   {{-- ====== Solicitudes de CNA ====== --}}
   <div class="card mt-4">
@@ -401,7 +398,6 @@
       </div>
     </div>
   </div>
-  {{-- ====== /Solicitudes de CNA ====== --}}
 
   {{-- Modal: Ficha CNA + pagos --}}
   <div class="modal fade" id="modalCnaFicha" tabindex="-1" aria-hidden="true">
@@ -556,9 +552,7 @@
           cuentas = raw ? JSON.parse(raw) : [];
         } catch(e) { cuentas = []; }
 
-        setRaw('f_op', cuentas.length
-          ? cuentas.map(c=>c.operacion).join(', ')
-          : (btn.dataset.operacion || '—'));
+        setRaw('f_op', btn.dataset.operacion || '—');
 
         if (!cuentas.length) {
           acc.innerHTML = '<div class="text-secondary small">No se encontraron cuentas asociadas.</div>';

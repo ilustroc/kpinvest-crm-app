@@ -18,9 +18,7 @@ class AutorizacionController extends Controller
 {
     use HasTeamVisibility;
 
-    /**
-     * Bandeja de autorización (Promesas + CNA).
-     */
+    // Lista de promesas de pago para autorización (supervisor/admin).
     public function index(Request $req)
     {
         $user    = Auth::user();
@@ -42,9 +40,9 @@ class AutorizacionController extends Controller
         if ($q !== '') {
             $promesas->where(function ($x) use ($q) {
                 $x->where('promesas_pago.dni', 'like', "%{$q}%")
-                  ->orWhere('promesas_pago.nota', 'like', "%{$q}%")
-                  ->orWhere('promesas_pago.operacion', 'like', "%{$q}%")
-                  ->orWhereHas('operaciones', fn($qq) => $qq->where('operacion', 'like', "%{$q}%"));
+                ->orWhere('promesas_pago.nota', 'like', "%{$q}%")
+                ->orWhere('promesas_pago.operacion', 'like', "%{$q}%")
+                ->orWhereHas('operaciones', fn($qq) => $qq->where('operacion', 'like', "%{$q}%"));
             });
         }
 
@@ -64,10 +62,12 @@ class AutorizacionController extends Controller
             ->orderByDesc('promesas_pago.fecha_promesa')
             ->get();
 
-        // ===== Prefetch por DNI (fallback de operaciones). clientes_cuentas usa numdoc
+        // ===== DNIs
         $dnis = $rows->pluck('dni')->filter()->unique()->values()->all();
+
+        // ===== Prefetch operaciones por DNI (fallback)
         $opsByDni = [];
-        if ($dnis) {
+        if (!empty($dnis)) {
             $opsByDni = DB::table('clientes_cuentas')
                 ->select(['numdoc as dni', 'operacion'])
                 ->whereIn('numdoc', $dnis)
@@ -77,7 +77,53 @@ class AutorizacionController extends Controller
                 ->all();
         }
 
-        // ===== Cargar info de cuentas por operación (incluye fecha_castigo)
+        // ===== Cliente/Titular por DNI (NO por operación)
+        $clienteByDni = [];
+        if (!empty($dnis)) {
+            $clienteByDni = DB::table('clientes_cuentas')
+                ->select(['numdoc as dni', DB::raw('MAX(nombre) as titular')])
+                ->whereIn('numdoc', $dnis)
+                ->groupBy('numdoc')
+                ->pluck('titular', 'dni')
+                ->all();
+        }
+
+        // ===== TODAS las cuentas del cliente por DNI (para el acordeón "Cuentas incluidas")
+        $ccAllByDni = [];
+        if (!empty($dnis)) {
+            $ccAllByDni = DB::table('clientes_cuentas')
+                ->select([
+                    'numdoc as dni',
+                    'operacion',
+                    'entidad',
+                    'cosecha',
+                    'producto',
+                    'deuda_capital',
+                    'deuda_total',
+                    'fecha_castigo',
+                ])
+                ->whereIn('numdoc', $dnis)
+                ->orderBy('operacion')
+                ->get()
+                ->groupBy('dni')
+                ->map(function ($g) {
+                    return $g->map(function ($cc) {
+                        return [
+                            'operacion'     => (string)$cc->operacion,
+                            'entidad'       => (string)($cc->entidad ?? ''),
+                            'cosecha'       => (string)($cc->cosecha ?? ''),
+                            'producto'      => (string)($cc->producto ?? ''),
+                            'saldo_capital' => (float)($cc->deuda_capital ?? 0),
+                            'deuda_total'   => (float)($cc->deuda_total   ?? 0),
+                            'fecha_castigo' => $cc->fecha_castigo ? (string)$cc->fecha_castigo : null,
+                            'anio_castigo'  => $cc->fecha_castigo ? (int)substr((string)$cc->fecha_castigo, 0, 4) : null,
+                        ];
+                    })->values();
+                })
+                ->all();
+        }
+
+        // ===== Cargar info de cuentas por operación (solo para las ops de las promesas)
         $opsAll = $rows->flatMap(function ($p) use ($opsByDni) {
                 if ($p->relationLoaded('operaciones') && $p->operaciones->count()) {
                     return $p->operaciones->pluck('operacion');
@@ -109,11 +155,12 @@ class AutorizacionController extends Controller
         }
 
         // ===== Enriquecer filas de promesas
-        $rows = $rows->map(function ($p) use ($opsByDni, $ccByOp) {
+        $rows = $rows->map(function ($p) use ($opsByDni, $ccByOp, $clienteByDni, $ccAllByDni) {
 
             $ops = $p->relationLoaded('operaciones') && $p->operaciones->count()
                 ? $p->operaciones->pluck('operacion')->map(fn($x) => (string)$x)->values()
                 : collect(array_filter(array_map('trim', explode(',', (string)($p->operacion ?? '')))));
+
             if ($ops->isEmpty()) {
                 $ops = collect($opsByDni[$p->dni] ?? []);
             }
@@ -122,8 +169,7 @@ class AutorizacionController extends Controller
             $p->ops_list  = $ops->values();
 
             $sumCap = 0.0; $sumDeu = 0.0;
-            $titulares = collect();
-            $cuentas = [];
+            $cuentasIncluidas = [];
 
             foreach ($ops as $op) {
                 $cc = $ccByOp[$op] ?? null;
@@ -132,9 +178,7 @@ class AutorizacionController extends Controller
                 $sumCap += (float)($cc->deuda_capital ?? 0);
                 $sumDeu += (float)($cc->deuda_total   ?? 0);
 
-                if (!empty($cc->titular)) $titulares->push($cc->titular);
-
-                $cuentas[] = [
+                $cuentasIncluidas[] = [
                     'operacion'     => (string)$cc->operacion,
                     'entidad'       => (string)($cc->entidad ?? ''),
                     'cosecha'       => (string)($cc->cosecha ?? ''),
@@ -146,16 +190,25 @@ class AutorizacionController extends Controller
                 ];
             }
 
-            $p->titular       = $titulares->filter()->unique()->implode(' / ');
+            // ✅ Titular por DNI
+            $p->titular = (string)($clienteByDni[$p->dni] ?? '—');
+
+            // Totales solo de operaciones incluidas en la promesa
             $p->deuda_total   = $sumDeu;
             $p->saldo_capital = $sumCap;
-            $p->cuentas_json  = $cuentas;
+
+            // Cuentas incluidas (promesa)
+            $p->cuentas_json  = $cuentasIncluidas;
+
+            // ✅ Todas las operaciones del cliente (por DNI)
+            $p->cuentas_cliente_json = $ccAllByDni[$p->dni] ?? [];
 
             return $p;
         });
 
         // ===== Cronogramas (si existe tabla promesa_cuotas)
         $ids = $rows->pluck('id')->filter()->all();
+
         $cuotasById = collect();
         if (!empty($ids) && Schema::hasTable('promesa_cuotas')) {
             $cuotasById = DB::table('promesa_cuotas')
@@ -165,6 +218,7 @@ class AutorizacionController extends Controller
                 ->get()
                 ->groupBy('promesa_id');
         }
+
         $rows = $rows->map(function ($p) use ($cuotasById) {
             $list = $cuotasById[$p->id] ?? collect();
             $p->has_balon   = (int)$list->contains('es_balon', 1);
@@ -189,9 +243,9 @@ class AutorizacionController extends Controller
         if ($q !== '') {
             $cnaBase->where(function ($x) use ($q) {
                 $x->where('dni', 'like', "%{$q}%")
-                  ->orWhere('nro_carta', 'like', "%{$q}%")
-                  ->orWhere('producto', 'like', "%{$q}%")
-                  ->orWhere('observacion', 'like', "%{$q}%");
+                ->orWhere('nro_carta', 'like', "%{$q}%")
+                ->orWhere('producto', 'like', "%{$q}%")
+                ->orWhere('observacion', 'like', "%{$q}%");
             });
         }
 
@@ -200,6 +254,7 @@ class AutorizacionController extends Controller
         } else {
             $cnaBase->where('workflow_estado', 'preaprobada');
         }
+
         if (!empty($status)) {
             $cnaBase->where('workflow_estado', $status);
         }
@@ -207,10 +262,9 @@ class AutorizacionController extends Controller
         $cnaRows = $cnaBase->orderByDesc('created_at')
             ->paginate(10, ['*'], 'page_cna');
 
-        /** @var \Illuminate\Pagination\LengthAwarePaginator $cnaRows */
         $cnaRows->withQueryString();
 
-        // Producto por operación (para la bandeja CNA)
+        // Producto por operación (para bandeja CNA)
         $opsAllCna = collect($cnaRows->items())
             ->flatMap(fn($c) => (array)($c->operaciones ?? []))
             ->filter()->map(fn($op) => (string)$op)->unique()->values()->all();
@@ -226,8 +280,8 @@ class AutorizacionController extends Controller
         }
 
         return view('autorizacion.index', [
-            'rows'         => $rows,           // Promesas (colección enriquecida)
-            'cnaRows'      => $cnaRows,        // CNA (paginado)
+            'rows'         => $rows,
+            'cnaRows'      => $cnaRows,
             'prodByOp'     => $prodByOp,
             'q'            => $q,
             'isSupervisor' => strtolower($user->role) === 'supervisor',
