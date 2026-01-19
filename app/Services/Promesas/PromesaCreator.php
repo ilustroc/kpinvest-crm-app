@@ -27,6 +27,20 @@ class PromesaCreator
         $cronMontos = array_map(fn($m)=>(float)$m, (array)$r->input('cron_monto', []));
         $cronBalon  = (int)$r->input('cron_balon', 0);
 
+        if (in_array($tipo, ['convenio','convenio_balon'], true)) {
+            $montoConvenio = round((float)$r->input('monto_convenio', 0), 2);
+            $sumCrono = round(array_sum($cronMontos), 2);
+
+            if (abs($sumCrono - $montoConvenio) > 0.01) {
+                throw new \RuntimeException('El Monto convenio no coincide con la suma del cronograma.');
+            }
+
+            $n = max(1, (int)$r->input('nro_cuotas'));
+            if (count($cronMontos) !== $n || count($cronFechas) !== $n) {
+                throw new \RuntimeException('El cronograma debe tener la misma cantidad de cuotas que "Nro cuotas".');
+            }
+        }
+        
         DB::beginTransaction();
         try {
             $base = [

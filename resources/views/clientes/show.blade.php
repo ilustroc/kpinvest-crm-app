@@ -717,7 +717,12 @@
                     <tfoot>
                       <tr>
                         <td colspan="2" class="text-end fw-bold">Total cronograma</td>
-                        <td><span id="cvSuma" class="fw-bold">0.00</span></td>
+                        <td>
+                          <span id="cvSuma" class="fw-bold">0.00</span>
+                          <div id="cvErr" class="small text-danger mt-1 d-none">
+                            El total del cronograma debe coincidir con el Monto convenio.
+                          </div>
+                        </td>
                       </tr>
                     </tfoot>
                   </table>
@@ -874,6 +879,7 @@
     const formConv  = document.getElementById('formConvenio');
     const formCanc  = document.getElementById('formCancelacion');
     const hintBalon = document.getElementById('hintBalon');
+    const err = document.getElementById('cvErr');
 
     // Convenio fields
     const nro   = document.getElementById('cvNro');
@@ -980,6 +986,7 @@
       const ok = Math.abs(s - convenio) <= 0.01;
       if (btnGuardar) btnGuardar.disabled = !ok;
       if (suma) suma.classList.toggle('text-danger', !ok);
+      if (err) err.classList.toggle('d-none', ok);
     }
 
     function genAuto(){
@@ -1022,9 +1029,30 @@
     });
 
     // Enviar índice de la cuota balón (última fila) solo cuando aplique
-    document.getElementById('formPropuesta')?.addEventListener('submit', () => {
-      if (cronBalonInput) cronBalonInput.value = ''; // no usamos cuota balón
-    });
+    document.getElementById('formPropuesta')?.addEventListener('submit', (e) => {
+      const t = (tipoSel?.value || '').toLowerCase();
+      const isConv = (t === 'convenio' || t === 'convenio_balon');
+      if (!isConv) return; // cancelación no valida cronograma
+
+      // recalcula antes de enviar
+      const convenio = num(total?.value);
+      const rows = tbl ? [...tbl.querySelectorAll('tr')] : [];
+      let s = 0;
+      rows.forEach(tr => s += num(tr.querySelector('.cr-monto')?.value));
+
+      const ok = Math.abs(s - convenio) <= 0.01;
+
+      if (!ok) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (suma) suma.classList.add('text-danger');
+        if (err) err.classList.remove('d-none');
+
+        alert('No se puede guardar: el total del cronograma debe coincidir con el Monto convenio.');
+      }
+    }, true);
+
 
     // ====== Selección de cuentas (chips + ocultos) ======
     const chkAll   = document.getElementById('chkAll');
