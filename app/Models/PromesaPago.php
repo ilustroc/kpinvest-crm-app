@@ -20,7 +20,6 @@ class PromesaPago extends Model
         'dni','operacion','fecha_promesa','monto','nota','user_id','telefono',
         // Estados
         'workflow_estado',        // pendiente|preaprobada|aprobada|rechazada|rechazada_sup
-        'cumplimiento_estado',    // pendiente|cumplida|caida
         'estado',                 // legacy (espejo de workflow_estado)
 
         // Tipo (convenio|cancelacion)
@@ -61,7 +60,7 @@ class PromesaPago extends Model
         // Nombres por id
         'aprobado_por_name','pre_aprobado_por_name','rechazado_por_name',
         // Labels / badges
-        'workflow_estado_label','tipo_label','cumplimiento_estado_label',
+        'workflow_estado_label','tipo_label',
         'workflow_badge_class','tipo_badge_class',
     ];
 
@@ -116,8 +115,6 @@ class PromesaPago extends Model
     public function scopePreAprobadas(Builder $q) { return $q->where('workflow_estado','preaprobada'); }
     public function scopeAprobadas(Builder $q)    { return $q->where('workflow_estado','aprobada'); }
     public function scopeRechazadas(Builder $q)   { return $q->whereIn('workflow_estado',['rechazada','rechazada_sup']); }
-    public function scopeCumplidas(Builder $q)    { return $q->where('cumplimiento_estado','cumplida'); }
-    public function scopeCaidas(Builder $q)       { return $q->where('cumplimiento_estado','caida'); }
 
     /* ------------------------------ Helpers -------------------------------- */
 
@@ -152,19 +149,6 @@ class PromesaPago extends Model
                 'rechazada_sup' => ['secondary','Rechazada (Sup)'],
             ];
             $k = $this->workflow_estado ?: 'pendiente';
-            return $map[$k] ?? ['light', ucfirst(str_replace('_',' ', (string)$k))];
-        });
-    }
-
-    protected function cumplimientoBadge(): Attribute
-    {
-        return Attribute::get(function () {
-            $map = [
-                'pendiente' => ['secondary','Pendiente'],
-                'cumplida'  => ['success','Cumplida'],
-                'caida'     => ['danger','Caída'],
-            ];
-            $k = $this->cumplimiento_estado ?: 'pendiente';
             return $map[$k] ?? ['light', ucfirst(str_replace('_',' ', (string)$k))];
         });
     }
@@ -264,15 +248,6 @@ class PromesaPago extends Model
         return Attribute::get(function () {
             $map = ['convenio' => 'Convenio', 'cancelacion' => 'Cancelación'];
             $v = (string)($this->tipo ?? 'convenio');
-            return $map[$v] ?? ucfirst(str_replace('_',' ', $v));
-        });
-    }
-
-    protected function cumplimientoEstadoLabel(): Attribute
-    {
-        return Attribute::get(function () {
-            $map = ['pendiente'=>'Pendiente','cumplida'=>'Cumplida','caida'=>'Caída'];
-            $v = (string)($this->cumplimiento_estado ?? 'pendiente');
             return $map[$v] ?? ucfirst(str_replace('_',' ', $v));
         });
     }

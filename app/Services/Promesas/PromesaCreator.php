@@ -35,7 +35,6 @@ class PromesaCreator
                 'tipo'                => $tipo,
                 'telefono'            => $r->input('telefono'),
                 'workflow_estado'     => 'pendiente',
-                'cumplimiento_estado' => 'pendiente',
                 'user_id'             => optional(Auth::user())->id,
             ];
 
