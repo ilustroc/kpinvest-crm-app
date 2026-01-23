@@ -151,13 +151,19 @@
               <thead><tr><th>DNI</th><th>Nombre</th><th>Operación</th><th>Cosecha</th><th></th></tr></thead>
               <tbody>
               @foreach(session('quick_list') as $r)
+                @php
+                  $dni      = data_get($r, 'dni');
+                  $nombre   = data_get($r, 'nombre');
+                  $operacion= data_get($r, 'operacion');
+                  $cosecha  = data_get($r, 'cosecha');
+                @endphp
                 <tr>
-                  <td class="text-nowrap">{{ $r['dni'] ?? $r->dni }}</td>
-                  <td>{{ $r['nombre'] ?? $r->nombre }}</td>
-                  <td class="text-nowrap">{{ $r['operacion'] ?? $r->operacion }}</td>
-                  <td class="text-nowrap">{{ $r['cosecha'] ?? $r->cosecha }}</td>
+                  <td class="text-nowrap">{{ $dni }}</td>
+                  <td>{{ $nombre }}</td>
+                  <td class="text-nowrap">{{ $operacion }}</td>
+                  <td class="text-nowrap">{{ $cosecha }}</td>
                   <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" href="{{ route('clientes.show', $r['dni'] ?? $r->dni) }}">Ver</a>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ route('clientes.show', $dni) }}">Ver</a>
                   </td>
                 </tr>
               @endforeach
@@ -188,24 +194,6 @@
           </div>
         </div>
       </div>
-
-      {{-- Accesos rápidos (ocultos para asesor) --}}
-      @unless($isAsesor)
-      <div class="card pad shadow-soft quick">
-        <div class="d-flex flex-wrap gap-2">
-          <a href="{{ route('autorizacion') }}" class="btn btn-outline-primary">
-            <i class="bi bi-inboxes me-1"></i> Autorización
-          </a>
-          {{-- Se quita el acceso a "Clientes" porque el buscador ahora está aquí --}}
-          <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-graph-up me-1"></i> Dashboard
-          </a>
-          <a href="{{ route('reportes.pdp') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Reportes
-          </a>
-        </div>
-      </div>
-      @endunless
 
       {{-- Gráfica: Pagos del mes --}}
       <div class="card pad shadow-soft chart-card">
