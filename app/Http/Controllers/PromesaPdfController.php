@@ -263,10 +263,10 @@ class PromesaPdfController extends Controller
             $doc->setValue('name', (string)($creador ?? ''));
             $doc->setValue('id', str_pad((string)$promesa->id, 4, '0', STR_PAD_LEFT));
             $doc->setValue('created_at', $promesa->created_at ? $fmtDate($promesa->created_at) : '');
-            $doc->setValue('nombre',    $nombre);
+            $doc->setValue('nombre',    $this->xmlSafe($nombre));
             $doc->setValue('numdoc',    $numdoc);
             $doc->setValue('telefono',  (string)($promesa->telefono ?? ''));
-            $doc->setValue('direccion', $direccion);
+            $doc->setValue('direccion', $this->xmlSafe($direccion));
             $doc->setValue('entidad',   $entidad);
 
             // ${monto} = suma de cuotas
@@ -402,4 +402,17 @@ class PromesaPdfController extends Controller
             abort(500, 'No se pudo generar el PDF del acuerdo.');
         }
     }
+
+    // Escapa una cadena para que sea segura en XML (plantilla DOCX)
+    private function xmlSafe($v): string
+    {
+        $v = (string)($v ?? '');
+
+        // Si ya viniera con entidades (&amp;), lo normaliza primero
+        $v = html_entity_decode($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
+        // Escapa para XML (clave para DOCX)
+        return htmlspecialchars($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
 }
