@@ -72,7 +72,6 @@ class CnaController extends Controller
             // Determinar origen para la serie
             $origen = $cosechaRef ? $this->originFromCosecha($cosechaRef) : null;
             if (!$origen) {
-                // Fallback simple por entidad si no hay cosecha clara
                 $entRef = strtoupper((string)($rowsOps->pluck('entidad')->filter()->first() ?? ''));
                 if (str_contains($entRef, 'COMPARTAMOS'))      $origen = 'COMPARTAMOS_1';
                 elseif (str_contains($entRef, 'CONFIANZA'))    $origen = 'CONFIANZA_1';
@@ -85,31 +84,58 @@ class CnaController extends Controller
 
             ['serie' => $serie, 'suffix' => $suffix] = $this->seriesConfig($origen);
 
+            // ✅ Detectar si quien crea es administrador/sistemas
+            $role = strtolower((string)(Auth::user()->role ?? ''));
+            $isAdminAuto = in_array($role, ['administrador','sistemas'], true);
+            $now = now();
+
             // Crear con correlativo (lock para evitar colisiones)
-            $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix) {
+            $solicitud = DB::transaction(function () use ($dni, $data, $ops, $titular, $productoAuto, $serie, $suffix, $isAdminAuto, $now) {
                 DB::table('cna_solicitudes')->lockForUpdate()->get();
                 $next = $this->nextCartaForSerie($serie, $suffix);
 
-                return CnaSolicitud::create([
+                $payload = [
                     'correlativo'          => $next['corr'],
                     'nro_carta'            => $next['nro'],
                     'dni'                  => $dni,
                     'titular'              => $titular,
                     'producto'             => $productoAuto,
-                    'operaciones'          => $ops, // cast array -> JSON/TEXT en el modelo
+                    'operaciones'          => $ops,
                     'nota'                 => $data['nota'] ?? null,
                     'observacion'          => $data['observacion'] ?? null,
                     'fecha_pago_realizado' => $data['fecha_pago_realizado'],
                     'monto_pagado'         => $data['monto_pagado'],
-                    'workflow_estado'      => 'pendiente',
                     'user_id'              => Auth::id(),
-                ]);
+                ];
+
+                if ($isAdminAuto) {
+                    // ✅ se aprueba directo
+                    $payload['workflow_estado']  = 'aprobada';
+                    $payload['pre_aprobado_por'] = Auth::id();
+                    $payload['pre_aprobado_at']  = $now;
+                    $payload['aprobado_por']     = Auth::id();
+                    $payload['aprobado_at']      = $now;
+                } else {
+                    $payload['workflow_estado']  = 'pendiente';
+                }
+
+                return CnaSolicitud::create($payload);
             });
 
+            // ✅ Si es admin: generar DOCX+PDF y NO mandar correos
+            if ($isAdminAuto) {
+                $this->generateOutputsFromTemplate($solicitud);
+
+                return redirect()->route('clientes.show', $dni)
+                    ->with('ok', "CNA APROBADA automáticamente. N.º {$solicitud->nro_carta}");
+            }
+
+            // ✅ Caso normal: enviar correo de pendiente
             WorkflowMailer::cnaPendiente($solicitud);
 
             return redirect()->route('clientes.show', $dni)
                 ->with('ok', "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}");
+
         } catch (\Throwable $e) {
             Log::error('CNA store error', [
                 'dni'  => $dni,
@@ -122,6 +148,7 @@ class CnaController extends Controller
                 ->withInput();
         }
     }
+
 
     // =========================================================
     // FLUJO DE APROBACIÓN
