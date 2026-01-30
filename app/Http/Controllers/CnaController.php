@@ -382,7 +382,11 @@ class CnaController extends Controller
         try {
             $this->convertDocxToPdfViaIlovepdf($docxAbs, $pdfAbs);
         } catch (\Throwable $e) {
-            Log::warning('iLovePDF falló: '.$e->getMessage());
+            Log::warning('iLovePDF falló, entregando DOCX', [
+                'msg' => $e->getMessage(),
+                'class' => get_class($e),
+                'code' => $e->getCode(),
+            ]);
         }
     }
     /** DOCX→PDF con iLovePDF (officepdf). Requiere keys en config/services.php */
