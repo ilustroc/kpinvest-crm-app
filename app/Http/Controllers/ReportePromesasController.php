@@ -17,6 +17,7 @@ class ReportePromesasController extends Controller
 {
     // Tablas
     private string $table       = 'promesas_pago';        // pp
+    private string $opsTable    = 'promesa_operaciones';  // po
     private string $cuotasTable = 'promesa_cuotas';       // pc
 
     public function index(Request $r)
