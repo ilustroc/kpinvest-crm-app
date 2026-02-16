@@ -80,8 +80,12 @@ Route::middleware(['auth','active'])->group(function () {
         Route::get('/pagos',        [ReportePagosController::class, 'index'])->name('reportes.pagos');
         Route::get('/pagos/export', [ReportePagosController::class, 'export'])->name('reportes.pagos.export');
 
-        Route::get('/pdp',        [ReportePromesasController::class, 'index'])->name('reportes.pdp');
-        Route::get('/pdp/export', [ReportePromesasController::class, 'export'])->name('reportes.pdp.export');
+        Route::get('/reportes/promesas', [ReportePromesasController::class,'index'])
+            ->name('reportes.pdp');
+        Route::get('/reportes/promesas/facets', [ReportePromesasController::class,'facets'])
+            ->name('reportes.pdp.facets');
+        Route::get('/reportes/promesas/export', [ReportePromesasController::class,'export'])
+            ->name('reportes.pdp.export');    
     });
 
     /*
