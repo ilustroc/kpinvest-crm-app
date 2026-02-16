@@ -1,0 +1,123 @@
+/* resources/css/reportes/pagos.css */
+
+.filters .form-control,
+.filters .form-select { background: var(--surface); }
+
+.toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.toolbar .spacer { flex:1 1 auto; }
+.tiny { font-size:.9rem; color: var(--muted); }
+
+.skeleton{
+  border:1px dashed var(--border);
+  border-radius: var(--radius);
+  padding:1rem;
+  color: var(--muted);
+  text-align:center;
+}
+
+.quick-range .btn{
+  border:1px solid var(--border);
+  background: var(--surface);
+  border-radius:999px;
+  padding:.25rem .6rem;
+}
+.quick-range .btn:hover{ background: var(--surface-2); }
+
+/* Tabla */
+.rpt-pagos .table thead th{
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.rpt-pagos .table tbody tr:nth-child(even){
+  background: color-mix(in oklab, var(--surface-2) 22%, transparent);
+}
+
+/* Bootstrap pagination */
+.rpt-pagos .page-link{
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+.rpt-pagos .page-link:hover{
+  background: color-mix(in oklab, var(--brand) 10%, transparent);
+  border-color: color-mix(in oklab, var(--brand) 30%, transparent);
+}
+.rpt-pagos .page-item.active .page-link{
+  background: var(--brand);
+  border-color: var(--brand);
+  color:#fff;
+}
+
+/* Multi-select (tipo Excel) */
+.ms-list{
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ms-item{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.35rem .5rem;
+  cursor:pointer;
+  user-select:none;
+}
+.ms-item:hover{ background: var(--surface-2); }
+.ms-item .form-check-input{ margin:0; }
+.ms-text{
+  display:block;
+  width:100%;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Botones más bonitos */
+.btn-clean{
+  border:1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  padding:.45rem .8rem;
+}
+.btn-clean:hover{ background: var(--surface-2); }
+
+.btn-export{
+  background:#198754;
+  border:1px solid #198754;
+  color:#fff;
+  border-radius: 10px;
+  padding:.45rem .9rem;
+  font-weight:600;
+}
+.btn-export:hover{ filter: brightness(.95); color:#fff; }
+
+/* Botón del multiselect con look de input */
+.btn-ms{
+  border:1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  padding:.45rem .75rem;
+}
+.btn-ms:hover{ background: var(--surface-2); }
+
+/* lista multiselect */
+.ms-list{
+  max-height: 260px;
+  overflow:auto;
+  border:1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ms-item{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.35rem .5rem;
+}
+.ms-item:hover{ background: var(--surface-2); }
+.ms-text{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; }

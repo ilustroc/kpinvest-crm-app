@@ -70,8 +70,12 @@ Route::middleware(['auth','active'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('reportes')->group(function () {
-        Route::get('/cna',        [ReporteCnaController::class, 'index'])->name('reportes.cna');
-        Route::get('/cna/export', [ReporteCnaController::class, 'export'])->name('reportes.cna.export');
+        Route::get('/cna',                   [ReporteCnaController::class, 'index'])
+            ->name('reportes.cna');
+        Route::get('/cna/export',            [ReporteCnaController::class, 'export'])
+            ->name('reportes.cna.export');
+        Route::get('/reportes/pagos/facets', [ReportePagosController::class, 'facets'])
+            ->name('reportes.pagos.facets');
 
         Route::get('/pagos',        [ReportePagosController::class, 'index'])->name('reportes.pagos');
         Route::get('/pagos/export', [ReportePagosController::class, 'export'])->name('reportes.pagos.export');
