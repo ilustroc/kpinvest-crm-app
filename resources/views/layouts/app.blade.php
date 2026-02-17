@@ -218,26 +218,24 @@
 </head>
 <body>
   @php
-    $route = request()->route();
-    $role  = strtolower(auth()->user()->role ?? '');
-    $isReportes     = request()->routeIs('reportes.*');
-    $isIntegracion  = request()->is('integracion/*');
+    $role = strtolower(auth()->user()->role ?? '');
+    // Detección automática de sección para mantener menús abiertos
+    $isReportes = request()->routeIs('reportes.*');
+    $isIntegracion = request()->is('integracion*');
   @endphp
 
   <div class="shell">
-    <!-- Sidebar -->
     <aside id="rail" class="rail">
       <div class="brand">
         <div class="mark"><i class="bi bi-building"></i></div>
         <div class="logo">
-          <!-- ÚNICO logo -->
           <img src="{{ asset('assets/img/logo.png') }}" alt="KP INVEST">
         </div>
       </div>
 
       <div class="who">
         <div class="n">{{ auth()->user()->name ?? 'Usuario' }}</div>
-        <div class="r">{{ auth()->user()->role ?? '' }}</div>
+        <div class="r">{{ strtoupper($role) }}</div>
       </div>
 
       <nav class="navy">
@@ -251,42 +249,36 @@
             <i class="bi bi-graph-up"></i><span>Estadísticas</span>
           </a>
 
-          {{-- REPORTES (supervisor, admin, sistemas, soporte) --}}
+          {{-- REPORTES --}}
           @if(in_array($role, ['supervisor','administrador','sistemas','soporte']))
             <div class="lab">REPORTES</div>
 
-            <!-- Botón padre -->
             <button
               class="accordion-btn {{ $isReportes ? 'active' : '' }}"
               data-bs-toggle="collapse"
               data-bs-target="#menuReportes"
-              aria-expanded="{{ $isReportes ? 'true' : 'false' }}"
-              aria-controls="menuReportes">
+              aria-expanded="{{ $isReportes ? 'true' : 'false' }}">
               <i class="bi bi-bar-chart-line"></i>
               <span>Reportes</span>
               <i class="bi bi-chevron-down chev"></i>
             </button>
 
-            <!-- Submenú -->
             <div id="menuReportes" class="collapse {{ $isReportes ? 'show' : '' }}">
               <div class="submenu">
-                <a href="{{ route('reportes.pagos') }}"
-                   class="{{ request()->routeIs('reportes.pagos*') ? 'active' : '' }}">
+                <a href="{{ route('reportes.pagos') }}" class="{{ request()->routeIs('reportes.pagos*') ? 'active' : '' }}">
                   <i class="bi bi-cash-coin"></i><span>Reporte de Pagos</span>
                 </a>
-                <a href="{{ route('reportes.cna') }}"
-                   class="{{ request()->routeIs('reportes.cna*') ? 'active' : '' }}">
+                <a href="{{ route('reportes.cna') }}" class="{{ request()->routeIs('reportes.cna*') ? 'active' : '' }}">
                   <i class="bi bi-chat-dots"></i><span>Reporte de Cna</span>
                 </a>
-                <a href="{{ route('reportes.pdp') }}"
-                   class="{{ request()->routeIs('reportes.pdp*') ? 'active' : '' }}">
+                <a href="{{ route('reportes.pdp') }}" class="{{ request()->routeIs('reportes.pdp*') ? 'active' : '' }}">
                   <i class="bi bi-flag"></i><span>Reporte de Promesas</span>
                 </a>
               </div>
             </div>
           @endif
 
-          {{-- APROBACIONES (admin y supervisor) --}}
+          {{-- APROBACIONES --}}
           @if(in_array($role, ['supervisor','administrador']))
             <div class="lab">APROBACIONES</div>
             <a href="{{ route('autorizacion') }}" class="{{ request()->is('autorizacion*') ? 'active' : '' }}">
@@ -294,46 +286,40 @@
             </a>
           @endif
 
-          {{-- ADMIN / SUPERVISIÓN (admin, supervisor, soporte, sistemas) --}}
+          {{-- ADMIN / SUPERVISIÓN --}}
           @if(in_array($role, ['administrador','supervisor','soporte','sistemas']))
             <div class="lab">ADMIN / SUPERVISIÓN</div>
 
-            <!-- Botón padre Integración -->
             <button
               class="accordion-btn {{ $isIntegracion ? 'active' : '' }}"
               data-bs-toggle="collapse"
               data-bs-target="#menuIntegracion"
-              aria-expanded="{{ $isIntegracion ? 'true' : 'false' }}"
-              aria-controls="menuIntegracion">
+              aria-expanded="{{ $isIntegracion ? 'true' : 'false' }}">
               <i class="bi bi-hdd-network"></i>
               <span>Integración</span>
               <i class="bi bi-chevron-down chev"></i>
             </button>
 
-            <!-- Submenú Integración -->
             <div id="menuIntegracion" class="collapse {{ $isIntegracion ? 'show' : '' }}">
               <div class="submenu">
-                <a href="{{ route('integracion.pagos') }}"
-                   class="{{ request()->is('integracion/pagos*') ? 'active' : '' }}">
+                <a href="{{ route('integracion.pagos.index') }}" class="{{ request()->is('integracion/pagos*') ? 'active' : '' }}">
                   <i class="bi bi-upload"></i><span>Subir Pagos</span>
                 </a>
-                <a href="{{ route('integracion.asignar') }}"
-                   class="{{ request()->is('integracion/asignar*') ? 'active' : '' }}">
-                  <i class="bi bi-person-check"></i><span>Subir Asignacion</span>
+                <a href="{{ route('integracion.asignacion.index') }}" class="{{ request()->is('integracion/asignacion*') ? 'active' : '' }}">
+                  <i class="bi bi-person-check"></i><span>Subir Asignación</span>
                 </a>
-                <a href="{{ route('integracion.ccd') }}"
-                   class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
+                <a href="{{ route('integracion.ccd.index') }}" class="{{ request()->is('integracion/ccd*') ? 'active' : '' }}">
                   <i class="bi bi-database"></i><span>Subir CCD</span>
                 </a>
-                <a href="{{ route('integracion.data') }}"
-                   class="{{ request()->is('integracion/data*') ? 'active' : '' }}">
+                <a href="{{ route('integracion.data.index') }}" class="{{ request()->is('integracion/data*') ? 'active' : '' }}">
                   <i class="bi bi-cloud-upload"></i><span>Subir Data</span>
                 </a>
               </div>
             </div>
 
-            <a href="{{ route('administracion') }}" class="{{ request()->routeIs('administracion') ? 'active' : '' }}">
-              <i class="bi bi-gear"></i><span>Administración</span>
+            <a href="{{ route('administracion.index') }}" 
+              class="{{ request()->routeIs('administracion.*') ? 'active' : '' }}">
+                <i class="bi bi-gear"></i><span>Administración</span>
             </a>
           @endif
         @endauth

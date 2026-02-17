@@ -1,0 +1,85 @@
+/* ======= MODO COMPACTO ======= */
+.admin-compact .card.pad{ padding:12px 14px; border-radius:12px }
+.admin-compact h5{ font-size:1rem; margin-bottom:.7rem }
+.admin-compact .helper{ font-size:.82rem }
+
+.admin-compact .form-control,
+.admin-compact .form-select{ font-size:.92rem; padding:.35rem .6rem; height:auto }
+.admin-compact .btn{
+  --bs-btn-padding-y:.32rem; --bs-btn-padding-x:.6rem; --bs-btn-border-radius:.45rem; font-size:.92rem
+}
+.admin-compact .btn-sm{ --bs-btn-padding-y:.25rem; --bs-btn-padding-x:.5rem; font-size:.9rem }
+
+.admin-compact .struct .table> :not(caption)>*>*{ padding:.50rem .60rem }
+.admin-compact .struct .table thead th{
+  font-size:.78rem; letter-spacing:.3px;
+  background: color-mix(in oklab, var(--accent) 8%, #fff);
+  border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:1;
+  box-shadow:0 3px 8px rgba(15,23,42,.06);
+  text-transform:uppercase;
+}
+.admin-compact .struct .table tbody tr:nth-child(odd) td{
+  background: color-mix(in oklab, var(--surface-2) 14%, transparent);
+}
+.admin-compact .struct .table tbody tr:hover td{
+  background: color-mix(in oklab, var(--brand) 10%, transparent);
+}
+
+/* ======= BARRA DE FILTROS (fix layout) ======= */
+.filters{
+  display:flex; gap:.8rem; align-items:center; justify-content:space-between;
+  flex-wrap:wrap;
+}
+.filters form{
+  display:flex; gap:.8rem; align-items:center;
+  flex:1 1 620px; min-width:460px;
+  margin:0;
+}
+.filters .form-check{ margin:0 }
+.filters .input-icon{
+  flex:1 1 320px; min-width:280px;
+}
+.filters .btn{ white-space:nowrap }
+
+/* ======= EMAIL TRUNCADO ======= */
+.td-email{ max-width: 340px }
+@media (max-width: 1400px){ .td-email{ max-width: 260px } }
+@media (max-width: 1200px){ .td-email{ max-width: 200px } }
+
+/* ======= CHIPS DE ESTADO ======= */
+.state-chip{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:.72rem; line-height:1; letter-spacing:.2px;
+  padding:.12rem .48rem; border-radius:999px; font-weight:700;
+  border:1px solid transparent; user-select:none;
+}
+.state-ok{
+  color:#0f5132;
+  background: color-mix(in oklab, #198754 14%, transparent);
+  border-color: color-mix(in oklab, #198754 30%, transparent);
+}
+.state-off{
+  color:#842029;
+  background: color-mix(in oklab, #dc3545 12%, transparent);
+  border-color: color-mix(in oklab, #dc3545 30%, transparent);
+}
+
+/* ======= ACCIONES EN UNA SOLA FILA ======= */
+.col-actions{ width:220px; text-align:right; white-space:nowrap }
+.actions-wrap{
+  display:flex; gap:.45rem; align-items:center; justify-content:flex-end; flex-wrap:nowrap;
+}
+.actions-wrap form{ display:inline; margin:0 }
+.btn-icon{
+  --size:32px; width:var(--size); height:var(--size);
+  padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
+}
+.btn-icon i{ font-size:1rem }
+
+/* ======= MÓVIL ======= */
+@media (max-width: 768px){
+  .filters{ flex-direction:column; align-items:stretch }
+  .filters form{ width:100%; min-width:0; flex:1 1 auto }
+  .filters .input-icon{ flex:1 1 auto; min-width:0 }
+}

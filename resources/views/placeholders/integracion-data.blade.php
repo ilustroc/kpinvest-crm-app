@@ -16,7 +16,7 @@
       <div class="text-muted small">Cargar/actualizar la tabla única <code>clientes_cuentas</code>.</div>
     </div>
     <a class="btn btn-outline-primary"
-       href="{{ route('integracion.data.clientes.template') }}">
+       href="{{ route('integracion.data.template') }}">
        Descargar plantilla CSV
     </a>
   </div>
@@ -25,7 +25,7 @@
 
   <form class="vstack gap-2"
         method="POST"
-        action="{{ route('integracion.data.clientes.import') }}"
+        action="{{ route('integracion.data.import') }}"
         enctype="multipart/form-data">
     @csrf
     <div>

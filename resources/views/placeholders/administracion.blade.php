@@ -3,95 +3,7 @@
 @section('crumb','Administración')
 
 @push('head')
-<style>
-  /* ======= MODO COMPACTO ======= */
-  .admin-compact .card.pad{ padding:12px 14px; border-radius:12px }
-  .admin-compact h5{ font-size:1rem; margin-bottom:.7rem }
-  .admin-compact .helper{ font-size:.82rem }
-
-  .admin-compact .form-control,
-  .admin-compact .form-select{ font-size:.92rem; padding:.35rem .6rem; height:auto }
-  .admin-compact .btn{
-    --bs-btn-padding-y:.32rem; --bs-btn-padding-x:.6rem; --bs-btn-border-radius:.45rem; font-size:.92rem
-  }
-  .admin-compact .btn-sm{ --bs-btn-padding-y:.25rem; --bs-btn-padding-x:.5rem; font-size:.9rem }
-
-  .admin-compact .struct .table> :not(caption)>*>*{ padding:.50rem .60rem }
-  .admin-compact .struct .table thead th{
-    font-size:.78rem; letter-spacing:.3px;
-    background: color-mix(in oklab, var(--accent) 8%, #fff);
-    border-bottom:1px solid var(--border);
-    position:sticky; top:0; z-index:1;
-    box-shadow:0 3px 8px rgba(15,23,42,.06);
-    text-transform:uppercase;
-  }
-  .admin-compact .struct .table tbody tr:nth-child(odd) td{
-    background: color-mix(in oklab, var(--surface-2) 14%, transparent);
-  }
-  .admin-compact .struct .table tbody tr:hover td{
-    background: color-mix(in oklab, var(--brand) 10%, transparent);
-  }
-
-  /* ======= BARRA DE FILTROS (fix layout) ======= */
-  .filters{
-    display:flex; gap:.8rem; align-items:center; justify-content:space-between;
-    flex-wrap:wrap; /* permite que en móviles se parta */
-  }
-  .filters form{
-    display:flex; gap:.8rem; align-items:center;
-    flex:1 1 620px; min-width:460px; /* evita que los botones bajen */
-    margin:0;
-  }
-  .filters .form-check{ margin:0 }
-  .filters .input-icon{
-    flex:1 1 320px; min-width:280px; /* search crece y mantiene mínimo */
-  }
-  .filters .btn{ white-space:nowrap }  /* que los botones no se rompan */
-  /* sección derecha (Nuevo usuario) no necesita estilos extra */
-
-  /* ======= EMAIL TRUNCADO ======= */
-  .td-email{ max-width: 340px }
-  @media (max-width: 1400px){ .td-email{ max-width: 260px } }
-  @media (max-width: 1200px){ .td-email{ max-width: 200px } }
-
-  /* ======= CHIPS DE ESTADO (más pequeños) ======= */
-  .state-chip{
-    display:inline-flex; align-items:center; justify-content:center;
-    font-size:.72rem; line-height:1; letter-spacing:.2px;
-    padding:.12rem .48rem; border-radius:999px; font-weight:700;
-    border:1px solid transparent; user-select:none;
-  }
-  .state-ok{
-    color:#0f5132;
-    background: color-mix(in oklab, #198754 14%, transparent);
-    border-color: color-mix(in oklab, #198754 30%, transparent);
-  }
-  .state-off{
-    color:#842029;
-    background: color-mix(in oklab, #dc3545 12%, transparent);
-    border-color: color-mix(in oklab, #dc3545 30%, transparent);
-  }
-
-  /* ======= ACCIONES EN UNA SOLA FILA ======= */
-  .col-actions{ width:220px; text-align:right; white-space:nowrap }
-  .actions-wrap{
-    display:flex; gap:.45rem; align-items:center; justify-content:flex-end; flex-wrap:nowrap;
-  }
-  .actions-wrap form{ display:inline; margin:0 }
-  .btn-icon{
-    --size:32px; width:var(--size); height:var(--size);
-    padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
-  }
-  .btn-icon i{ font-size:1rem }
-
-  /* ======= MÓVIL ======= */
-  @media (max-width: 768px){
-    .filters{ flex-direction:column; align-items:stretch }
-    .filters form{ width:100%; min-width:0; flex:1 1 auto }
-    .filters .input-icon{ flex:1 1 auto; min-width:0 }
-  }
-</style>
-
+  <link rel="stylesheet" href="{{ asset('css/admin/admin.css') }}">
 @endpush
 
 @section('content')
@@ -114,7 +26,7 @@
   {{-- Barra superior: filtro + búsqueda + crear --}}
   <div class="card pad mb-2">
     <div class="filters">
-      <form method="GET" action="{{ route('administracion') }}">
+      <form method="GET" action="{{ route('administracion.index') }}">
         <div class="form-check form-switch m-0">
           <input class="form-check-input" type="checkbox" id="swInactivos" name="inactivos" value="1" {{ request('inactivos') ? 'checked' : '' }}>
           <label class="form-check-label" for="swInactivos">Mostrar inactivos</label>
@@ -127,7 +39,7 @@
         <button class="btn btn-outline-primary" type="submit">
           <i class="bi bi-filter-right me-1"></i> Aplicar
         </button>
-        <a class="btn btn-outline-primary" href="{{ route('administracion') }}">
+        <a class="btn btn-outline-primary" href="{{ route('administracion.index') }}">
           Limpiar
         </a>
       </form>
@@ -209,7 +121,7 @@
                 @endif
               </div>
 
-              {{-- Modal password (centrado + labels alineados) --}}
+              {{-- Modal password --}}
               <div class="modal fade" id="pw-usr-{{ $u->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                   <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}" class="modal-content">
@@ -228,7 +140,7 @@
                         <div class="col-12 col-md-8">
                           <div class="input-group">
                             <input type="password" name="password" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button" data-eye-target="password-{{ $u->id }}"><i class="bi bi-eye"></i></button>
+                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
                           </div>
                         </div>
 
@@ -238,7 +150,7 @@
                         <div class="col-12 col-md-8">
                           <div class="input-group">
                             <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button" data-eye-target="confirm-{{ $u->id }}"><i class="bi bi-eye"></i></button>
+                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
                           </div>
                         </div>
                       </div>
@@ -320,161 +232,15 @@
 @endsection
 
 @push('scripts')
-<script>
-  // ===== Tooltips globales
-  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
-
-  // ===== Botón "ojo": alternar password/visible en input-group
-  document.addEventListener('click', function(e){
-    const btn = e.target.closest('.btn-eye');
-    if(!btn) return;
-    const input = btn.parentElement.querySelector('input[type="password"], input[type="text"]');
-    if(!input) return;
-    const show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    btn.innerHTML = show ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
-  }, false);
-
-  // ===== Filtro "Mostrar inactivos" autosubmit
-  (function(){
-    const sw = document.getElementById('swInactivos');
-    if(!sw) return;
-    sw.addEventListener('change', ()=> {
-      // Submitea el form de filtros (padre más cercano)
-      const form = sw.closest('form');
-      if(form) form.submit();
-    });
-  })();
-
-  // ===== Atajo Ctrl+K para enfocar búsqueda
-  (function(){
-    const input = document.querySelector('.filters input[name="q"]');
-    if(!input) return;
-    window.addEventListener('keydown', (e)=>{
-      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){
-        e.preventDefault();
-        input.focus();
-        input.select();
-      }
-    });
-  })();
-
-  // ===== Modal: Crear usuario (rol ↔ supervisor)
-  (function(){
-    const ME_ROLE = @json(auth()->user()->role ?? 'usuario');
-    const ME_ID   = @json(auth()->id() ?? null);
-
-    // Supervisores activos para el <select> (id, name, email)
-    const SUPERVISORES = @json(
+  <script>
+    window.ADMIN_ME_ROLE = @json(auth()->user()->role ?? 'usuario');
+    window.ADMIN_ME_ID   = @json(auth()->id() ?? null);
+    window.ADMIN_SUPERVISORES = @json(
       ($supervisores ?? collect())->map(fn($s) => [
-        'id'    => $s->id,
+        'id' => $s->id,
         'label' => $s->name.' — '.$s->email
       ])
     );
-
-    const modalEl   = document.getElementById('modalCreateUser');
-    if(!modalEl) return;
-
-    const modal     = new bootstrap.Modal(modalEl);
-    const form      = modalEl.querySelector('form');
-    const roleSel   = modalEl.querySelector('select[name="role"]');
-
-    // Crea contenedor y select de supervisor si no existe aún
-    let supRow      = modalEl.querySelector('[data-sup-row]');
-    let supSel      = modalEl.querySelector('select[name="supervisor_id"]');
-
-    if(!supRow){
-      // Inserta después de la fila de "Rol"
-      const ref = roleSel.closest('.row');
-      supRow = document.createElement('div');
-      supRow.className = 'row g-3 align-items-center';
-      supRow.setAttribute('data-sup-row','');
-      supRow.innerHTML = `
-        <div class="col-12 col-md-4 text-md-end">
-          <label class="form-label mb-0">Supervisor</label>
-        </div>
-        <div class="col-12 col-md-8">
-          <select name="supervisor_id" class="form-select"></select>
-        </div>
-      `;
-      ref.after(supRow);
-      supSel = supRow.querySelector('select[name="supervisor_id"]');
-    }
-
-    // Poblar opciones de supervisores
-    function fillSupervisorOptions(){
-      supSel.innerHTML = '<option value="">Selecciona…</option>';
-      SUPERVISORES.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id; opt.textContent = s.label;
-        supSel.appendChild(opt);
-      });
-    }
-
-    // Mostrar/ocultar campo supervisor según reglas
-    function updateSupervisorField(){
-      const role = roleSel.value;
-      const necesitaSup = (role === 'asesor' || role === 'soporte');
-
-      if(!necesitaSup){
-        supRow.classList.add('d-none');
-        supSel.removeAttribute('required');
-        supSel.value = '';
-        return;
-      }
-
-      // Si quien crea es supervisor: se auto-asigna y oculta el control
-      if(ME_ROLE === 'supervisor'){
-        supRow.classList.add('d-none');
-        // Asegura un input hidden con el valor del supervisor
-        ensureHiddenSup(ME_ID);
-      } else {
-        // Admin / Sistemas: mostrar selector y exigirlo
-        removeHiddenSup();
-        fillSupervisorOptions();
-        supRow.classList.remove('d-none');
-        supSel.setAttribute('required','required');
-      }
-    }
-
-    // Helpers para inyectar/eliminar hidden supervisor_id
-    function ensureHiddenSup(id){
-      let hid = form.querySelector('input[type="hidden"][name="supervisor_id"]');
-      if(!hid){
-        hid = document.createElement('input');
-        hid.type = 'hidden'; hid.name = 'supervisor_id';
-        form.appendChild(hid);
-      }
-      hid.value = id ?? '';
-      // también limpia el select visible por si quedó algo
-      if(supSel){ supSel.value = ''; supSel.removeAttribute('required'); }
-    }
-    function removeHiddenSup(){
-      const hid = form.querySelector('input[type="hidden"][name="supervisor_id"]');
-      if(hid) hid.remove();
-    }
-
-    // Reset bonito al abrir
-    modalEl.addEventListener('show.bs.modal', ()=>{
-      form.reset();
-      removeHiddenSup();
-      // Rol vacío por defecto
-      if(roleSel){ roleSel.value=''; }
-      // Oculta supervisor hasta que elija un rol
-      supRow.classList.add('d-none');
-      supSel.removeAttribute('required');
-
-      // Autofocus nombre
-      const first = modalEl.querySelector('input[name="name"]');
-      setTimeout(()=> first?.focus(), 120);
-    });
-
-    // Reaccionar al cambio de rol
-    roleSel.addEventListener('change', updateSupervisorField);
-
-    // Exponer función global opcional para abrir el modal
-    window.openCreateUserModal = ()=> modal.show();
-  })();
-</script>
+  </script>
+  <script src="{{ asset('js/admin/admin.js') }}" defer></script>
 @endpush
-

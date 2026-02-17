@@ -1,0 +1,91 @@
+:root{
+  --brand:#00a81c;
+  --brand-700:#008517;
+  --bg:#f6f8fb;
+  --surface:#ffffff;
+  --ink:#1f2328;
+  --muted:#6d7b8a;
+  --border:#e9edf3;
+  --ring:0 0 0 4px rgba(0,168,28,.18);
+}
+
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(900px 500px at -10% -10%, rgba(0,168,28,.07), transparent 60%),
+    radial-gradient(700px 400px at 120% 0%, rgba(0,168,28,.05), transparent 60%),
+    linear-gradient(#fbfcff,#f6f8fb);
+  color:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  padding:clamp(16px, 2.8vw, 24px);
+  padding-top:calc(env(safe-area-inset-top,0) + 16px);
+  padding-bottom:calc(env(safe-area-inset-bottom,0) + 16px);
+}
+
+.wrap{
+  width:min(1120px, 100%);
+  border-radius:22px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  box-shadow:0 18px 60px rgba(15,23,42,.06);
+  overflow:hidden;
+}
+
+/* Lado ilustración */
+.side{
+  background:
+    linear-gradient(180deg,#fff, #fff),
+    radial-gradient(60% 60% at 40% 30%, rgba(0,168,28,.10), transparent 72%);
+  padding:clamp(18px, 3vw, 34px);
+  min-height: 280px;
+}
+.brand img{height:36px; width:auto; object-fit:contain}
+.side-hero{
+  display:grid; place-items:center; text-align:center;
+  margin:14px 0 8px;
+}
+.illus{
+  max-height:300px; width:auto; border-radius:14px;
+  filter: drop-shadow(0 14px 24px rgba(0,0,0,.06));
+}
+.side p{ color:var(--muted) }
+
+/* Panel formulario */
+.panel{
+  padding:clamp(18px, 3vw, 34px);
+  background:var(--surface);
+}
+.card-soft{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 8px 28px rgba(15,23,42,.05);
+  padding:clamp(18px, 2.4vw, 28px);
+}
+.form-control{
+  background:#fff; color:var(--ink); border:1px solid var(--border);
+}
+.form-control:focus{ border-color:var(--brand); box-shadow:var(--ring); }
+.input-group-text{ background:#fff; border-left:none }
+.input-group .form-control{ border-right:none }
+
+.btn-brand{
+  background:var(--brand); color:#fff; border:none; border-radius:999px;
+  padding:.9rem 1rem; font-weight:600;
+}
+.btn-brand:hover{ background:var(--brand-700) }
+.link{ color:var(--brand); text-decoration:none }
+.link:hover{ text-decoration:underline }
+.help{ color:var(--muted) }
+.caps{ color:#b54708 }
+
+/* Mobile tuning */
+@media (max-width: 575.98px){
+  .side { padding:16px }
+  .illus{ max-height:220px }
+  .brand img{ height:30px }
+  .wrap{ border-radius:16px }
+}
+@media (max-width: 420px){
+  .illus{ display:none }
+}

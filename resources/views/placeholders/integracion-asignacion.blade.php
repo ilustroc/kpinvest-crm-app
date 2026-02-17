@@ -18,18 +18,14 @@
         Campos requeridos en el archivo: <code>NUMDOC</code>, <code>OPERACION</code>, <code>NAME</code>.
       </div>
     </div>
-    <a class="btn btn-outline-primary"
-       href="{{ route('integracion.asignar.template') }}">
-       Descargar plantilla CSV
-    </a>
+      <a class="btn btn-outline-primary" href="{{ route('integracion.asignacion.template') }}">
+          Descargar plantilla CSV
+      </a>
   </div>
 
   <hr class="my-3">
 
-  <form class="vstack gap-2"
-        method="POST"
-        action="{{ route('integracion.asignar.import') }}"
-        enctype="multipart/form-data">
+  <form class="vstack gap-2" method="POST" action="{{ route('integracion.asignacion.import') }}" enctype="multipart/form-data"></form>
     @csrf
     <div>
       <label class="form-label">Archivo CSV</label>
