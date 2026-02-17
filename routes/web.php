@@ -70,21 +70,25 @@ Route::middleware(['auth','active'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('reportes')->group(function () {
-        Route::get('/cna',                   [ReporteCnaController::class, 'index'])
+        Route::get('/cna',        [ReporteCnaController::class,'index'])
             ->name('reportes.cna');
-        Route::get('/cna/export',            [ReporteCnaController::class, 'export'])
+        Route::get('/cna/facets', [ReporteCnaController::class,'facets'])
+            ->name('reportes.cna.facets');
+        Route::get('/cna/export', [ReporteCnaController::class,'export'])
             ->name('reportes.cna.export');
-        Route::get('/reportes/pagos/facets', [ReportePagosController::class, 'facets'])
+
+        Route::get('/pagos',        [ReportePagosController::class, 'index'])
+            ->name('reportes.pagos');
+        Route::get('/pagos/export', [ReportePagosController::class, 'export'])
+            ->name('reportes.pagos.export');
+        Route::get('/pagos/facets', [ReportePagosController::class,'facets'])
             ->name('reportes.pagos.facets');
 
-        Route::get('/pagos',        [ReportePagosController::class, 'index'])->name('reportes.pagos');
-        Route::get('/pagos/export', [ReportePagosController::class, 'export'])->name('reportes.pagos.export');
-
-        Route::get('/reportes/promesas', [ReportePromesasController::class,'index'])
+        Route::get('/promesas', [ReportePromesasController::class,'index'])
             ->name('reportes.pdp');
-        Route::get('/reportes/promesas/facets', [ReportePromesasController::class,'facets'])
+        Route::get('/promesas/facets', [ReportePromesasController::class,'facets'])
             ->name('reportes.pdp.facets');
-        Route::get('/reportes/promesas/export', [ReportePromesasController::class,'export'])
+        Route::get('/promesas/export', [ReportePromesasController::class,'export'])
             ->name('reportes.pdp.export');    
     });
 

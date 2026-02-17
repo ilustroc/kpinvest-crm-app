@@ -16,17 +16,17 @@
     <div class="col-6 col-md-2">
       <label class="form-label">Desde</label>
       <input type="date" name="from" class="form-control"
-             value="{{ $from }}" data-default="{{ $defaultFrom }}">
+            value="{{ $from }}" data-default="{{ $defaultFrom }}">
     </div>
 
     <div class="col-6 col-md-2">
       <label class="form-label">Hasta</label>
       <input type="date" name="to" class="form-control"
-             value="{{ $to }}" data-default="{{ $defaultTo }}">
+            value="{{ $to }}" data-default="{{ $defaultTo }}">
     </div>
 
     {{-- Estado --}}
-    <div class="col-12 col-md-3">
+    <div class="col-12 col-md-2">
       <label class="form-label">Estado</label>
       <div class="dropdown w-100" data-multiselect="estado" data-title="Estado" data-empty="Todos">
         <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
@@ -40,7 +40,7 @@
             @forelse($estados as $v)
               <label class="ms-item">
                 <input class="form-check-input" type="checkbox" name="estado[]" value="{{ $v }}"
-                       @checked(in_array($v, $estadoSel, true))>
+                      @checked(in_array($v, $estadoSel, true))>
                 <span class="ms-text">{{ $v }}</span>
               </label>
             @empty
@@ -70,7 +70,7 @@
             @forelse($tipos as $v)
               <label class="ms-item">
                 <input class="form-check-input" type="checkbox" name="tipo[]" value="{{ $v }}"
-                       @checked(in_array($v, $tipoSel, true))>
+                      @checked(in_array($v, $tipoSel, true))>
                 <span class="ms-text">{{ $v }}</span>
               </label>
             @empty
@@ -85,8 +85,8 @@
       </div>
     </div>
 
-    {{-- Entidad --}}
-    <div class="col-12 col-md-4">
+    {{-- Entidad (subida y mismo tamaño que Tipo) --}}
+    <div class="col-12 col-md-3">
       <label class="form-label">Entidad</label>
       <div class="dropdown w-100" data-multiselect="entidad" data-title="Entidad" data-empty="Todas">
         <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
@@ -100,7 +100,7 @@
             @forelse($entidades as $v)
               <label class="ms-item">
                 <input class="form-check-input" type="checkbox" name="entidad[]" value="{{ $v }}"
-                       @checked(in_array($v, $entidadSel, true))>
+                      @checked(in_array($v, $entidadSel, true))>
                 <span class="ms-text">{{ $v }}</span>
               </label>
             @empty
@@ -112,6 +112,18 @@
             <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    {{-- Buscar (abajo) --}}
+    <div class="col-12">
+      <label class="form-label">Buscar por DNI o Cliente</label>
+      <div class="input-group">
+        <input type="text" name="q" class="form-control"
+              placeholder="DNI o Cliente" value="{{ $q }}">
+        <button class="btn btn-outline-secondary" id="btnBuscar" type="button">
+          <i class="bi bi-search"></i>
+        </button>
       </div>
     </div>
 

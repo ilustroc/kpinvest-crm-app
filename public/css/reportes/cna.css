@@ -1,0 +1,119 @@
+/* resources/css/reportes/cna.css */
+
+.filters .form-control,
+.filters .form-select { background: var(--surface); }
+
+.toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.toolbar .spacer { flex:1 1 auto; }
+.tiny { font-size:.9rem; color: var(--muted); }
+
+.skeleton{
+  border:1px dashed var(--border);
+  border-radius: var(--radius);
+  padding:1rem;
+  color: var(--muted);
+  text-align:center;
+}
+
+/* Tabla */
+.rpt-cna .table thead th{
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.rpt-cna .table tbody tr:nth-child(even){
+  background: color-mix(in oklab, var(--surface-2) 22%, transparent);
+}
+
+/* Bootstrap pagination */
+.rpt-cna .page-link{
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+.rpt-cna .page-link:hover{
+  background: color-mix(in oklab, var(--brand) 10%, transparent);
+  border-color: color-mix(in oklab, var(--brand) 30%, transparent);
+}
+.rpt-cna .page-item.active .page-link{
+  background: var(--brand);
+  border-color: var(--brand);
+  color:#fff;
+}
+
+.nowrap{ white-space:nowrap; }
+.text-mono{ font-variant-numeric: tabular-nums; }
+
+/* Multi-select (tipo Excel) */
+.ms-list{
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.ms-item{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.35rem .5rem;
+  cursor:pointer;
+  user-select:none;
+}
+.ms-item:hover{ background: var(--surface-2); }
+.ms-item .form-check-input{ margin:0; }
+.ms-text{
+  display:block;
+  width:100%;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Botones */
+.btn-clean{
+  border:1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  padding:.45rem .8rem;
+}
+.btn-clean:hover{ background: var(--surface-2); }
+
+.btn-ms{
+  border:1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  padding:.45rem .75rem;
+}
+.btn-ms:hover{ background: var(--surface-2); }
+
+/* Export: que NO se ponga blanco ni con borde negro */
+.btn-export{
+  background:#198754;
+  border:1px solid #198754;
+  color:#fff;
+  border-radius: 10px;
+  padding:.45rem .9rem;
+  font-weight:600;
+}
+.btn-export:hover,
+.btn-export:focus{
+  background:#198754;
+  border-color:#198754;
+  color:#fff;
+  filter: brightness(.95);
+  box-shadow: none;
+}
+.btn-export:active{
+  background:#198754 !important;
+  border-color:#198754 !important;
+  color:#fff !important;
+  filter: brightness(.92);
+  box-shadow: none !important;
+}
+.btn-export:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 .25rem color-mix(in oklab, #198754 25%, transparent);
+}

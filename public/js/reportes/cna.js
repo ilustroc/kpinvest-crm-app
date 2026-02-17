@@ -3,18 +3,17 @@
   const $btnLimpiar = document.getElementById('btnLimpiar');
   const $btnExport = document.getElementById('btnExport');
   const $summary = document.getElementById('summary');
-  const $btnBuscar = document.getElementById('btnBuscar');
-  const $qInput = $form.querySelector('input[name="q"]'); // Buscar DNI/Cliente
 
   const baseUrl = $form.getAttribute('action');
-  const exportUrl = document.querySelector('meta[name="rpt-pdp-export"]').content;
-  const facetsUrl = document.querySelector('meta[name="rpt-pdp-facets"]').content;
+  const exportUrl = document.querySelector('meta[name="rpt-cna-export"]').content;
+  const facetsUrl = document.querySelector('meta[name="rpt-cna-facets"]').content;
 
-  function buildQuery(extra = {}) {
+  function buildQuery() {
     const fd = new FormData($form);
     const p = new URLSearchParams();
-    for (const [k, v] of fd.entries()) if (v !== null && v !== '') p.append(k, v);
-    for (const k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) p.set(k, extra[k]);
+    for (const [k, v] of fd.entries()) {
+      if (v !== null && v !== '') p.append(k, v);
+    }
     return p.toString();
   }
 
@@ -24,22 +23,18 @@
 
   function updateSummary() {
     const m = document.querySelector('#pagMeta');
-    const page = m?.dataset.page || '';
-    const total = m?.dataset.total || '';
-    $summary.textContent = total ? `Página ${page} · ${total} resultados` : (page ? `Página ${page}` : '');
+    $summary.textContent = m ? `Página ${m.dataset.page} · ${m.dataset.total} resultados` : '';
   }
 
   async function loadData(url = null) {
-    const targetUrl = url ? url : (baseUrl + '?' + buildQuery({ partial: 1 }));
-
-    const tabla = document.getElementById('tablaPdp');
-    if (tabla) tabla.outerHTML = `<div id="tablaPdp"><div class="skeleton">Cargando…</div></div>`;
+    const targetUrl = url ? url : (baseUrl + '?' + buildQuery());
+    const tabla = document.getElementById('tablaCna');
+    if (tabla) tabla.innerHTML = '<div class="skeleton">Cargando…</div>';
 
     const text = await fetch(targetUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.text());
     const doc = new DOMParser().parseFromString(text, 'text/html');
-    const frag = doc.querySelector('#tablaPdp');
-
-    if (frag) document.getElementById('tablaPdp').outerHTML = frag.outerHTML;
+    const frag = doc.querySelector('#tablaCna');
+    if (frag) document.getElementById('tablaCna').outerHTML = frag.outerHTML;
 
     hookPagination();
     updateExport();
@@ -48,12 +43,10 @@
   }
 
   function hookPagination() {
-    document.querySelectorAll('#tablaPdp .pagination a').forEach(a => {
+    document.querySelectorAll('.pagination a').forEach(a => {
       a.addEventListener('click', ev => {
         ev.preventDefault();
-        const u = new URL(a.getAttribute('href'), location.origin);
-        u.searchParams.set('partial', '1');
-        loadData(u.pathname + '?' + u.searchParams.toString());
+        loadData(a.getAttribute('href'));
       });
     });
   }
@@ -92,10 +85,9 @@
       setLabel(msRoot);
     });
 
-    apply?.addEventListener('click', async () => {
+    apply?.addEventListener('click', () => {
       setLabel(msRoot);
-      await loadData();
-      await refreshFacets(false); // cascada (opcional)
+      refreshFacetsAndMaybeLoad(true); // 👈 clave: facets dependientes
     });
 
     setLabel(msRoot);
@@ -103,7 +95,7 @@
 
   document.querySelectorAll('[data-multiselect]').forEach(initMultiSelect);
 
-  // ===== Facets =====
+  // ===== Facets dependientes =====
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, s => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -134,59 +126,33 @@
     setLabel(msRoot);
   }
 
-  async function refreshFacets(loadAfter = true) {
-    const qs = buildQuery(); // incluye selecciones actuales
-    const url = facetsUrl + '?' + qs;
-
+  async function refreshFacetsAndMaybeLoad(loadAfter = true) {
+    const url = facetsUrl + '?' + buildQuery();
     const data = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(r => r.json());
 
     renderOptions(document.querySelector('[data-multiselect="estado"]'), 'estado', data.estados || []);
-    renderOptions(document.querySelector('[data-multiselect="tipo"]'), 'tipo', data.tipos || []);
+    renderOptions(document.querySelector('[data-multiselect="gestor"]'), 'gestor', data.gestores || []);
     renderOptions(document.querySelector('[data-multiselect="entidad"]'), 'entidad', data.entidades || []);
 
     document.querySelectorAll('[data-multiselect]').forEach(initMultiSelect);
 
-    if (loadAfter) await loadData();
+    if (loadAfter) loadData();
   }
 
-  // ===== Eventos =====
-  $btnLimpiar.addEventListener('click', async () => {
+  // Eventos
+  $btnLimpiar.addEventListener('click', () => {
     $form.from.value = $form.from.dataset.default || '';
     $form.to.value = $form.to.dataset.default || '';
+
     $form.querySelectorAll('input[type="checkbox"]').forEach(i => (i.checked = false));
-    await refreshFacets(true);
+    document.querySelectorAll('[data-multiselect]').forEach(ms => setLabel(ms));
+
+    refreshFacetsAndMaybeLoad(true);
   });
 
-  // Buscar (DNI / Cliente)
-  $btnBuscar?.addEventListener('click', async (e) => {
-    e.preventDefault();
+  $form.from.addEventListener('change', () => refreshFacetsAndMaybeLoad(true));
+  $form.to.addEventListener('change', () => refreshFacetsAndMaybeLoad(true));
 
-    // OJO: si quieres que también se actualicen las listas (facets) según lo buscado:
-    try {
-      await refreshFacets(true);
-    } catch (err) {
-      console.error(err);
-      await loadData();
-    }
-  });
-
-  // Enter en el input Buscar
-  $qInput?.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      try {
-        await refreshFacets(true);
-      } catch (err) {
-        console.error(err);
-        await loadData();
-      }
-    }
-  });
-
-  $form.from.addEventListener('change', () => refreshFacets(true));
-  $form.to.addEventListener('change', () => refreshFacets(true));
-
-  // Init
   hookPagination();
   updateExport();
   updateSummary();
