@@ -61,7 +61,7 @@
             <span class="pill"><i class="bi bi-card-checklist"></i> Fecha</span>
             <span class="pill">DNI</span>
             <span class="pill">Nombre</span>
-            <span class="pill">Operación</span>
+            <span class="pill">Operacion</span>
             <span class="pill">Monto</span>
             <span class="pill">Agente</span>
             <span class="pill">Cosecha</span>
@@ -112,7 +112,7 @@
               <tr>
                 <th>Fecha</th>
                 <th>DNI</th>
-                <th>Operación</th>
+                <th>Operacion</th>
                 <th>Nombre</th>
                 <th>Entidad Financiera</th>
                 <th class="text-end">Monto</th>
@@ -149,7 +149,7 @@
 <script>
 (function(){
   // Encabezados EXACTOS
-  const HEADERS = ["Fecha","DNI","Nombre","Operación","Monto","Agente","Cosecha","Cuenta_Recaudo","Entidad Financiera"];
+  const HEADERS = ["Fecha","DNI","Nombre","Operacion","Monto","Agente","Cosecha","Cuenta_Recaudo","Entidad Financiera"];
 
   const $file = document.getElementById('csvFilePagos');
   const $btn  = document.getElementById('btnImportPagos');

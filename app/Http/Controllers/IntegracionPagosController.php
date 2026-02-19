@@ -29,7 +29,7 @@ class IntegracionPagosController extends Controller
     public function template()
     {
         $headers = [
-            'Fecha', 'DNI', 'Nombre', 'Operación', 'Monto', 
+            'Fecha', 'DNI', 'Nombre', 'Operacion', 'Monto', 
             'Agente', 'Cosecha', 'Cuenta_Recaudo', 'Entidad Financiera'
         ];
 

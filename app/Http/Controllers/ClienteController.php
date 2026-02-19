@@ -32,7 +32,7 @@ class ClienteController extends Controller
             abort_if($cuentas->isEmpty(), 404);
             $titular = $cuentas->first()->nombre ?? '—';
             
-            // === Asesor asignado (por operación)
+            // === Asesor asignado (por operacion)
             $asesorByOperacion = collect();
             if (Schema::hasTable('asignar_clientes')) {
                 $asig = AsignarCliente::query()
@@ -141,7 +141,7 @@ class ClienteController extends Controller
                     }
 
                     foreach ($opsArr as $op) {
-                        // Por operación
+                        // Por operacion
                         $mapOp[$op] = $mapOp[$op] ?? collect();
                         $mapOp[$op]->push((object)[
                             'id'              => $cna->id,
@@ -152,7 +152,7 @@ class ClienteController extends Controller
                             'docx_path'       => $cna->docx_path ?? null,
                         ]);
 
-                        // Por cuenta (elige la cuenta mapeada para esa operación)
+                        // Por cuenta (elige la cuenta mapeada para esa operacion)
                         $ctaDb = optional($cuentas->firstWhere('operacion', $op))->cuenta;
                         $cta   = (string)($ctaDb ?: ($op2cta[$op] ?? $op));
 

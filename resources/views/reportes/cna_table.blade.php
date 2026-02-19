@@ -16,7 +16,7 @@
           <th>Año_Mes</th>
           <th class="text-end">Cna_Imp</th>
           <th>Nro_Cuenta</th>
-          <th>Nro_Operación</th>
+          <th>Nro_Operacion</th>
           <th>Gestor</th>
           <th>Estado</th>
           <th>Gen_Gestor</th>

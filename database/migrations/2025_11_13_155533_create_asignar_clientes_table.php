@@ -14,7 +14,7 @@ return new class extends Migration
             // DNI del cliente (numdoc en clientes_cuentas)
             $table->string('numdoc', 20)->index();
 
-            // Operación del cliente
+            // Operacion del cliente
             $table->string('operacion', 50)->index();
 
             // Nombre del asesor/usuario asignado

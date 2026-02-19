@@ -15,20 +15,21 @@ class PagosImport
         if (!$fh) return [0, 0, ['No se pudo abrir el archivo']];
 
         $firstLine = fgets($fh);
-        if ($firstLine === false) { 
-            fclose($fh); 
-            return [0, 0, ['Archivo vacío']]; 
+        if ($firstLine === false) {
+            fclose($fh);
+            return [0, 0, ['Archivo vacío']];
         }
+
         $del = $this->detectDelimiter($firstLine);
         rewind($fh);
 
         $headers = fgetcsv($fh, 0, $del);
-        if (!$headers) { 
-            fclose($fh); 
-            return [0, 0, ['No se pudieron leer los encabezados']]; 
+        if (!$headers) {
+            fclose($fh);
+            return [0, 0, ['No se pudieron leer los encabezados']];
         }
 
-        $idx = $this->mapHeaders($headers);
+        $idx = $this->mapHeaders($headers);   // <- ahora normaliza
         $map = $this->getColumnMap();
 
         $ok = 0; $skip = 0; $err = []; $rowNum = 1;
@@ -39,8 +40,10 @@ class PagosImport
 
             foreach ($map as $headerClean => $col) {
                 if (!isset($idx[$headerClean])) continue;
-                
-                $val = $this->toUtf8($row[$idx[$headerClean]] ?? null);
+
+                $pos = $idx[$headerClean];
+                $raw = $row[$pos] ?? null;
+                $val = $this->toUtf8($raw);
 
                 switch ($headerClean) {
                     case 'FECHA':
@@ -50,13 +53,14 @@ class PagosImport
                         $data[$col] = $this->parseNumber($val);
                         break;
                     default:
-                        $data[$col] = $val;
+                        $data[$col] = is_string($val) ? trim($val) : $val;
                         break;
                 }
             }
 
+            // Si no hay data útil, omitir
             if (empty($data['dni']) && empty($data['operacion']) && empty($data['nombre_cliente'])) {
-                $skip++; 
+                $skip++;
                 continue;
             }
 
@@ -77,9 +81,29 @@ class PagosImport
     {
         $idx = [];
         foreach ($headers as $i => $h) {
-            $idx[$this->toUtf8($h)] = $i;
+            $idx[$this->cleanHeader($h)] = $i;
         }
         return $idx;
+    }
+
+    private function cleanHeader($h): string
+    {
+        $h = $this->toUtf8((string)$h);
+
+        // Quitar BOM si viene en el primer encabezado
+        $h = preg_replace('/^\xEF\xBB\xBF/', '', $h);
+
+        $h = trim($h);
+        $h = strtoupper($h);
+
+        // Espacios y separadores a _
+        $h = str_replace([' ', '-', '/', '\\', '.'], '_', $h);
+        $h = preg_replace('/_+/', '_', $h);
+
+        // Solo A-Z, 0-9 y _
+        $h = preg_replace('/[^A-Z0-9_]/', '', $h);
+
+        return $h;
     }
 
     private function getColumnMap(): array

@@ -9,7 +9,7 @@
           <th>Fecha</th>
           <th>DNI</th>
           <th>Nombre</th>
-          <th>Operación</th>
+          <th>Operacion</th>
           <th class="text-end">Monto</th>
           <th>Agente</th>
           <th>Cosecha</th>
