@@ -25,7 +25,7 @@
 
   <hr class="my-3">
 
-  <form class="vstack gap-2" method="POST" action="{{ route('integracion.asignacion.import') }}" enctype="multipart/form-data"></form>
+  <form class="vstack gap-2" method="POST" action="{{ route('integracion.asignacion.import') }}" enctype="multipart/form-data">
     @csrf
     <div>
       <label class="form-label">Archivo CSV</label>

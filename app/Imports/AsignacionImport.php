@@ -23,6 +23,11 @@ class AsignacionImport
         $headers = fgetcsv($fh, 0, $del);
         if (!$headers) { fclose($fh); return [0, 0, ['Sin encabezados']]; }
 
+        if (count($headers) === 1 && str_contains($headers[0], "\t")) {
+            rewind($fh);
+            $headers = fgetcsv($fh, 0, "\t");
+        }
+
         $idx = $this->mapHeaders($headers);
         if (!isset($idx['numdoc'], $idx['operacion'], $idx['name'])) {
             fclose($fh);
@@ -62,14 +67,38 @@ class AsignacionImport
     private function mapHeaders(array $headers): array
     {
         $idx = [];
+
         foreach ($headers as $i => $h) {
-            $k = $this->toUtf8($h);
-            if ($k === 'NUMDOC')    $idx['numdoc'] = $i;
-            if ($k === 'OPERACION') $idx['operacion'] = $i;
-            if ($k === 'NAME')      $idx['name'] = $i;
+            $k = $this->cleanHeader($h);
+
+            if ($k === 'NUMDOC')     $idx['numdoc']    = $i;
+            if ($k === 'OPERACION')  $idx['operacion'] = $i;
+            if ($k === 'NAME')       $idx['name']      = $i;
         }
+
         return $idx;
     }
+
+    private function cleanHeader($h): string
+    {
+        $h = $this->toUtf8((string)$h);
+
+        // quitar BOM
+        $h = preg_replace('/^\xEF\xBB\xBF/', '', $h);
+
+        $h = trim($h);
+        $h = strtoupper($h);
+
+        // espacios a _
+        $h = str_replace([' ', '-', '/', '\\', '.'], '_', $h);
+        $h = preg_replace('/_+/', '_', $h);
+
+        // solo A-Z 0-9 _
+        $h = preg_replace('/[^A-Z0-9_]/', '', $h);
+
+        return $h;
+    }
+
 
     private function processBuffer(array $buffer, &$ok, &$skip, &$err): void
     {
