@@ -1,61 +1,69 @@
-<div id="tablaCna">
+<div id="tablaCna" class="space-y-3">
   <div id="pagMeta"
        data-page="{{ method_exists($rows,'currentPage') ? $rows->currentPage() : '' }}"
        data-total="{{ method_exists($rows,'total') ? $rows->total() : '' }}"></div>
 
-  <div class="table-responsive">
-    <table class="table table-sm align-middle">
-      <thead>
+  <div class="overflow-auto rounded-2xl border border-slate-200 bg-white">
+    <table class="min-w-full text-sm">
+      <thead class="sticky top-0 bg-slate-50 text-slate-700 border-b border-slate-200">
         <tr>
-          <th>Documento</th>
-          <th>Cliente</th>
-          <th>Entidad</th>
-          <th>Cna_Nro</th>
-          <th>Cna_Fec</th>
-          <th>Fondo_Inv</th>
-          <th>Año_Mes</th>
-          <th class="text-end">Cna_Imp</th>
-          <th>Nro_Cuenta</th>
-          <th>Nro_Operacion</th>
-          <th>Gestor</th>
-          <th>Estado</th>
-          <th>Gen_Gestor</th>
-          <th>Apr_Gestor</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Documento</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Cliente</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Entidad</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Cna_Nro</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Cna_Fec</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Fondo_Inv</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Año_Mes</th>
+          <th class="px-3 py-2 text-right font-semibold whitespace-nowrap">Cna_Imp</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Nro_Cuenta</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Nro_Operacion</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Gestor</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Estado</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Gen_Gestor</th>
+          <th class="px-3 py-2 text-left font-semibold whitespace-nowrap">Apr_Gestor</th>
         </tr>
       </thead>
-      <tbody>
+
+      <tbody class="divide-y divide-slate-100">
       @forelse($rows as $r)
-        <tr>
-          <td class="nowrap text-mono">{{ $r->documento }}</td>
-          <td class="nowrap">{{ $r->cliente }}</td>
-          <td class="nowrap">{{ $r->entidad ?? '' }}</td>
-          <td class="nowrap">{{ $r->cna_nro }}</td>
-          <td class="nowrap text-mono">{{ $r->cna_fec }}</td>
-          <td class="nowrap">{{ $r->fondo_inv }}</td>
-          <td class="nowrap text-mono">{{ $r->anio_mes }}</td>
-          <td class="text-end text-mono">{{ $r->cna_imp!==null ? number_format((float)$r->cna_imp,2) : '' }}</td>
-          <td class="nowrap text-mono">{{ $r->nro_cuenta }}</td>
-          <td class="nowrap text-mono">{{ $r->nro_operacion }}</td>
-          <td class="nowrap">{{ $r->gestor }}</td>
-          <td class="nowrap">{{ $r->estado }}</td>
-          <td class="nowrap">{{ $r->gen_gestor }}</td>
-          <td class="nowrap">{{ $r->apr_gestor }}</td>
+        <tr class="{{ $loop->even ? 'bg-slate-50/60' : 'bg-white' }} hover:bg-emerald-50/40">
+          <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $r->documento }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->cliente }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->entidad ?? '' }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->cna_nro }}</td>
+          <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $r->cna_fec }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->fondo_inv }}</td>
+          <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $r->anio_mes }}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap font-mono">
+            {{ $r->cna_imp!==null ? number_format((float)$r->cna_imp,2) : '' }}
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $r->nro_cuenta }}</td>
+          <td class="px-3 py-2 whitespace-nowrap font-mono">{{ $r->nro_operacion }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->gestor }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->estado }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->gen_gestor }}</td>
+          <td class="px-3 py-2 whitespace-nowrap">{{ $r->apr_gestor }}</td>
         </tr>
       @empty
-        <tr><td colspan="15" class="text-secondary">Sin resultados.</td></tr>
+        <tr>
+          <td colspan="14" class="px-3 py-10 text-center text-slate-500">
+            Sin resultados.
+          </td>
+        </tr>
       @endforelse
       </tbody>
     </table>
   </div>
 
-  <div class="d-flex justify-content-between align-items-center mt-2">
-    <div class="small text-muted">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="text-sm text-slate-500">
       Mostrando {{ method_exists($rows,'firstItem') ? ($rows->firstItem() ?? 0) : 0 }}–{{ method_exists($rows,'lastItem') ? ($rows->lastItem() ?? 0) : 0 }}
       @if(method_exists($rows,'total')) de {{ $rows->total() }} @endif
     </div>
 
     @if(method_exists($rows,'links'))
-      {{ $rows->onEachSide(1)->withQueryString()->links('pagination::bootstrap-5') }}
+      {{-- usa tailwind default o tu paginador custom --}}
+      {{ $rows->onEachSide(1)->withQueryString()->links() }}
     @endif
   </div>
 </div>

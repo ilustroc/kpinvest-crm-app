@@ -1,98 +1,159 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="h-full">
 <head>
   <meta charset="utf-8" />
   <title>Ingreso | KP Invest</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#00a81c">
-
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-
-  <link rel="icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
-  <link rel="shortcut icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
-
-  <link rel="stylesheet" href="{{ asset('css/auth/login.css') }}">
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
 
-  <div class="wrap row g-0">
-    <!-- IZQUIERDA -->
-    <div class="side col-12 col-lg-6 d-none d-lg-flex flex-column">
-      <div class="d-flex align-items-center justify-content-between">
-        <a href="/" class="brand d-inline-flex align-items-center gap-2">
-          <img src="{{ asset('assets/img/logo.png') }}" alt="KP Invest" loading="lazy" decoding="async">
-        </a>
-      </div>
+<body class="min-h-screen login-bg antialiased flex items-center justify-center p-4 md:p-8">
 
-      <div class="side-hero flex-grow-1">
-        <img class="illus img-fluid" src="/assets/img/login-illustration.png" alt="Ilustración" loading="lazy" decoding="async">
-        <p class="mt-3 mb-0">Bienvenido a <strong>KP Invest</strong>.</p>
-      </div>
+  <main
+    class="glass-card w-full max-w-[920px] overflow-hidden rounded-[2rem]
+           border border-white/60 shadow-[0_28px_70px_rgba(2,6,23,.16)]
+           backdrop-blur-xl"
+  >
+    <div class="flex flex-col lg:flex-row min-h-[520px]">
 
-      <div class="help small">&copy; {{ date('Y') }} KP Invest</div>
-    </div>
+      {{-- PANEL IZQUIERDO (BLANCO) --}}
+      <aside class="relative hidden lg:flex w-[42%] flex-col bg-white/70 border-r border-slate-200/70 overflow-hidden">
 
-    <!-- DERECHA (form) -->
-    <div class="col-12 col-lg-6 panel d-flex align-items-center">
-      <div class="card-soft w-100">
-        <h1 class="h3 mb-1 fw-semibold">Iniciar sesión</h1>
-        <p class="help mb-4">Ingresa tus credenciales para continuar.</p>
-
-        @if ($errors->any())
-          <div class="alert alert-danger py-2">{{ $errors->first() }}</div>
-        @endif
-
-        <form id="login-form" method="POST" action="{{ route('login.post') }}" class="vstack gap-3" novalidate>
-          @csrf
-
-          <div>
-            <label for="email" class="form-label">Correo</label>
-            <input id="email" type="email" name="email" class="form-control" placeholder="tucorreo@empresa.com"
-                   value="{{ old('email') }}" required autocomplete="username" inputmode="email">
-            <div class="invalid-feedback">Ingresa un correo válido.</div>
-          </div>
-
-          <div>
-            <label for="password" class="form-label d-flex justify-content-between align-items-center">
-              <span>Contraseña</span>
-              <span id="caps" class="small d-none">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                <span class="caps">Bloq Mayús activado</span>
-              </span>
-            </label>
-            <div class="input-group">
-              <input id="password" type="password" name="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
-              <button class="input-group-text" type="button" id="togglePwd" aria-label="Mostrar contraseña">
-                <i class="bi bi-eye"></i>
-              </button>
-            </div>
-            <div class="invalid-feedback">Ingresa tu contraseña.</div>
-          </div>
-
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="remember" name="remember">
-              <label class="form-check-label" for="remember">Recordarme</label>
-            </div>
-            <a href="#" class="small link">¿Olvidaste tu contraseña?</a>
-          </div>
-
-          <button id="submitBtn" class="btn btn-brand w-100 mt-2">
-            <span class="btn-text">Ingresar</span>
-            <span class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
-          </button>
-        </form>
-
-        <div class="mt-4 d-flex justify-content-between small">
-          <a class="link" href="mailto:impulse.conciliacion-cobranza@mgi-go.com">Soporte</a>
-          <span class="text-muted">KP Invest</span>
+        {{-- decor suave --}}
+        <div class="pointer-events-none absolute inset-0 opacity-80">
+          <div class="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl"></div>
+          <div class="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl"></div>
+          <div class="absolute inset-0 left-grid-soft"></div>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <script src="{{ asset('js/auth/login.js') }}" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        {{-- LOGO ARRIBA --}}
+        <div class="relative z-10 flex items-center justify-center pt-10">
+          <img src="{{ asset('assets/img/logo.png') }}" alt="KP Invest" class="h-9 w-auto">
+        </div>
+
+        {{-- ILUSTRACIÓN EN MEDIO --}}
+        <div class="relative z-10 flex-1 flex items-center justify-center py-10">
+          <img
+            src="{{ asset('assets/img/login-illustration.png') }}"
+            alt="Ilustración"
+            class="w-full max-w-[280px] drop-shadow-[0_25px_25px_rgba(0,0,0,0.18)] animate-fade-in"
+          />
+        </div>
+
+        {{-- espacio inferior (solo para balance visual) --}}
+        <div class="relative z-10 pb-10"></div>
+      </aside>
+
+      {{-- PANEL DERECHO --}}
+      <section class="relative flex-1 px-8 py-10 md:px-12 md:py-12 bg-white/70">
+        {{-- decor --}}
+        <div class="pointer-events-none absolute inset-0 right-soft"></div>
+
+        <div class="relative z-10 flex h-full flex-col">
+
+          {{-- INICIO DE SESIÓN ARRIBA --}}
+          <header class="mb-8">
+            <h1 class="text-sm font-semibold tracking-[0.18em] uppercase text-slate-400">
+              Inicio de sesión
+            </h1>
+            <div class="mt-3 h-px w-full bg-slate-200/70"></div>
+          </header>
+
+          <form id="login-form" method="POST" action="{{ route('login.post') }}"
+                class="space-y-6 flex-grow" novalidate>
+            @csrf
+
+            {{-- EMAIL --}}
+            <div class="group">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2
+                       group-focus-within:text-emerald-600 transition-colors"
+              >
+                Correo Electrónico
+              </label>
+
+              <div class="relative">
+                <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 6h16v12H4z"/>
+                    <path d="m22 6-10 7L2 6"/>
+                  </svg>
+                </span>
+
+                <input
+                  type="email" name="email" required
+                  class="input-pro w-full pl-12"
+                  placeholder="ejemplo@kpinvest.pe"
+                />
+              </div>
+            </div>
+
+            {{-- PASSWORD --}}
+            <div class="group">
+              <div class="flex justify-between mb-2">
+                <label
+                  class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400
+                         group-focus-within:text-emerald-600 transition-colors"
+                >
+                  Contraseña
+                </label>
+              </div>
+
+              <div class="relative">
+                <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/>
+                    <path d="M17 8V7a5 5 0 0 0-10 0v1"/>
+                    <path d="M6 8h12v13H6z"/>
+                  </svg>
+                </span>
+
+                <input
+                  id="password" type="password" name="password" required
+                  class="input-pro w-full pl-12"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            {{-- REMEMBER --}}
+            <div class="flex items-center gap-3 pt-1">
+              <input
+                type="checkbox" id="remember"
+                class="h-5 w-5 rounded-lg border-slate-300 text-emerald-600
+                       focus:ring-4 focus:ring-emerald-500/20 transition-all"
+              />
+              <label for="remember" class="text-sm text-slate-600 cursor-pointer select-none">
+                Mantener sesión activa
+              </label>
+            </div>
+
+            {{-- BUTTON --}}
+            <button
+              class="w-full rounded-2xl py-3.5 font-bold text-base text-white
+                     bg-gradient-to-r from-emerald-600 to-emerald-500
+                     hover:from-emerald-700 hover:to-emerald-600
+                     shadow-[0_10px_35px_rgba(16,185,129,.25)]
+                     transition-all active:scale-[0.99]
+                     flex items-center justify-center gap-3"
+            >
+              <span>Ingresar al Sistema</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </form>
+
+          <footer class="mt-10 pt-6 border-t border-slate-200/70 flex justify-between items-center
+                        text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+            <span>© 2026 KP Invest</span>
+            <a href="#" class="hover:text-slate-600 transition-colors">Soporte Técnico</a>
+          </footer>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
 </body>
 </html>

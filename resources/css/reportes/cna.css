@@ -1,0 +1,53 @@
+/* resources/css/reportes/cna.css */
+
+.rpt-cna .ms-menu{
+  position: absolute;
+  z-index: 40;
+  margin-top: .5rem;
+  width: 100%;
+  border: 1px solid rgb(226 232 240);
+  background: white;
+  border-radius: 14px;
+  padding: .75rem;
+  box-shadow: 0 16px 40px rgba(15,23,42,.12);
+}
+
+.rpt-cna .ms-list{
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 12px;
+  background: white;
+}
+
+.rpt-cna .ms-item{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  padding:.42rem .6rem;
+  cursor:pointer;
+  user-select:none;
+}
+
+.rpt-cna .ms-item:hover{ background: rgba(15,23,42,.04); }
+
+.rpt-cna .ms-item input[type="checkbox"]{
+  width:16px; height:16px;
+  accent-color: #00a81c;
+}
+
+.rpt-cna .ms-text{
+  display:block;
+  width:100%;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpt-cna .cna-skeleton{
+  border:1px dashed rgb(226 232 240);
+  border-radius: 16px;
+  padding: 18px;
+  color: rgb(100 116 139);
+  text-align: center;
+}

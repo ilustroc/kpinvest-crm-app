@@ -1,222 +1,231 @@
 @extends('layouts.app')
 
 @section('title','Integración ▸ Subir Pagos')
-@section('crumb','Integración ▸ Subir Pagos')
+@section('crumb','Integración')
 
 @push('head')
-<style>
-  .ui-compact .card.pad{ padding:14px 16px; border-radius:14px }
-  .ui-compact .form-control,
-  .ui-compact .form-select{ font-size:.92rem; padding:.4rem .6rem; height:auto; background:var(--surface); border-color:var(--border) }
-  .ui-compact .form-control:focus,
-  .ui-compact .form-select:focus{ border-color:var(--brand); box-shadow:0 0 0 .25rem color-mix(in oklab, var(--brand) 22%, transparent) }
-  .ui-compact .btn{ --bs-btn-padding-y:.36rem; --bs-btn-padding-x:.75rem; --bs-btn-border-radius:.55rem; font-size:.92rem }
-  .ui-compact .btn-primary{ background:var(--brand); border-color:var(--brand) }
-  .ui-compact .btn-primary:hover{ background:color-mix(in oklab, var(--brand) 85%, black); border-color:color-mix(in oklab, var(--brand) 85%, black) }
-
-  .upload-card a{ color:var(--brand) } .upload-card a:hover{ color:color-mix(in oklab, var(--brand) 85%, black) }
-
-  .pill{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--border);background:var(--surface);
-        border-radius:999px;padding:.18rem .6rem;font-size:.8rem}
-  .mini{font-size:.9rem;color:var(--muted)}
-  .ok{color:#0a7a3d} .err{color:#b42318} .warn{color:#8a6a00}
-
-  #precheckBoxPagos{ background:color-mix(in oklab, var(--surface-2) 35%, transparent); border:1px dashed var(--border); border-radius:12px; padding:.6rem .75rem }
-</style>
+  @vite([
+    'resources/css/integracion/pagos.css',
+    'resources/js/integracion/pagos.js',
+  ])
 @endpush
 
 @section('content')
-  {{-- ALERTAS --}}
+@php
+  $ultimoLote = $ultimoLote ?? ($ultimoLotePropia ?? null);
+  $pagos      = $pagos ?? ($pagosPropia ?? collect());
+@endphp
+
+<div class="space-y-4">
+
+  {{-- ALERTAS (mismo modelo que Asignación) --}}
   @if(session('ok'))
-    <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>{!! nl2br(e(session('ok'))) !!}</div>
+    <div class="kp-alert kp-alert-ok">
+      <span class="kp-alert-ico">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 6 9 17l-5-5"/>
+        </svg>
+      </span>
+      <div class="text-sm leading-relaxed">{!! nl2br(e(session('ok'))) !!}</div>
+    </div>
   @endif
+
   @if(session('warn'))
-    <div class="alert alert-warning"><pre class="mb-0" style="white-space:pre-wrap">{{ session('warn') }}</pre></div>
+    <div class="kp-alert kp-alert-warn">
+      <span class="kp-alert-ico">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 9v4"/>
+          <path d="M12 17h.01"/>
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+        </svg>
+      </span>
+      <pre class="m-0 text-xs leading-relaxed whitespace-pre-wrap">{{ session('warn') }}</pre>
+    </div>
   @endif
+
   @if($errors->any())
-    <div class="alert alert-danger">{{ $errors->first() }}</div>
+    <div class="kp-alert kp-alert-bad">
+      <span class="kp-alert-ico">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 9v4"/>
+          <path d="M12 17h.01"/>
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+        </svg>
+      </span>
+      <div class="text-sm">{{ $errors->first() }}</div>
+    </div>
   @endif
 
-  @php
-    $ultimoLote = $ultimoLote ?? ($ultimoLotePropia ?? null);
-    $pagos      = $pagos ?? ($pagosPropia ?? collect());
-  @endphp
+  {{-- CARD: SUBIDA (igual patrón de Asignación) --}}
+  <div class="kp-card p-5">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <h2 class="text-base font-extrabold text-slate-900">Subida de pagos</h2>
+        <div class="text-sm text-slate-500 mt-1">
+          Formato aceptado: <span class="font-semibold text-slate-700">CSV UTF-8</span> (coma).
+        </div>
+      </div>
 
-  <div class="ui-compact">
-    {{-- Subida --}}
-    <div class="card pad mb-3 upload-card">
-      <h5 class="mb-2 d-flex align-items-center gap-2"><i class="bi bi-upload"></i><span>Subida de archivo</span></h5>
-      <p class="text-secondary mb-2">
-        Formato aceptado: <strong>CSV UTF-8</strong>, delimitado por <strong>coma</strong>.
-        <a href="{{ route('integracion.pagos.template') }}">Descargar plantilla</a>.
-      </p>
+      <a class="kp-btn kp-btn-outline inline-flex items-center gap-2"
+         href="{{ route('integracion.pagos.template') }}">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <path d="M7 10l5 5 5-5"/>
+          <path d="M12 15V3"/>
+        </svg>
+        Descargar plantilla
+      </a>
+    </div>
 
-      <form method="POST" action="{{ route('integracion.pagos.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end" id="formImportPagos">
-        @csrf
-        <div class="col-lg-7">
-          <label class="form-label">Archivo CSV</label>
-          <input type="file" name="archivo" id="csvFilePagos" class="form-control" accept=".csv,text/csv" required>
-          <div class="form-text">
-            Encabezados esperados:
-            <span class="pill"><i class="bi bi-card-checklist"></i> Fecha</span>
-            <span class="pill">DNI</span>
-            <span class="pill">Nombre</span>
-            <span class="pill">Operacion</span>
-            <span class="pill">Monto</span>
-            <span class="pill">Agente</span>
-            <span class="pill">Cosecha</span>
-            <span class="pill">Cuenta_Recaudo</span>
-            <span class="pill">Entidad Financiera</span>
+    <div class="kp-divider my-4"></div>
+
+    <form method="POST"
+          action="{{ route('integracion.pagos.import') }}"
+          enctype="multipart/form-data"
+          id="formImportPagos"
+          class="grid grid-cols-1 lg:grid-cols-10 gap-3 items-end">
+      @csrf
+
+      <div class="lg:col-span-7 space-y-2">
+        <label class="kp-label">Archivo CSV</label>
+
+        <input type="file"
+               name="archivo"
+               id="csvFilePagos"
+               accept=".csv,text/csv"
+               required
+               class="kp-input-file"/>
+
+        <div class="text-xs text-slate-500 leading-relaxed">
+          Encabezados esperados:
+          <span class="kp-pill">Fecha</span>
+          <span class="kp-pill">DNI</span>
+          <span class="kp-pill">Nombre</span>
+          <span class="kp-pill">Operacion</span>
+          <span class="kp-pill">Monto</span>
+          <span class="kp-pill">Agente</span>
+          <span class="kp-pill">Cosecha</span>
+          <span class="kp-pill">Cuenta_Recaudo</span>
+          <span class="kp-pill">Entidad Financiera</span>
+        </div>
+      </div>
+
+      <div class="lg:col-span-3">
+        <button type="submit"
+                class="kp-btn kp-btn-primary w-full inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                id="btnImportPagos"
+                disabled>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <path d="M7 10l5 5 5-5"/>
+            <path d="M12 15V3"/>
+          </svg>
+          Importar
+        </button>
+      </div>
+
+      {{-- PRECHECK --}}
+      <div class="lg:col-span-10 hidden" id="precheckBoxPagos">
+        <div class="kp-divider my-3"></div>
+
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2">
+            <span class="kp-mini-ico kp-ok">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6 9 17l-5-5"/>
+              </svg>
+            </span>
+            <span class="kp-mini" id="hdrMsgPagos" aria-live="polite">Validando encabezados…</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="kp-mini-ico kp-warn">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19V5"/>
+                <path d="M20 19V5"/>
+                <path d="M4 12h16"/>
+                <path d="M8 9h.01"/>
+                <path d="M8 15h.01"/>
+              </svg>
+            </span>
+            <span class="kp-mini" id="typeMsgPagos" aria-live="polite">Tipos por muestra: —</span>
           </div>
         </div>
-        <div class="col-lg-3">
-          <button class="btn btn-primary w-100" id="btnImportPagos" disabled>
-            <i class="bi bi-cloud-upload me-1"></i> Importar
-          </button>
-        </div>
 
-        {{-- Pre-check --}}
-        <div class="col-12 d-none" id="precheckBoxPagos">
-          <hr class="my-2">
-          <div class="d-flex flex-wrap align-items-center gap-3">
-            <div><i class="bi bi-check-circle-fill ok me-1"></i><span class="mini" id="hdrMsgPagos" aria-live="polite">Validando encabezados…</span></div>
-            <div><i class="bi bi-123 warn me-1"></i><span class="mini" id="typeMsgPagos" aria-live="polite">Tipos por muestra: —</span></div>
-          </div>
-          <div class="table-responsive mt-2 d-none" id="issuesWrapPagos">
-            <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Fila</th><th>Columna</th><th>Valor</th><th>Detalle</th></tr></thead>
-              <tbody id="issuesBodyPagos"></tbody>
+        <div class="mt-3 hidden" id="issuesWrapPagos">
+          <div class="kp-table">
+            <table class="min-w-full text-sm">
+              <thead class="kp-thead">
+                <tr>
+                  <th class="px-3 py-2 text-left">Fila</th>
+                  <th class="px-3 py-2 text-left">Columna</th>
+                  <th class="px-3 py-2 text-left">Valor</th>
+                  <th class="px-3 py-2 text-left">Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="issuesBodyPagos" class="divide-y divide-slate-200/60"></tbody>
             </table>
           </div>
         </div>
-      </form>
-    </div>
-
-    {{-- Último lote --}}
-    <div class="card pad">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> <span>Último lote importado</span></h5>
-        @if($ultimoLote)
-          <span class="text-secondary small">
-            Lote #{{ $ultimoLote->id }} · {{ $ultimoLote->created_at->format('Y-m-d H:i') }} · {{ $ultimoLote->total_registros }} registros
-          </span>
-        @endif
       </div>
+    </form>
+  </div>
 
-      @if(!$ultimoLote)
-        <div class="text-secondary">Aún no hay importaciones.</div>
-      @else
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>DNI</th>
-                <th>Operacion</th>
-                <th>Nombre</th>
-                <th>Entidad Financiera</th>
-                <th class="text-end">Monto</th>
-                <th>Agente</th>
-                <th>Cosecha</th>
-                <th>Cuenta_Recaudo</th>
-              </tr>
-            </thead>
-            <tbody>
-              @forelse($pagos as $p)
-                <tr>
-                  <td class="text-nowrap">{{ optional($p->fecha)->format('Y-m-d') }}</td>
-                  <td class="text-nowrap">{{ $p->dni }}</td>
-                  <td class="text-nowrap">{{ $p->operacion }}</td>
-                  <td>{{ $p->nombre_cliente }}</td>
-                  <td>{{ $p->entidad }}</td>
-                  <td class="text-end">{{ number_format((float)$p->monto_pagado, 2) }}</td>
-                  <td>{{ $p->gestor }}</td>
-                  <td>{{ $p->cosecha }}</td>
-                  <td>{{ $p->cuenta_recaudo }}</td>
-                </tr>
-              @empty
-                <tr><td colspan="9" class="text-secondary">Sin datos para mostrar.</td></tr>
-              @endforelse
-            </tbody>
-          </table>
+  {{-- ÚLTIMO LOTE --}}
+  <div class="kp-card p-5">
+    <div class="flex items-start justify-between gap-3 flex-wrap mb-3">
+      <h2 class="text-base font-extrabold text-slate-900">Último lote importado</h2>
+
+      @if($ultimoLote)
+        <div class="text-xs text-slate-500">
+          Lote <span class="font-semibold text-slate-700">#{{ $ultimoLote->id }}</span>
+          · {{ $ultimoLote->created_at->format('Y-m-d H:i') }}
+          · {{ $ultimoLote->total_registros }} registros
         </div>
       @endif
     </div>
+
+    @if(!$ultimoLote)
+      <div class="text-sm text-slate-500">Aún no hay importaciones.</div>
+    @else
+      <div class="kp-table">
+        <table class="min-w-full text-sm">
+          <thead class="kp-thead">
+            <tr>
+              <th class="px-3 py-2 text-left">Fecha</th>
+              <th class="px-3 py-2 text-left">DNI</th>
+              <th class="px-3 py-2 text-left">Operacion</th>
+              <th class="px-3 py-2 text-left">Nombre</th>
+              <th class="px-3 py-2 text-left">Entidad Financiera</th>
+              <th class="px-3 py-2 text-right">Monto</th>
+              <th class="px-3 py-2 text-left">Agente</th>
+              <th class="px-3 py-2 text-left">Cosecha</th>
+              <th class="px-3 py-2 text-left">Cuenta_Recaudo</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200/60">
+            @forelse($pagos as $p)
+              <tr class="hover:bg-emerald-50/40">
+                <td class="px-3 py-2 whitespace-nowrap">{{ optional($p->fecha)->format('Y-m-d') }}</td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ $p->dni }}</td>
+                <td class="px-3 py-2 whitespace-nowrap">{{ $p->operacion }}</td>
+                <td class="px-3 py-2">{{ $p->nombre_cliente }}</td>
+                <td class="px-3 py-2">{{ $p->entidad }}</td>
+                <td class="px-3 py-2 text-right whitespace-nowrap">{{ number_format((float)$p->monto_pagado, 2) }}</td>
+                <td class="px-3 py-2">{{ $p->gestor }}</td>
+                <td class="px-3 py-2">{{ $p->cosecha }}</td>
+                <td class="px-3 py-2">{{ $p->cuenta_recaudo }}</td>
+              </tr>
+            @empty
+              <tr>
+                <td colspan="9" class="px-3 py-4 text-sm text-slate-500">Sin datos para mostrar.</td>
+              </tr>
+            @endforelse
+          </tbody>
+        </table>
+      </div>
+    @endif
   </div>
+
+</div>
 @endsection
-
-@push('scripts')
-<script>
-(function(){
-  // Encabezados EXACTOS
-  const HEADERS = ["Fecha","DNI","Nombre","Operacion","Monto","Agente","Cosecha","Cuenta_Recaudo","Entidad Financiera"];
-
-  const $file = document.getElementById('csvFilePagos');
-  const $btn  = document.getElementById('btnImportPagos');
-  const $box  = document.getElementById('precheckBoxPagos');
-  const $hdr  = document.getElementById('hdrMsgPagos');
-  const $typ  = document.getElementById('typeMsgPagos');
-  const $wrap = document.getElementById('issuesWrapPagos');
-  const $body = document.getElementById('issuesBodyPagos');
-
-  function splitCSV(line, sep){
-    const out=[]; let cur=''; let q=false;
-    for(let i=0;i<line.length;i++){
-      const c=line[i];
-      if(c==='"'){ q=!q } else if(c===sep && !q){ out.push(cur); cur='' } else { cur+=c }
-    }
-    out.push(cur); return out.map(s=>s.replace(/^"|"$/g,'').trim());
-  }
-  function parseCSV(text){
-    text=(text||'').replace(/\r/g,'');
-    const lines=text.split(/\n+/).filter(Boolean);
-    if(!lines.length) return {rows:[],sep:','};
-    const sep=(lines[0].split(';').length > lines[0].split(',').length) ? ';' : ',';
-    return {rows:lines.map(l=>splitCSV(l,sep)), sep};
-  }
-  const isNumber=v=>{ if(v===''||v==null) return true; const x=(v+'').replace(/\s/g,'').replace(/,/g,'.'); return /^-?\d+(\.\d+)?$/.test(x) }
-  const parseDate=v=>{ if(!v) return null; const s=v.trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return s; m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; return null }
-  const isDate=v=> v==='' || parseDate(v)!=null;
-
-  $file?.addEventListener('change', ev=>{
-    const file = ev.target.files?.[0];
-    if(!file){ $btn.disabled=true; return }
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const {rows}=parseCSV(e.target.result||'');
-      if(!rows.length){ $btn.disabled=true; return }
-
-      $box.classList.remove('d-none'); $body.innerHTML=''; $wrap.classList.add('d-none');
-
-      const header=rows[0];
-      const missing=HEADERS.filter(h=>!header.includes(h));
-      const extra=header.filter(h=>!HEADERS.includes(h));
-      const headerOk=missing.length===0;
-
-      $hdr.innerHTML = headerOk
-        ? `Encabezados: OK (<span class="ok">${header.length}</span>)`
-        : `Encabezados: faltan <span class="err">${missing.join(', ')||'-'}</span>${extra.length?`, extra: <span class='warn'>${extra.join(', ')}</span>`:''}`;
-
-      let issues=[], sampled=0;
-      for(let r=1; r<Math.min(rows.length,51); r++){
-        const row=rows[r]; if(!row||!row.length) continue; sampled++;
-        HEADERS.forEach((h,idx)=>{
-          const val=(row[idx]??'').trim(); let ok=true, detail='';
-          if(h==='Fecha'){ ok=isDate(val); if(!ok) detail='Fecha inválida. Use YYYY-MM-DD o DD/MM/YYYY' }
-          else if(h==='Monto'){ ok=isNumber(val); if(!ok) detail='Número inválido' }
-          if(!ok){ issues.push({r:r+1,col:h,val,detail}) }
-        });
-      }
-
-      $typ.textContent = `Tipos por muestra: ${sampled} fila(s) verificadas, ${issues.length} posible(s) problema(s)`;
-      if(issues.length){
-        $wrap.classList.remove('d-none');
-        $body.innerHTML = issues.slice(0,80).map(it=>`<tr><td>${it.r}</td><td>${it.col}</td><td>${(it.val||'').replace(/</g,'&lt;')}</td><td>${it.detail}</td></tr>`).join('');
-      }
-      $btn.disabled = !headerOk;
-    };
-    reader.readAsText(file,'UTF-8');
-  });
-})();
-</script>
-@endpush

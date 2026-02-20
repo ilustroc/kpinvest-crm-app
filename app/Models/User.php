@@ -11,7 +11,6 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    // ⛳️ SOLO UNA VEZ
     protected $fillable = [
         'name',
         'email',
@@ -26,7 +25,6 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    // Opcional (si lo usas, puedes guardar el password en texto y se hashea solo)
     protected function casts(): array
     {
         return [

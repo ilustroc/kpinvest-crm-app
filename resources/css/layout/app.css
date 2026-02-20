@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+/* ===== KP LOOK (igual al login) ===== */
+:root{
+  --brand:#00a81c;
+  --brand-ink:#008517;
+}
+
+@layer base{
+  html{ font-family: Inter, ui-sans-serif, system-ui; }
+  body{ @apply text-slate-900; }
+}
+
+/* ===============================
+   FONDO (tipo login) - SIN overlay
+   =============================== */
+@layer components{
+  .kp-bg{
+    background:
+      /* grid MUY suave */
+      linear-gradient(to right, rgba(15,23,42,.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15,23,42,.035) 1px, transparent 1px),
+
+      /* base blanca */
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background-size: 30px 30px, 30px 30px, auto;
+    background-position: center, center, center;
+  }
+
+  /* ===============================
+     TARJETAS / SUPERFICIES
+     =============================== */
+  .kp-card{
+    @apply rounded-[1.25rem] border border-white/60 bg-white/70 backdrop-blur-xl;
+    @apply shadow-[0_18px_55px_rgba(2,6,23,.10)];
+    @apply p-4;
+  }
+
+  /* ===============================
+     INPUTS
+     =============================== */
+  .kp-label{
+    @apply block text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 mb-2;
+  }
+
+  .kp-input{
+    @apply w-full rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-2.5 text-sm;
+    @apply text-slate-900 placeholder:text-slate-400 shadow-sm;
+    @apply outline-none transition;
+    @apply focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/15;
+  }
+
+  /* Botón del ojo */
+  .kp-eye{
+    @apply absolute right-2 top-1/2 -translate-y-1/2 rounded-xl;
+    @apply border border-slate-200/70 bg-white/70 p-2 text-slate-600;
+    @apply hover:text-slate-900 transition;
+  }
+
+  /* ===============================
+     BOTONES
+     =============================== */
+  .kp-btn{
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5;
+    @apply text-sm font-extrabold transition active:scale-[0.99];
+    @apply border border-transparent;
+  }
+
+  .kp-btn-primary{
+    @apply text-white;
+    @apply bg-gradient-to-r from-emerald-600 to-emerald-500;
+    @apply hover:from-emerald-700 hover:to-emerald-600;
+    @apply shadow-[0_12px_35px_rgba(16,185,129,.22)];
+  }
+
+  .kp-btn-ghost{
+    @apply text-slate-700 bg-white/60 border border-slate-200/70;
+    @apply hover:bg-white/80 hover:border-slate-300/70;
+  }
+
+  /* ===============================
+     BADGES / CHIPS
+     =============================== */
+  .kp-badge{
+    @apply inline-flex items-center justify-center rounded-full;
+    @apply border border-slate-200/70 bg-white/70 px-3 py-1;
+    @apply text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-700;
+  }
+
+  .kp-chip{
+    @apply inline-flex items-center justify-center rounded-full;
+    @apply border px-2.5 py-1 text-[11px] font-extrabold tracking-[0.12em];
+  }
+  .kp-chip-ok{
+    @apply border-emerald-500/25 bg-emerald-500/10 text-emerald-800;
+  }
+  .kp-chip-off{
+    @apply border-rose-500/25 bg-rose-500/10 text-rose-800;
+  }
+
+  /* ===============================
+     ICON BUTTONS
+     =============================== */
+  .kp-icon-btn{
+    @apply inline-flex items-center justify-center;
+    @apply h-9 w-9 rounded-xl;
+    @apply border border-slate-200/70 bg-white/60 text-slate-700;
+    @apply hover:bg-white/80 hover:border-slate-300/70 transition;
+  }
+
+  .kp-icon-success{
+    @apply text-emerald-700;
+  }
+  .kp-icon-danger{
+    @apply text-rose-700;
+  }
+
+  /* ===============================
+     ALERTAS
+     =============================== */
+  .kp-alert{
+    @apply flex items-start gap-3 rounded-2xl border bg-white/70 p-3.5 shadow-sm;
+  }
+  .kp-alert-ic{
+    @apply mt-0.5 h-9 w-9 rounded-xl grid place-items-center;
+  }
+  .kp-alert-ok{
+    @apply border-emerald-500/20;
+  }
+  .kp-alert-ok .kp-alert-ic{
+    @apply bg-emerald-500/10 text-emerald-700;
+  }
+  .kp-alert-bad{
+    @apply border-rose-500/20;
+  }
+  .kp-alert-bad .kp-alert-ic{
+    @apply bg-rose-500/10 text-rose-700;
+  }
+
+  /* ===============================
+     TABLAS
+     =============================== */
+  .kp-table-wrap{
+    @apply overflow-auto rounded-2xl border border-slate-200/70 bg-white/60;
+  }
+
+  .kp-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+
+  .kp-table thead th{
+    @apply text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500;
+    @apply bg-white/70 backdrop-blur-xl;
+    @apply px-4 py-3 border-b border-slate-200/70;
+  }
+
+  .kp-table tbody td{
+    @apply px-4 py-3 text-sm border-b border-slate-200/50;
+    @apply bg-white/40;
+  }
+
+  .kp-table tbody tr:hover td{
+    @apply bg-emerald-500/5;
+  }
+
+  /* ===============================
+     MODALES
+     =============================== */
+  .kp-modal{
+    @apply fixed inset-0 z-50 grid place-items-center p-4;
+  }
+
+  .kp-modal-backdrop{
+    @apply absolute inset-0 bg-slate-950/40 backdrop-blur-[2px];
+  }
+
+  .kp-modal-card{
+    @apply relative w-full max-w-lg overflow-hidden rounded-2xl;
+    @apply border border-white/60 bg-white/80 backdrop-blur-xl;
+    @apply shadow-[0_30px_80px_rgba(2,6,23,.18)];
+  }
+
+  .kp-modal-head{
+    @apply flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200/70;
+  }
+
+  .kp-modal-body{
+    @apply px-5 py-4;
+  }
+
+  .kp-modal-foot{
+    @apply px-5 py-4 border-t border-slate-200/70 flex items-center justify-end gap-2;
+  }
+
+  .kp-x{
+    @apply h-9 w-9 rounded-xl grid place-items-center;
+    @apply border border-slate-200/70 bg-white/60 text-slate-700;
+    @apply hover:bg-white/80 transition;
+  }
+
+  /* ===============================
+     SWITCH (checkbox)
+     =============================== */
+  .kp-switch{
+    appearance:none;
+    width:44px;
+    height:26px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.55);
+    background: rgba(226,232,240,.9);
+    position:relative;
+    transition:.15s;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.55);
+  }
+  .kp-switch::after{
+    content:"";
+    position:absolute;
+    top:3px; left:3px;
+    width:20px; height:20px;
+    border-radius:999px;
+    background:white;
+    box-shadow: 0 6px 14px rgba(2,6,23,.12);
+    transition:.15s;
+  }
+  .kp-switch:checked{
+    background: rgba(16,185,129,1);
+    border-color: rgba(16,185,129,1);
+  }
+  .kp-switch:checked::after{
+    transform: translateX(18px);
+  }
+  .kp-switch:focus{
+    outline:none;
+    box-shadow: 0 0 0 6px rgba(16,185,129,.18);
+  }
+}

@@ -1,0 +1,12 @@
+/* Solo estilos “extra” del módulo. El look base viene del layout/login */
+
+.admin-compact .struct .kp-table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Evita que el sticky se vea “duro” */
+.admin-compact .struct .kp-table thead{
+  box-shadow: 0 8px 18px rgba(2,6,23,.06);
+}

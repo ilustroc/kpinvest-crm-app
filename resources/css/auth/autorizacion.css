@@ -1,0 +1,64 @@
+/* public/css/auth/autorizacion.css */
+
+/* ======= Marca KP: verde primario + azul acento ======= */
+:root{
+  --brand:#00a81c;        /* Verde KP (primario) */
+  --brand-ink:#008517;    /* Hover/ink */
+  --accent:#0b4ea2;       /* Azul KP (acento) */
+  --accent-ink:#093f82;
+
+  --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
+  --ink:#151a23; --muted:#6d7b8a;
+}
+
+/* Botonería con coherencia de marca */
+.btn-primary{ background:var(--brand); border-color:var(--brand) }
+.btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
+.btn-outline-primary{ color:var(--accent); border-color:var(--accent) }
+.btn-outline-primary:hover{ color:#fff; background:var(--accent-ink); border-color:var(--accent-ink) }
+
+/* Inputs / buscador */
+.card .form-control{ background:var(--surface); border-color:var(--border) }
+.card .form-control::placeholder{ color:var(--muted) }
+.card .form-control:focus{
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 .2rem color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+/* Tablas: encabezado fijo + hover suave con acento */
+.table-responsive{ max-height: none } /* deja crecer; los modales ya son scrollables */
+table thead th{
+  position:sticky; top:0; z-index:1;
+  background: color-mix(in oklab, var(--surface-2) 55%, transparent) !important;
+  color: var(--ink);
+  text-transform: uppercase; letter-spacing:.3px; font-size:.82rem;
+  border-bottom:1px solid var(--border);
+  box-shadow:0 3px 8px rgba(15,23,42,.06);
+}
+.table.table-hover tbody tr:hover{
+  background: color-mix(in oklab, var(--accent) 10%, var(--brand) 6%);
+}
+
+/* Chips/badges suaves (si se usan en celdas) */
+.badge-soft{
+  background:color-mix(in oklab, var(--brand) 12%, transparent);
+  color:var(--brand);
+  border:1px solid color-mix(in oklab, var(--brand) 24%, transparent);
+  border-radius:999px; padding:.18rem .55rem; font-weight:600
+}
+
+/* Paginación bootstrap (si aparece) */
+.pagination .page-link{ border-color:var(--border); color:var(--ink) }
+.pagination .page-link:hover{
+  background:color-mix(in oklab, var(--brand) 10%, transparent);
+  border-color:color-mix(in oklab, var(--brand) 28%, transparent);
+}
+.pagination .page-item.active .page-link{
+  background:var(--brand); border-color:var(--brand)
+}
+
+/* Scrollbar horizontal en tablas anchas */
+.table-responsive::-webkit-scrollbar{ height:10px }
+.table-responsive::-webkit-scrollbar-thumb{
+  background: color-mix(in oklab, var(--accent) 22%, transparent); border-radius:10px
+}

@@ -36,9 +36,9 @@ class DataImport
 
         // Columnas a actualizar si el registro ya existe
         $updateCols = [
-            'cuenta', 'nombre', 'producto', 'dpto', 'provincia', 'distrito', 'direccion',
-            'entidad', 'cosecha', 'fecha_compra', 'fecha_castigo', 'moneda',
-            'deuda_capital', 'interes', 'deuda_total', 'updated_at'
+            'cuenta','nombre','producto','dpto','provincia','distrito','direccion',
+            'entidad','cosecha','fecha_compra','fecha_castigo','moneda',
+            'deuda_capital','interes','deuda_total','updated_at'
         ];
 
         while (($row = fgetcsv($fh, 0, $del)) !== false) {
@@ -68,7 +68,13 @@ class DataImport
         $map = [];
         foreach ($headers as $i => $h) {
             $norm = $this->toUtf8($h);
+
+            $norm = preg_replace('/^\xEF\xBB\xBF/', '', $norm);
+
+            $norm = strtoupper(trim($norm));
+
             if ($norm === 'ENTIDAD_FINANCIERA') $norm = 'ENTIDAD';
+
             $map[$i] = $norm;
         }
         return $map;
@@ -80,6 +86,7 @@ class DataImport
         foreach ($row as $i => $val) {
             $key = $map[$i] ?? null;
             if (!$key) continue;
+            $key = strtoupper(trim($key));
 
             $v = $this->toUtf8($val);
 

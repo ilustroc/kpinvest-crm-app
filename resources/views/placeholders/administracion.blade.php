@@ -3,63 +3,138 @@
 @section('crumb','Administración')
 
 @push('head')
-  <link rel="stylesheet" href="{{ asset('css/admin/admin.css') }}">
+  @vite(['resources/css/admin/admin.css'])
 @endpush
 
 @section('content')
-<div class="admin-compact">
+@php
+  $me = auth()->user();
+
+  $meRole = strtolower(trim($me->role ?? 'usuario'));
+
+  $roleOptions = match($meRole){
+    'administrador' => ['supervisor'=>'Supervisor','asesor'=>'Asesor','soporte'=>'Soporte','usuario'=>'Usuario'],
+    'supervisor'    => ['asesor'=>'Asesor','soporte'=>'Soporte'],
+    'soporte'       => ['usuario'=>'Usuario'],
+    default         => [],
+  };
+@endphp
+
+{{-- Boot data SIN JS inline --}}
+<div id="adminBoot"
+     data-me-role="{{ $meRole }}"
+     data-me-id="{{ auth()->id() }}"
+     data-supervisores='@json($supervisores->map(fn($s)=>[
+        "id"=>$s->id,
+        "label"=>$s->name." (".$s->email.")"
+     ])->values())'
+     data-pw-action-template="{{ route('administracion.usuarios.password', '__ID__') }}">
+</div>
+
+<div class="admin-compact space-y-4">
 
   {{-- ALERTAS --}}
   @if(session('ok'))
-    <div class="alert alert-success d-flex align-items-center" role="alert">
-      <i class="bi bi-check-circle me-2"></i>
-      <div>{{ session('ok') }}</div>
+    <div class="kp-alert kp-alert-ok">
+      <span class="kp-alert-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+          <path d="M9 12l2 2 4-4"></path>
+          <path d="M12 22a10 10 0 1 0-10-10 10 10 0 0 0 10 10Z"></path>
+        </svg>
+      </span>
+      <div class="font-semibold">{{ session('ok') }}</div>
     </div>
   @endif
+
   @if($errors->any())
-    <div class="alert alert-danger d-flex align-items-center" role="alert">
-      <i class="bi bi-exclamation-triangle me-2"></i>
-      <div>{{ $errors->first() }}</div>
+    <div class="kp-alert kp-alert-bad">
+      <span class="kp-alert-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+          <path d="M12 9v4"></path><path d="M12 17h.01"></path>
+          <path d="M10.3 3.6 2.3 17.5A2 2 0 0 0 4 20h16a2 2 0 0 0 1.7-2.5L13.7 3.6a2 2 0 0 0-3.4 0Z"></path>
+        </svg>
+      </span>
+      <div class="font-semibold">{{ $errors->first() }}</div>
     </div>
   @endif
 
-  {{-- Barra superior: filtro + búsqueda + crear --}}
-  <div class="card pad mb-2">
-    <div class="filters">
-      <form method="GET" action="{{ route('administracion.index') }}">
-        <div class="form-check form-switch m-0">
-          <input class="form-check-input" type="checkbox" id="swInactivos" name="inactivos" value="1" {{ request('inactivos') ? 'checked' : '' }}>
-          <label class="form-check-label" for="swInactivos">Mostrar inactivos</label>
+  {{-- FILTROS --}}
+  <div class="kp-card">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
+      <form method="GET" action="{{ route('administracion.index') }}"
+            class="flex flex-col gap-3 lg:flex-row lg:items-center lg:flex-1">
+        {{-- Switch --}}
+        <label class="inline-flex items-center gap-3 select-none">
+          <input id="swInactivos" type="checkbox" name="inactivos" value="1"
+                 class="kp-switch"
+                 {{ request('inactivos') ? 'checked' : '' }}>
+          <span class="text-sm font-semibold text-slate-700">Mostrar inactivos</span>
+        </label>
+
+        {{-- Search --}}
+        <div class="relative lg:min-w-[320px] lg:flex-1">
+          <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <path d="M21 21l-4.3-4.3"></path>
+              <path d="M10.8 18.2a7.4 7.4 0 1 1 0-14.8 7.4 7.4 0 0 1 0 14.8Z"></path>
+            </svg>
+          </span>
+          <input id="adminSearch" type="search" name="q" value="{{ request('q') }}"
+                 class="kp-input pl-10"
+                 placeholder="Buscar nombre o email…">
         </div>
 
-        <div class="input-icon" style="min-width:260px; flex:1">
-          <input type="search" class="form-control" name="q" value="{{ request('q') }}" placeholder="Buscar nombre o email…">
-        </div>
+        <div class="flex items-center gap-2">
+          <button class="kp-btn kp-btn-ghost" type="submit">
+            <span class="inline-flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                <path d="M3 4h18"></path><path d="M6 8h12"></path><path d="M10 12h4"></path>
+              </svg>
+              Aplicar
+            </span>
+          </button>
 
-        <button class="btn btn-outline-primary" type="submit">
-          <i class="bi bi-filter-right me-1"></i> Aplicar
-        </button>
-        <a class="btn btn-outline-primary" href="{{ route('administracion.index') }}">
-          Limpiar
-        </a>
+          <a class="kp-btn kp-btn-ghost" href="{{ route('administracion.index') }}">
+            Limpiar
+          </a>
+        </div>
       </form>
 
-      <div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateUser">
-          <i class="bi bi-person-plus me-1"></i> Nuevo usuario
+      <div class="lg:pl-3">
+        <button type="button" class="kp-btn kp-btn-primary" data-modal-open="createUser">
+          <span class="inline-flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+              <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+              <path d="M19 8v6"></path><path d="M22 11h-6"></path>
+            </svg>
+            Nuevo usuario
+          </span>
         </button>
       </div>
+
     </div>
   </div>
 
-  {{-- Tabla de usuarios --}}
-  <div class="card pad struct">
-    <h5 class="mb-3 d-flex align-items-center gap-2">
-      <i class="bi bi-people" style="color:var(--accent)"></i> <span>Usuarios</span>
-    </h5>
+  {{-- TABLA --}}
+  <div class="kp-card struct">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h2 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+        <span class="h-9 w-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-700">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.9"></path>
+            <path d="M16 3.1a4 4 0 0 1 0 7.8"></path>
+          </svg>
+        </span>
+        Usuarios
+      </h2>
+    </div>
 
-    <div class="table-responsive">
-      <table class="table align-middle">
+    <div class="kp-table-wrap">
+      <table class="kp-table">
         <thead>
           <tr>
             <th>Nombre</th>
@@ -67,180 +142,271 @@
             <th class="text-center">Rol</th>
             <th class="text-center">Supervisor</th>
             <th class="text-center">Estado</th>
-            <th class="col-actions">Acciones</th>
+            <th class="text-right w-[210px]">Acciones</th>
           </tr>
         </thead>
         <tbody>
         @forelse($users as $u)
           @php
-            $me = auth()->user();
-            $canManage = $me->role === 'administrador'
-                      || ($me->role === 'supervisor' && in_array($u->role, ['asesor','soporte']))
-                      || ($me->role === 'soporte'    && in_array($u->role, ['usuario']));
+            $uRole   = strtolower(trim($u->role ?? ''));
+            $isOn    = (bool) $u->active;
+
+            $canManage = $meRole === 'administrador'
+                      || ($meRole === 'supervisor' && in_array($uRole, ['asesor','soporte']))
+                      || ($meRole === 'soporte'    && in_array($uRole, ['usuario']));
           @endphp
           <tr>
-            <td class="fw-semibold">{{ $u->name }}</td>
-            <td class="text-secondary td-email">
-              <div class="text-truncate" title="{{ $u->email }}">{{ $u->email }}</div>
+            <td class="font-semibold text-slate-900">{{ $u->name }}</td>
+
+            <td class="text-slate-600">
+              <div class="max-w-[340px] truncate" title="{{ $u->email }}">{{ $u->email }}</div>
             </td>
+
             <td class="text-center">
-              <span class="badge rounded-pill text-bg-light border">{{ strtoupper($u->role) }}</span>
+              <span class="kp-badge">{{ strtoupper($u->role) }}</span>
             </td>
+
             <td class="text-center">
               @if($u->supervisor)
-                <span class="text-secondary">{{ $u->supervisor->name }}</span>
+                <span class="text-slate-600">{{ $u->supervisor->name }}</span>
               @else
-                <span class="text-muted">—</span>
+                <span class="text-slate-400">—</span>
               @endif
             </td>
+
             <td class="text-center">
-              @if($u->active)
-                <span class="state-chip state-ok">ACTIVO</span>
+              @if($isOn)
+                <span class="kp-chip kp-chip-ok">ACTIVO</span>
               @else
-                <span class="state-chip state-off">INACTIVO</span>
+                <span class="kp-chip kp-chip-off">INACTIVO</span>
               @endif
             </td>
-            <td class="col-actions">
-              <div class="actions-wrap">
+
+            <td class="text-right">
+              <div class="flex items-center justify-end gap-2">
+
                 {{-- Cambiar contraseña --}}
-                @if($canManage || $me->role === 'administrador' || $me->id === $u->id)
-                  <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $u->id }}" title="Contraseña">
-                    <i class="bi bi-key"></i>
+                @if($meRole === 'administrador' || $me->id === $u->id || $canManage)
+                  <button type="button"
+                          class="kp-icon-btn"
+                          title="Cambiar contraseña"
+                          data-modal-open="pw"
+                          data-user-id="{{ $u->id }}"
+                          data-user-name="{{ $u->name }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                      <path d="M21 2l-2 2"></path>
+                      <path d="M7 14l-4 4v3h3l4-4"></path>
+                      <path d="M16 5l3 3"></path>
+                      <path d="M14 7l3 3"></path>
+                      <path d="M8 13l3 3"></path>
+                      <path d="M9 12l7-7"></path>
+                    </svg>
                   </button>
                 @endif
 
                 {{-- Activar / Desactivar --}}
                 @if($canManage && $me->id !== $u->id)
-                  <form method="POST" action="{{ route('administracion.usuarios.toggle',$u) }}"
-                        onsubmit="return confirm('¿Confirmas {{ $u->active ? 'desactivar' : 'activar' }} esta cuenta?')">
+                  <form method="POST"
+                        action="{{ route('administracion.usuarios.toggle',$u) }}"
+                        data-confirm="¿Confirmas {{ $isOn ? 'desactivar' : 'activar' }} esta cuenta?">
                     @csrf @method('PATCH')
-                    <button class="btn btn-outline-{{ $u->active ? 'danger' : 'success' }} btn-icon" title="{{ $u->active ? 'Desactivar' : 'Activar' }}">
-                      <i class="bi bi-{{ $u->active ? 'person-x' : 'person-check' }}"></i>
+
+                    <button type="submit"
+                            class="kp-icon-btn {{ $isOn ? 'kp-icon-danger' : 'kp-icon-success' }}"
+                            title="{{ $isOn ? 'Desactivar' : 'Activar' }}">
+                      @if($isOn)
+                        {{-- icono desactivar --}}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                          <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+                          <path d="M18 8l4 4"></path><path d="M22 8l-4 4"></path>
+                        </svg>
+                      @else
+                        {{-- icono activar --}}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                          <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path>
+                          <path d="M16 11l2 2 4-4"></path>
+                        </svg>
+                      @endif
                     </button>
                   </form>
                 @endif
-              </div>
 
-              {{-- Modal password --}}
-              <div class="modal fade" id="pw-usr-{{ $u->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                  <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}" class="modal-content">
-                    @csrf @method('PATCH')
-                    <div class="modal-header">
-                      <h6 class="modal-title w-100 text-center">
-                        <i class="bi bi-key me-1"></i> Cambiar contraseña — {{ $u->name }}
-                      </h6>
-                      <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body">
-                      <div class="row g-3 align-items-center">
-                        <div class="col-12 col-md-4 text-md-end">
-                          <label class="form-label mb-0">Nueva contraseña</label>
-                        </div>
-                        <div class="col-12 col-md-8">
-                          <div class="input-group">
-                            <input type="password" name="password" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
-                          </div>
-                        </div>
-
-                        <div class="col-12 col-md-4 text-md-end">
-                          <label class="form-label mb-0">Confirmar contraseña</label>
-                        </div>
-                        <div class="col-12 col-md-8">
-                          <div class="input-group">
-                            <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="modal-footer justify-content-between">
-                      <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-                      <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Guardar</button>
-                    </div>
-                  </form>
-                </div>
               </div>
             </td>
           </tr>
         @empty
-          <tr><td colspan="6" class="text-center text-muted py-4">Sin usuarios.</td></tr>
+          <tr>
+            <td colspan="6" class="py-6 text-center text-slate-500">
+              Sin usuarios.
+            </td>
+          </tr>
         @endforelse
         </tbody>
       </table>
     </div>
 
-    <div class="mt-2">
-      {{ $users->withQueryString()->links('pagination::bootstrap-5') }}
+    <div class="pt-3">
+      {{ $users->withQueryString()->links() }}
     </div>
   </div>
-</div>
 
-{{-- Modal: Crear usuario --}}
-@php
-  $me = auth()->user();
-  $roleOptions = match($me->role){
-    'administrador' => ['supervisor'=>'Supervisor','asesor'=>'Asesor','soporte'=>'Soporte','usuario'=>'Usuario'],
-    'supervisor'    => ['asesor'=>'Asesor','soporte'=>'Soporte'],
-    'soporte'       => ['usuario'=>'Usuario'],
-    default         => [],
-  };
-@endphp
-<div class="modal fade" id="modalCreateUser" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" action="{{ route('administracion.usuarios.store') }}" class="modal-content" autocomplete="off">
-      @csrf
-      <div class="modal-header">
-        <h6 class="modal-title w-100 text-center"><i class="bi bi-person-plus me-1"></i> Crear usuario</h6>
-        <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+  {{-- MODAL: CAMBIAR CONTRASEÑA (único, reutilizable) --}}
+  <div id="modalPw" class="kp-modal hidden" aria-hidden="true">
+    <div class="kp-modal-backdrop" data-modal-close></div>
+
+    <div class="kp-modal-card" role="dialog" aria-modal="true" aria-labelledby="pwTitle">
+      <div class="kp-modal-head">
+        <div class="font-extrabold text-slate-900" id="pwTitle">Cambiar contraseña</div>
+        <button type="button" class="kp-x" data-modal-close aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+            <path d="M18 6 6 18"></path><path d="M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
-      <div class="modal-body vstack gap-3">
-        <div class="row g-3 align-items-center">
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Nombre</label></div>
-          <div class="col-12 col-md-8"><input name="name" class="form-control" required placeholder="Ej: Carlos López"></div>
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Email</label></div>
-          <div class="col-12 col-md-8"><input name="email" type="email" class="form-control" required placeholder="usuario@empresa.com"></div>
+      <form id="pwForm" method="POST" action="">
+        @csrf @method('PATCH')
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Rol</label></div>
-          <div class="col-12 col-md-8">
-            <select name="role" class="form-select" required>
-              <option value="">Selecciona…</option>
-              @foreach($roleOptions as $val=>$label)
-                <option value="{{ $val }}">{{ $label }}</option>
-              @endforeach
-            </select>
+        <div class="kp-modal-body space-y-4">
+          <div class="text-sm text-slate-600">
+            Usuario: <span class="font-semibold text-slate-900" id="pwUserName">—</span>
           </div>
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Contraseña</label></div>
-          <div class="col-12 col-md-8">
-            <div class="input-group">
-              <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-              <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
+          <div class="grid gap-3">
+            <div>
+              <label class="kp-label">Nueva contraseña</label>
+              <div class="relative">
+                <input id="pw1" type="password" name="password" minlength="6" required class="kp-input pr-12" placeholder="Mínimo 6 caracteres">
+                <button type="button" class="kp-eye" data-eye>
+                  <svg data-eye-open viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
+                  </svg>
+                  <svg data-eye-off class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M3 3l18 18"></path>
+                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+                    <path d="M9.9 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3.2 4.2"></path>
+                    <path d="M6.1 6.1C3.3 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.3-1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="kp-label">Confirmar contraseña</label>
+              <div class="relative">
+                <input id="pw2" type="password" name="password_confirmation" minlength="6" required class="kp-input pr-12" placeholder="Repite la contraseña">
+                <button type="button" class="kp-eye" data-eye>
+                  <svg data-eye-open viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
+                  </svg>
+                  <svg data-eye-off class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M3 3l18 18"></path>
+                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+                    <path d="M9.9 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3.2 4.2"></path>
+                    <path d="M6.1 6.1C3.3 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.3-1"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="modal-footer justify-content-between">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
-      </div>
-    </form>
+
+        <div class="kp-modal-foot">
+          <button type="button" class="kp-btn kp-btn-ghost" data-modal-close>Cancelar</button>
+          <button type="submit" class="kp-btn kp-btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
+
+  {{-- MODAL: CREAR USUARIO --}}
+  <div id="modalCreateUser" class="kp-modal hidden" aria-hidden="true">
+    <div class="kp-modal-backdrop" data-modal-close></div>
+
+    <div class="kp-modal-card" role="dialog" aria-modal="true" aria-labelledby="cuTitle">
+      <div class="kp-modal-head">
+        <div class="font-extrabold text-slate-900" id="cuTitle">Crear usuario</div>
+        <button type="button" class="kp-x" data-modal-close aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+            <path d="M18 6 6 18"></path><path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form id="createUserForm" method="POST" action="{{ route('administracion.usuarios.store') }}" autocomplete="off">
+        @csrf
+
+        <div class="kp-modal-body space-y-4">
+          <div class="grid gap-3">
+            <div>
+              <label class="kp-label">Nombre</label>
+              <input name="name" class="kp-input" required placeholder="Ej: Carlos López">
+            </div>
+
+            <div>
+              <label class="kp-label">Email</label>
+              <input name="email" type="email" class="kp-input" required placeholder="usuario@empresa.com">
+            </div>
+
+            <div>
+              <label class="kp-label">Rol</label>
+              <select name="role" class="kp-input" required id="createRole">
+                <option value="">Selecciona…</option>
+                @foreach($roleOptions as $val=>$label)
+                  <option value="{{ $val }}">{{ $label }}</option>
+                @endforeach
+              </select>
+            </div>
+
+            {{-- Supervisor (dinámico) --}}
+            <div id="createSupervisorRow" class="hidden">
+              <label class="kp-label">Supervisor</label>
+
+              <select name="supervisor_id" class="kp-input" id="createSupervisor">
+                <option value="">Selecciona...</option>
+
+                @forelse($supervisores as $s)
+                  <option value="{{ $s->id }}">{{ $s->name }} ({{ $s->email }})</option>
+                @empty
+                  <option value="" disabled>No hay supervisores activos</option>
+                @endforelse
+              </select>
+            </div>
+
+            <div>
+              <label class="kp-label">Contraseña</label>
+              <div class="relative">
+                <input name="password" type="password" class="kp-input pr-12" required minlength="6" placeholder="Mínimo 6 caracteres">
+                <button type="button" class="kp-eye" data-eye>
+                  <svg data-eye-open viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
+                  </svg>
+                  <svg data-eye-off class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+                    <path d="M3 3l18 18"></path>
+                    <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+                    <path d="M9.9 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3.2 4.2"></path>
+                    <path d="M6.1 6.1C3.3 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.3-1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kp-modal-foot">
+          <button type="button" class="kp-btn kp-btn-ghost" data-modal-close>Cancelar</button>
+          <button type="submit" class="kp-btn kp-btn-primary">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
 @endsection
 
 @push('scripts')
-  <script>
-    window.ADMIN_ME_ROLE = @json(auth()->user()->role ?? 'usuario');
-    window.ADMIN_ME_ID   = @json(auth()->id() ?? null);
-    window.ADMIN_SUPERVISORES = @json(
-      ($supervisores ?? collect())->map(fn($s) => [
-        'id' => $s->id,
-        'label' => $s->name.' — '.$s->email
-      ])
-    );
-  </script>
-  <script src="{{ asset('js/admin/admin.js') }}" defer></script>
+  @vite(['resources/js/admin/admin.js'])
 @endpush

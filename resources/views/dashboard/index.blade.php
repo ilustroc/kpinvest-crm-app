@@ -3,12 +3,8 @@
 @section('crumb','Estadísticas')
 
 @push('head')
-    <link rel="stylesheet" href="{{ asset('css/dashboard-stats.css') }}?v={{ time() }}">
-    <style>
-        /* Ajuste para que los cuadros tengan la misma altura */
-        .viz { height: 100%; min-height: 380px; display: flex; flex-direction: column; }
-        .chart-container { flex-grow: 1; position: relative; }
-    </style>
+  <link rel="stylesheet"
+        href="{{ asset('css/dashboard-stats.css') }}?v={{ @filemtime(public_path('css/dashboard-stats.css')) }}">
 @endpush
 @section('content')
   {{-- Filtros --}}
@@ -122,119 +118,22 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
-<script>
-(function(){
-    const data = {
-        meses: {!! json_encode($meses ?? []) !!},
-        serieMto: {!! json_encode($serie_pagos_monto ?? []) !!},
-        dias: {!! json_encode($dias ?? []) !!},
-        serieDia: {!! json_encode($serie_pagos_dia ?? []) !!},
-        entLabels: {!! json_encode($entLabels ?? []) !!},
-        entData: {!! json_encode($entData ?? []) !!},
-        asesLabels: {!! json_encode($asesLabels ?? []) !!},
-        asesData: {!! json_encode($asesData ?? []) !!},
-        hasTopAses: {{ $isAsesor ? 'false' : 'true' }}
+  <script>
+    window.DASHBOARD_DATA = {
+      meses: @json($meses ?? []),
+      serieMto: @json($serie_pagos_monto ?? []),
+      dias: @json($dias ?? []),
+      serieDia: @json($serie_pagos_dia ?? []),
+      entLabels: @json($entLabels ?? []),
+      entData: @json($entData ?? []),
+      asesLabels: @json($asesLabels ?? []),
+      asesData: @json($asesData ?? []),
+      hasTopAses: {{ ($isAsesor ?? false) ? 'false' : 'true' }},
     };
+  </script>
 
-    Chart.register(ChartDataLabels);
-    const brandColor = '#00a81c';
-
-    // 1. Gráfico Evolución 12 Meses
-    const ctx12 = document.getElementById('linePagos12').getContext('2d');
-    const chLine12 = new Chart(ctx12, {
-        type: 'line',
-        data: { 
-            labels: data.meses, 
-            datasets: [{ label: 'Monto (S/)', data: data.serieMto, tension: 0.3, borderColor: brandColor, backgroundColor: brandColor + '15', fill: true }] 
-        },
-        options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
-    });
-
-    // 2. Gráfico Evolución Este Mes (Diario) - INICIALMENTE OCULTO
-    const ctxDia = document.getElementById('linePagosDia').getContext('2d');
-    const chLineDia = new Chart(ctxDia, {
-        type: 'line',
-        data: { 
-            labels: data.dias, 
-            datasets: [{ label: 'Monto Diario (S/)', data: data.serieDia, tension: 0.3, borderColor: '#16a34a', backgroundColor: '#16a34a15', fill: true }] 
-        },
-        options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
-    });
-
-    // LÓGICA DE LOS BOTONES PARA CAMBIAR VISTA
-    const btn12 = document.getElementById('btnEv12');
-    const btnMes = document.getElementById('btnEvMes');
-    const canv12 = document.getElementById('linePagos12');
-    const canvDia = document.getElementById('linePagosDia');
-
-    btnMes.addEventListener('click', () => {
-        canv12.classList.add('d-none');
-        canvDia.classList.remove('d-none');
-        btnMes.classList.add('active');
-        btn12.classList.remove('active');
-        chLineDia.update(); // Actualizar para renderizar correctamente
-    });
-
-    btn12.addEventListener('click', () => {
-        canvDia.classList.add('d-none');
-        canv12.classList.remove('d-none');
-        btn12.classList.add('active');
-        btnMes.classList.remove('active');
-        chLine12.update();
-    });
-
-    // 3. Donut Entidades
-    new Chart(document.getElementById('pieEntidades'), {
-        type: 'doughnut',
-        data: { 
-            labels: data.entLabels, 
-            datasets: [{ data: data.entData, backgroundColor: [brandColor, '#16a34a', '#22c55e', '#4ade80', '#86efac'] }] 
-        },
-        options: { maintainAspectRatio: false, cutout: '70%', plugins: { datalabels: { display: false }, legend: { position: 'bottom' } } }
-    });
-
-    // 4. Gráfico Asesores
-    if (data.hasTopAses) {
-        const numAsesores = data.asesLabels.length;
-        const altoCalculado = Math.max(300, numAsesores * 35);
-        document.querySelector('.chart-wrap--ases').style.height = altoCalculado + 'px';
-
-        new Chart(document.getElementById('barAsesores'), {
-            type: 'bar',
-            data: { 
-                labels: data.asesLabels, 
-                datasets: [{ 
-                    label: 'Monto Recaudado',
-                    data: data.asesData, 
-                    backgroundColor: brandColor,
-                    borderRadius: 5,
-                    barThickness: 20
-                }] 
-            },
-            options: {
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                plugins: {
-                    legend: { display: false },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'end',
-                        offset: 5,
-                        formatter: (val) => 'S/ ' + Intl.NumberFormat('es-PE', {minimumFractionDigits: 2}).format(val),
-                        font: { weight: 'bold', size: 11 },
-                        color: '#151a23'
-                    }
-                },
-                scales: {
-                    x: { display: false, grace: '25%' },
-                    y: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' } } }
-                }
-            }
-        });
-    }
-})();
-</script>
+  <script defer src="{{ asset('js/dashboard-stats.js') }}?v={{ @filemtime(public_path('js/dashboard-stats.js')) }}"></script>
 @endpush

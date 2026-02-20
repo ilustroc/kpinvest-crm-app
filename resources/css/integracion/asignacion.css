@@ -1,0 +1,77 @@
+@reference "../layout/app.css";
+
+/* Estilos del módulo Integración/Asignación (KP look) */
+@layer components{
+  .kp-card{
+    @apply rounded-[2rem] border border-white/60 bg-white/70
+           shadow-[0_28px_70px_rgba(2,6,23,.12)]
+           backdrop-blur-xl;
+  }
+
+  .kp-divider{
+    @apply h-px w-full bg-slate-200/70;
+  }
+
+  .kp-label{
+    @apply block text-[11px] font-semibold uppercase tracking-[0.12em]
+           text-slate-400;
+  }
+
+  .kp-input-file{
+    @apply block w-full rounded-2xl border border-slate-200/80
+           bg-white/60 px-4 py-3 text-sm text-slate-700 shadow-sm
+           focus:outline-none focus:ring-4 focus:ring-emerald-500/20;
+  }
+
+  /* Botón del file input (sin usar variantes file: para evitar problemas) */
+  .kp-input-file::file-selector-button{
+    @apply mr-4 rounded-xl border-0 bg-emerald-600 px-4 py-2
+           text-sm font-semibold text-white;
+  }
+  .kp-input-file:hover::file-selector-button{
+    @apply bg-emerald-700;
+  }
+
+  .kp-btn{
+    @apply rounded-2xl px-5 py-3 text-sm font-bold transition
+           active:scale-[0.99];
+  }
+  .kp-btn-primary{
+    @apply bg-gradient-to-r from-emerald-600 to-emerald-500 text-white
+           shadow-[0_10px_35px_rgba(16,185,129,.20)]
+           hover:from-emerald-700 hover:to-emerald-600;
+  }
+  .kp-btn-soft{
+    @apply border border-emerald-200 bg-white/70 text-emerald-700
+           hover:bg-emerald-50;
+  }
+
+  .kp-alert{
+    @apply flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm;
+  }
+  .kp-alert-ico{
+    @apply mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center
+           rounded-xl;
+  }
+
+  .kp-alert-ok{
+    @apply border-emerald-200/70 bg-emerald-50/70 text-emerald-900;
+  }
+  .kp-alert-ok .kp-alert-ico{
+    @apply bg-emerald-500/10 text-emerald-700;
+  }
+
+  .kp-alert-warn{
+    @apply border-amber-200/70 bg-amber-50/70 text-amber-900;
+  }
+  .kp-alert-warn .kp-alert-ico{
+    @apply bg-amber-500/10 text-amber-700;
+  }
+
+  .kp-alert-bad{
+    @apply border-rose-200/70 bg-rose-50/70 text-rose-900;
+  }
+  .kp-alert-bad .kp-alert-ico{
+    @apply bg-rose-500/10 text-rose-700;
+  }
+}

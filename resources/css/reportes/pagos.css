@@ -1,0 +1,52 @@
+/* resources/css/reportes/pagos.css */
+
+.rpt-pagos .ms-menu{
+  position:absolute;
+  z-index:40;
+  margin-top:.5rem;
+  width:100%;
+  border:1px solid rgb(226 232 240);
+  background:#fff;
+  border-radius:14px;
+  padding:.75rem;
+  box-shadow:0 16px 40px rgba(15,23,42,.12);
+}
+
+.rpt-pagos .ms-list{
+  max-height:260px;
+  overflow:auto;
+  border:1px solid rgb(226 232 240);
+  border-radius:12px;
+  background:#fff;
+}
+
+.rpt-pagos .ms-item{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  padding:.42rem .6rem;
+  cursor:pointer;
+  user-select:none;
+}
+.rpt-pagos .ms-item:hover{ background: rgba(15,23,42,.04); }
+
+.rpt-pagos .ms-item input[type="checkbox"]{
+  width:16px;height:16px;
+  accent-color:#00a81c;
+}
+
+.rpt-pagos .ms-text{
+  display:block;
+  width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.rpt-pagos .pagos-skeleton{
+  border:1px dashed rgb(226 232 240);
+  border-radius:16px;
+  padding:18px;
+  color:rgb(100 116 139);
+  text-align:center;
+}

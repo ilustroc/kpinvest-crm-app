@@ -5,139 +5,221 @@
 @push('head')
   <meta name="rpt-cna-export" content="{{ route('reportes.cna.export') }}">
   <meta name="rpt-cna-facets" content="{{ route('reportes.cna.facets') }}">
-  <link rel="stylesheet" href="{{ asset('css/reportes/cna.css') }}">
+
+  @vite([
+    'resources/css/reportes/cna.css',
+    'resources/js/reportes/cna.js'
+  ])
 @endpush
 
 @section('content')
-<div class="card pad rpt-cna">
+<div class="space-y-4">
 
-  <form id="filtros" class="row g-2 align-items-end filters" method="GET" action="{{ route('reportes.cna') }}">
+  <div class="kp-card p-5 rpt-cna">
+    <form id="filtros"
+          method="GET"
+          action="{{ route('reportes.cna') }}"
+          class="space-y-3">
 
-    <div class="col-6 col-md-2">
-      <label class="form-label">Desde</label>
-      <input type="date" name="from" class="form-control"
-             value="{{ $from }}" data-default="{{ $defaultFrom }}">
-    </div>
+      {{-- Grid filtros --}}
+      <div class="grid grid-cols-12 gap-3 items-end">
 
-    <div class="col-6 col-md-2">
-      <label class="form-label">Hasta</label>
-      <input type="date" name="to" class="form-control"
-             value="{{ $to }}" data-default="{{ $defaultTo }}">
-    </div>
+        {{-- Desde --}}
+        <div class="col-span-6 md:col-span-2">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Desde</label>
+          <input type="date"
+                 name="from"
+                 value="{{ $from }}"
+                 data-default="{{ $defaultFrom }}"
+                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+                        focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400">
+        </div>
 
-    {{-- Estado --}}
-    <div class="col-12 col-md-3">
-      <label class="form-label">Estado</label>
-      <div class="dropdown w-100" data-multiselect="estado" data-title="Estado" data-empty="Todos">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Estado: Todos
-        </button>
+        {{-- Hasta --}}
+        <div class="col-span-6 md:col-span-2">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Hasta</label>
+          <input type="date"
+                 name="to"
+                 value="{{ $to }}"
+                 data-default="{{ $defaultTo }}"
+                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+                        focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400">
+        </div>
 
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar estado…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($estados as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="estado[]" value="{{ $v }}"
-                       @checked(in_array($v, $estadoSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin estados en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
+        {{-- Estado --}}
+        <div class="col-span-12 md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Estado</label>
+
+          <div class="relative"
+               data-multiselect="estado"
+               data-title="Estado"
+               data-empty="Todos">
+
+            <button type="button"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+                           flex items-center justify-between gap-3
+                           hover:bg-slate-50
+                           focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                    data-ms-button>
+              <span class="truncate">Estado: Todos</span>
+              <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+
+            <div class="ms-menu hidden" data-ms-menu>
+              <input type="text"
+                     placeholder="Buscar estado…"
+                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm
+                            focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                     data-ms-search>
+
+              <div class="ms-list mt-2" data-ms-list>
+                @forelse($estados as $v)
+                  <label class="ms-item">
+                    <input type="checkbox"
+                           name="estado[]"
+                           value="{{ $v }}"
+                           @checked(in_array($v, $estadoSel, true))>
+                    <span class="ms-text">{{ $v }}</span>
+                  </label>
+                @empty
+                  <div class="px-2 py-2 text-xs text-slate-500">Sin estados en este rango.</div>
+                @endforelse
+              </div>
+
+              <div class="mt-3 flex gap-2">
+                <button type="button" class="kp-btn kp-btn-ghost" data-ms-clear>Limpiar</button>
+                <button type="button" class="kp-btn kp-btn-primary ms-auto" data-ms-apply>Aplicar</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    {{-- Gestor --}}
-    <div class="col-12 col-md-3">
-      <label class="form-label">Gestor</label>
-      <div class="dropdown w-100" data-multiselect="gestor" data-title="Gestor" data-empty="Todos">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Gestor: Todos
-        </button>
+        {{-- Gestor --}}
+        <div class="col-span-12 md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Gestor</label>
 
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar gestor…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($gestores as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="gestor[]" value="{{ $v }}"
-                       @checked(in_array($v, $gestorSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin gestores en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
-          </div>
-        </div>
-      </div>
-    </div>
+          <div class="relative"
+               data-multiselect="gestor"
+               data-title="Gestor"
+               data-empty="Todos">
 
-    {{-- Entidad --}}
-    <div class="col-12 col-md-4">
-      <label class="form-label">Entidad</label>
-      <div class="dropdown w-100" data-multiselect="entidad" data-title="Entidad" data-empty="Todas">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Entidad: Todas
-        </button>
+            <button type="button"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+                           flex items-center justify-between gap-3
+                           hover:bg-slate-50
+                           focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                    data-ms-button>
+              <span class="truncate">Gestor: Todos</span>
+              <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
 
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar entidad…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($entidades as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="entidad[]" value="{{ $v }}"
-                       @checked(in_array($v, $entidadSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin entidades en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
+            <div class="ms-menu hidden" data-ms-menu>
+              <input type="text"
+                     placeholder="Buscar gestor…"
+                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm
+                            focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                     data-ms-search>
+
+              <div class="ms-list mt-2" data-ms-list>
+                @forelse($gestores as $v)
+                  <label class="ms-item">
+                    <input type="checkbox"
+                           name="gestor[]"
+                           value="{{ $v }}"
+                           @checked(in_array($v, $gestorSel, true))>
+                    <span class="ms-text">{{ $v }}</span>
+                  </label>
+                @empty
+                  <div class="px-2 py-2 text-xs text-slate-500">Sin gestores en este rango.</div>
+                @endforelse
+              </div>
+
+              <div class="mt-3 flex gap-2">
+                <button type="button" class="kp-btn kp-btn-ghost" data-ms-clear>Limpiar</button>
+                <button type="button" class="kp-btn kp-btn-primary ms-auto" data-ms-apply>Aplicar</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="col-12">
-      <div class="toolbar mt-1">
-        <button class="btn btn-clean" id="btnLimpiar" type="button">
-          <i class="bi bi-eraser me-1"></i> Limpiar
+        {{-- Entidad --}}
+        <div class="col-span-12 md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Entidad</label>
+
+          <div class="relative"
+               data-multiselect="entidad"
+               data-title="Entidad"
+               data-empty="Todas">
+
+            <button type="button"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
+                           flex items-center justify-between gap-3
+                           hover:bg-slate-50
+                           focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                    data-ms-button>
+              <span class="truncate">Entidad: Todas</span>
+              <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+
+            <div class="ms-menu hidden" data-ms-menu>
+              <input type="text"
+                     placeholder="Buscar entidad…"
+                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm
+                            focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                     data-ms-search>
+
+              <div class="ms-list mt-2" data-ms-list>
+                @forelse($entidades as $v)
+                  <label class="ms-item">
+                    <input type="checkbox"
+                           name="entidad[]"
+                           value="{{ $v }}"
+                           @checked(in_array($v, $entidadSel, true))>
+                    <span class="ms-text">{{ $v }}</span>
+                  </label>
+                @empty
+                  <div class="px-2 py-2 text-xs text-slate-500">Sin entidades en este rango.</div>
+                @endforelse
+              </div>
+
+              <div class="mt-3 flex gap-2">
+                <button type="button" class="kp-btn kp-btn-ghost" data-ms-clear>Limpiar</button>
+                <button type="button" class="kp-btn kp-btn-primary ms-auto" data-ms-apply>Aplicar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {{-- Toolbar --}}
+      <div class="flex flex-wrap items-center gap-2 pt-1">
+        <button type="button" id="btnLimpiar" class="kp-btn kp-btn-ghost">
+          Limpiar
         </button>
 
-        <div class="spacer"></div>
-        <div id="summary" class="tiny"></div>
+        <div class="flex-1"></div>
 
-        <a class="btn btn-export" id="btnExport" href="#">
-          <i class="bi bi-download me-1"></i> Exportar
+        <div id="summary" class="text-sm text-slate-500"></div>
+
+        <a id="btnExport" href="#" class="kp-btn kp-btn-success">
+          Exportar
         </a>
       </div>
-    </div>
-  </form>
 
-  <hr class="my-3">
+    </form>
 
-  @include('reportes.cna_table', ['rows' => $rows])
+    <div class="kp-divider my-4"></div>
+
+    @include('reportes.cna_table', ['rows' => $rows])
+
+  </div>
 
 </div>
 @endsection
-
-@push('scripts')
-  <script src="{{ asset('js/reportes/cna.js') }}" defer></script>
-@endpush
