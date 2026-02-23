@@ -30,7 +30,6 @@ class PaymentExport
         $sheet->fromArray($headers, null, "A{$row}");
         $row++;
 
-        // Usamos chunkById para manejar grandes volúmenes de datos
         $this->query->orderBy('id')->chunkById(1000, function ($items) use (&$row, $sheet) {
             foreach ($items as $item) {
                 $sheet->fromArray([
@@ -45,7 +44,6 @@ class PaymentExport
                     $item->entidad,
                 ], null, "A{$row}");
 
-                // Formateo explícito de celdas sensibles
                 $sheet->setCellValueExplicit("B{$row}", (string)$item->dni, DataType::TYPE_STRING);
                 $sheet->setCellValueExplicit("D{$row}", (string)$item->operacion, DataType::TYPE_STRING);
                 $row++;

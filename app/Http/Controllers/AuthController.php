@@ -15,7 +15,6 @@ class AuthController extends Controller{
           'password' => ['required'],
       ]);
   
-      // Si el correo existe pero está inactivo, avisa antes de intentar
       $user = User::where('email', $data['email'])->first();
       if ($user && !$user->active) {
           return back()
@@ -23,12 +22,11 @@ class AuthController extends Controller{
               ->onlyInput('email');
       }
   
-      // Exigir active=1 en el attempt (cierra el paso a inactivos)
       $remember = $r->boolean('remember');
       if (Auth::attempt([
           'email' => $data['email'],
           'password' => $data['password'],
-          'active' => 1, // <- clave
+          'active' => 1,
       ], $remember)) {
           $r->session()->regenerate();
           return redirect()->intended(route('panel'));
