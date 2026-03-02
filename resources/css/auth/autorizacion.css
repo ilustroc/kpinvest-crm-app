@@ -1,64 +1,148 @@
-/* public/css/auth/autorizacion.css */
+/* resources/css/auth/autorizacion.css */
+@reference "tailwindcss";
 
-/* ======= Marca KP: verde primario + azul acento ======= */
-:root{
-  --brand:#00a81c;        /* Verde KP (primario) */
-  --brand-ink:#008517;    /* Hover/ink */
-  --accent:#0b4ea2;       /* Azul KP (acento) */
-  --accent-ink:#093f82;
+@layer components {
+    /* Estructura Base y Layout */
+    .autz-page { @apply max-w-[1200px] mx-auto px-2; }
+    .autz-card { @apply rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5; }
+    .autz-ic { @apply h-9 w-9 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-700; }
 
-  --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
-  --ink:#151a23; --muted:#6d7b8a;
+    /* Buscador e Inputs */
+    .autz-input-wrap { @apply relative; }
+    .autz-input-ic { @apply pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400; }
+    .autz-input {
+        @apply w-[320px] max-w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-2.5
+               text-sm text-slate-900 shadow-sm
+               focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400;
+    }
+
+    /* Botones Globales */
+    .autz-btn {
+        @apply inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold
+               transition shadow-sm ring-1 ring-slate-200 bg-white text-slate-800 hover:bg-slate-50;
+    }
+    .autz-btn-primary { @apply bg-emerald-600 text-white ring-0 hover:bg-emerald-700; }
+    .autz-btn-danger { @apply bg-white text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50; }
+    .autz-btn-ghost { @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50; }
+    .autz-btn-sm { @apply rounded-xl px-3 py-1.5 text-xs font-extrabold; }
+
+    /* Segmentados (Tabs) */
+    .autz-seg { @apply inline-flex rounded-2xl bg-slate-50 ring-1 ring-slate-200 p-1; }
+    .autz-seg-btn { @apply px-3 py-1.5 text-xs font-extrabold rounded-xl text-slate-600 hover:text-slate-900 transition; }
+    .autz-seg-btn.is-active { @apply bg-white text-slate-900 ring-1 ring-slate-200 shadow-sm; }
+    .autz-pill {
+        @apply inline-flex items-center justify-center min-w-[28px] h-5 px-2 rounded-full
+               text-[11px] font-extrabold bg-emerald-500/10 text-emerald-700 ml-1;
+    }
+
+    /* Alertas y Feedback */
+    .autz-alert { @apply inline-flex items-center gap-2 rounded-2xl px-3 py-2 ring-1 text-sm; }
+    .autz-alert-ok { @apply bg-emerald-50 text-emerald-800 ring-emerald-200; }
+    .autz-alert-bad { @apply bg-rose-50 text-rose-800 ring-rose-200; }
+
+    /* Encabezados de Sección */
+    .autz-card-head { @apply flex items-center justify-between gap-3 mb-3; }
+    .autz-title { @apply text-sm font-extrabold tracking-tight text-slate-900; }
+    .autz-sub { @apply text-xs text-slate-500; }
+
+    /* Tablas */
+    .autz-table-wrap { @apply overflow-auto rounded-2xl ring-1 ring-slate-200/70; }
+    .autz-table { @apply min-w-full text-sm; }
+    .autz-table-fixed { table-layout: fixed; }
+    .autz-table thead th {
+        @apply sticky top-0 z-10 bg-slate-50/95 backdrop-blur
+               text-xs font-extrabold uppercase tracking-wide text-slate-700
+               border-b border-slate-200 px-3 py-2.5;
+    }
+    .autz-table tbody td { @apply border-b border-slate-100 px-3 py-2.5 align-middle; }
+    .autz-table tbody tr:hover { @apply bg-emerald-500/5 transition-colors; }
+
+    /* Chips y Badges */
+    .autz-chip { @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold bg-slate-100 text-slate-700 ring-1 ring-slate-200; }
+    .autz-chip-info { @apply bg-sky-500/10 text-sky-700 ring-sky-200; }
+    .autz-badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-extrabold bg-slate-200 text-slate-700; }
+    .autz-badge-info { @apply bg-sky-500/20 text-sky-800; }
+
+    /* Grid de Datos (Key-Value) */
+    .autz-grid { @apply grid grid-cols-1 gap-3; }
+    .autz-kv { @apply rounded-2xl bg-slate-50 ring-1 ring-slate-200 p-3; }
+    .autz-k { @apply text-xs font-extrabold uppercase tracking-wide text-slate-500; }
+    .autz-v { @apply mt-1 text-sm font-semibold text-slate-900; }
+
+    /* resources/css/auth/autorizacion.css */
+    .autz-acc details {
+        @apply border border-slate-200 rounded-xl overflow-hidden transition-all;
+    }
+    .autz-acc summary {
+        @apply flex items-center justify-between p-3 bg-white cursor-pointer hover:bg-slate-50 font-bold text-slate-700 list-none;
+    }
+    /* Quitar la flecha default de Chrome/Safari */
+    .autz-acc summary::-webkit-details-marker { display: none; }
+
+    .autz-acc details[open] {
+        @apply ring-2 ring-emerald-500/10 border-emerald-200 shadow-sm mb-4;
+    }
+    .autz-acc details[open] summary {
+        @apply border-b border-slate-100 bg-slate-50/50;
+    }
+    .autz-acc-body {
+        @apply p-4 bg-white;
+    }
+    
+    /* Celdas de Notas y Preview */
+    .autz-note-cell { @apply flex flex-col items-start gap-1; }
+    .autz-note-preview {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        @apply text-sm text-slate-600 leading-5 break-words;
+    }
+    .autz-note-mobile { @apply text-sm text-slate-700 leading-5 break-words; }
+    .autz-box { @apply rounded-2xl bg-slate-50 ring-1 ring-slate-200 p-3 text-sm text-slate-700; }
+    .autz-total { @apply text-2xl font-extrabold tracking-tight text-slate-900 mt-1; }
+
+    /* Tipografía y Misceláneos */
+    #t_neg { font-feature-settings: "tnum"; letter-spacing: -0.02em; }
+    #f_dni, #f_op { @apply font-mono tracking-tighter; }
+    .autz-link { @apply text-xs font-extrabold text-emerald-700 hover:text-emerald-900 cursor-pointer; }
+    .autz-actions-btns { @apply flex items-center justify-end gap-2 flex-nowrap; }
 }
 
-/* Botonería con coherencia de marca */
-.btn-primary{ background:var(--brand); border-color:var(--brand) }
-.btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
-.btn-outline-primary{ color:var(--accent); border-color:var(--accent) }
-.btn-outline-primary:hover{ color:#fff; background:var(--accent-ink); border-color:var(--accent-ink) }
+/* ===== MODAL KP SYSTEM ===== */
+@layer components {
+    .kp-modal { @apply fixed inset-0 z-[80] grid place-items-center p-3; }
+    .kp-modal.hidden { display: none; }
+    .kp-modal-backdrop { @apply absolute inset-0 bg-slate-900/40 backdrop-blur-sm; }
 
-/* Inputs / buscador */
-.card .form-control{ background:var(--surface); border-color:var(--border) }
-.card .form-control::placeholder{ color:var(--muted) }
-.card .form-control:focus{
-  border-color: color-mix(in oklab, var(--accent) 60%, var(--border));
-  box-shadow: 0 0 0 .2rem color-mix(in oklab, var(--accent) 22%, transparent);
-}
+    .kp-modal-card {
+        @apply relative w-full max-w-xl rounded-2xl bg-white shadow-[0_24px_60px_rgba(15,23,42,.24)]
+               ring-1 ring-slate-200 overflow-hidden flex flex-col;
+        max-height: calc(100vh - 2rem);
+    }
+    .kp-modal-lg { max-width: 980px; }
 
-/* Tablas: encabezado fijo + hover suave con acento */
-.table-responsive{ max-height: none } /* deja crecer; los modales ya son scrollables */
-table thead th{
-  position:sticky; top:0; z-index:1;
-  background: color-mix(in oklab, var(--surface-2) 55%, transparent) !important;
-  color: var(--ink);
-  text-transform: uppercase; letter-spacing:.3px; font-size:.82rem;
-  border-bottom:1px solid var(--border);
-  box-shadow:0 3px 8px rgba(15,23,42,.06);
-}
-.table.table-hover tbody tr:hover{
-  background: color-mix(in oklab, var(--accent) 10%, var(--brand) 6%);
-}
+    .kp-modal-head { @apply px-5 py-4 border-b border-slate-200 flex items-center justify-between; }
+    .kp-modal-body { @apply overflow-y-auto p-6; scrollbar-gutter: stable; }
+    .kp-modal-foot { @apply px-5 py-4 border-t border-slate-200 flex items-center justify-end gap-2; }
 
-/* Chips/badges suaves (si se usan en celdas) */
-.badge-soft{
-  background:color-mix(in oklab, var(--brand) 12%, transparent);
-  color:var(--brand);
-  border:1px solid color-mix(in oklab, var(--brand) 24%, transparent);
-  border-radius:999px; padding:.18rem .55rem; font-weight:600
+    .kp-x { @apply h-9 w-9 rounded-xl grid place-items-center bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors; }
+    .kp-label { @apply text-xs font-extrabold uppercase tracking-wide text-slate-600; }
+
+    .kp-input {
+        @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
+               focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all;
+    }
+
+    .kp-btn { @apply inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold transition shadow-sm; }
+    .kp-btn-ghost { @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50; }
+    .kp-btn-primary { @apply bg-emerald-600 text-white hover:bg-emerald-700 ring-0; }
+    .kp-btn-danger { @apply bg-rose-600 text-white hover:bg-rose-700 ring-0; }
 }
 
-/* Paginación bootstrap (si aparece) */
-.pagination .page-link{ border-color:var(--border); color:var(--ink) }
-.pagination .page-link:hover{
-  background:color-mix(in oklab, var(--brand) 10%, transparent);
-  border-color:color-mix(in oklab, var(--brand) 28%, transparent);
-}
-.pagination .page-item.active .page-link{
-  background:var(--brand); border-color:var(--brand)
-}
-
-/* Scrollbar horizontal en tablas anchas */
-.table-responsive::-webkit-scrollbar{ height:10px }
-.table-responsive::-webkit-scrollbar-thumb{
-  background: color-mix(in oklab, var(--accent) 22%, transparent); border-radius:10px
+/* ===== MEDIA QUERIES (BREAKPOINTS) ===== */
+@media (min-width: 640px) {
+    .autz-page { padding-left: 1rem; padding-right: 1rem; }
+    .autz-title { font-size: 1rem; line-height: 1.5rem; }
+    .autz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

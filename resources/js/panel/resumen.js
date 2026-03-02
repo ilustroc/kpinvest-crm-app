@@ -1,116 +1,176 @@
+// resources/js/panel/resumen.js
+import { Chart, registerables } from 'chart.js'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
+
+Chart.register(...registerables, ChartDataLabels)
+
 document.addEventListener('DOMContentLoaded', () => {
 
-  /* ====================== AUTOCOMPLETE ====================== */
-  (function(){
-    const frm = document.getElementById('frmQuick');
-    const inp = document.getElementById('inpQuick');
-    const sug = document.getElementById('quickSug');
-    if (!frm || !inp || !sug) return;
+  /* =========================
+  *  AUTOCOMPLETE QUICK SEARCH
+  * ========================= */
+  const inp = document.getElementById('inpQuick')
+  const box = document.getElementById('quickSug')
+  const suggestUrl = document.querySelector('meta[name="quick-suggest-url"]')?.content
 
-    let timer = null, idx = -1;
+  if (inp && box && suggestUrl) {
+    let timer = null
+    let active = -1
+    let items = []
+    let aborter = null
 
-    const meta = document.querySelector('meta[name="clientes-suggest-url"]');
-    const SUG_URL = meta?.content || '';
-
-    function hide(){ sug.classList.remove('show'); sug.innerHTML=''; idx=-1; }
-    function show(){ if(!sug.classList.contains('show')) sug.classList.add('show'); }
-
-    const escRx = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    function mark(txt, q){
-      if(!q) return txt;
-      const rx = new RegExp('('+escRx(q)+')','ig');
-      return String(txt||'').replace(rx,'<span class="quick-hl">$1</span>');
+    const close = () => {
+      box.classList.remove('show')
+      box.innerHTML = ''
+      active = -1
+      items = []
     }
 
-    function setActive(i){
-      const items = [...sug.querySelectorAll('.quick-item')];
-      items.forEach((a,k)=>a.classList.toggle('active', k===i));
-      idx = i;
-    }
+    const open = () => box.classList.add('show')
 
-    function render(items, q){
-      if(!items.length){ hide(); return; }
+    const render = (data) => {
+      items = Array.isArray(data) ? data : []
+      active = -1
 
-      sug.innerHTML = items.map((it,i)=>`
-        <a href="${it.url}" class="quick-item ${i===0?'active':''}" data-idx="${i}">
-          <div class="quick-left">
-            <span class="quick-dni">${mark(it.dni,q)}</span>
-            <span class="quick-sep">»</span>
-            <span class="quick-name">${mark(it.nombre,q)}</span>
+      if (!items.length) return close()
+
+      box.innerHTML = items.map((it, i) => {
+        const dni = it.value ?? ''
+        // Limpiamos el nombre para que no repita el DNI si ya viene en el title
+        const name = (it.title ?? '').split('»')[1]?.trim() || it.title
+        const meta = it.meta ?? ''
+
+        return `
+          <div class="quick-item group cursor-pointer border-b border-slate-50 last:border-none" data-i="${i}">
+            <div class="flex flex-col w-full">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-emerald-600 font-extrabold text-sm">${dni}</span>
+                  <span class="text-slate-300">|</span>
+                  <span class="text-slate-900 font-bold text-sm truncate max-w-[200px]">${name}</span>
+                </div>
+                ${meta ? `<span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">${meta}</span>` : ''}
+              </div>
+            </div>
           </div>
-          <div class="quick-meta">${mark(it.operacion||'—',q)} · ${it.cosecha||'—'}</div>
-        </a>
-      `).join('');
+        `
+      }).join('')
 
-      sug.querySelectorAll('.quick-item').forEach((a,i)=>{
-        a.addEventListener('mouseenter',()=>setActive(i));
-      });
-
-      show(); idx=0;
+      open()
     }
 
-    function fetchSuggest(q){
-      if (!SUG_URL) { hide(); return; }
-      if (!q || q.trim().length < 1){ hide(); return; }
-
-      fetch(SUG_URL + '?q=' + encodeURIComponent(q.trim()), {
-        headers:{ 'X-Requested-With':'XMLHttpRequest' }
-      })
-        .then(r => r.json())
-        .then(data => render(data, q))
-        .catch(() => hide());
+    const setActive = (idx) => {
+      const nodes = [...box.querySelectorAll('.quick-item')]
+      nodes.forEach(n => n.classList.remove('active'))
+      if (idx >= 0 && idx < nodes.length) {
+        nodes[idx].classList.add('active')
+        nodes[idx].scrollIntoView({ block: 'nearest' })
+      }
     }
 
-    inp.addEventListener('input', ()=>{
-      clearTimeout(timer);
-      timer = setTimeout(()=>fetchSuggest(inp.value), 140);
-    });
-    inp.addEventListener('focus', ()=>{ if(inp.value.trim()) fetchSuggest(inp.value); });
+    const fetchSuggest = async () => {
+      const q = (inp.value || '').trim()
+      if (q.length < 2) return close()
 
-    inp.addEventListener('keydown', (e)=>{
-      const items = [...sug.querySelectorAll('.quick-item')];
-      if(e.key==='ArrowDown' && items.length){ e.preventDefault(); setActive(Math.min(idx+1, items.length-1)); }
-      if(e.key==='ArrowUp'   && items.length){ e.preventDefault(); setActive(Math.max(idx-1, 0)); }
-      if(e.key==='Enter'     && items.length && idx>=0){ e.preventDefault(); items[idx].click(); }
-      if(e.key==='Escape'){ hide(); }
-    });
+      if (aborter) aborter.abort()
+      aborter = new AbortController()
 
-    document.addEventListener('click', (e)=>{ if(!e.target.closest('#frmQuick')) hide(); });
-  })();
+      try {
+        const url = new URL(suggestUrl, window.location.origin)
+        url.searchParams.set('q', q)
 
+        console.log('[Quick] GET =>', url.toString())
 
-  /* ====================== SELECTOR DE MES ====================== */
-  document.getElementById('mesPicker')?.addEventListener('change', (e)=>{
-    const ym = e.target.value || '';
-    const url = new URL(window.location.href);
-    url.searchParams.set('mes', ym);
-    window.location.assign(url.toString());
-  });
+        const res = await fetch(url.toString(), {
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: aborter.signal,
+        })
 
+        console.log('[Quick] status:', res.status, 'content-type:', res.headers.get('content-type'))
 
-  /* ====================== CHART: PAGOS DEL MES ====================== */
-  (function(){
-    const el = document.getElementById('chartPagos');
-    if(!el) return;
+        const text = await res.text()
+        console.log('[Quick] body preview:', text.slice(0, 120))
 
-    if (!window.Chart) {
-      console.warn('Chart.js no está cargado');
-      return;
+        // si no es JSON, cerramos
+        if (!(res.headers.get('content-type') || '').includes('application/json')) {
+          return close()
+        }
+
+        const data = JSON.parse(text)
+        render(data)
+
+      } catch (e) {
+        console.error('[Quick] error:', e)
+        close()
+      }
     }
 
-    const payload = (()=>{ try{ return JSON.parse(el.dataset.chart||'{}'); }catch(_){ return {}; }})();
-    const labels = payload.labels || [];
-    const data   = payload.data   || [];
+    inp.addEventListener('input', () => {
+      clearTimeout(timer)
+      timer = setTimeout(fetchSuggest, 200)
+    })
 
-    const css    = (v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-    const ACCENT = css('--accent') || '#0b4ea2';
+    inp.addEventListener('keydown', (e) => {
+      if (!box.classList.contains('show')) return
 
-    const hexToRgba = (hex, a=1)=>{
-      const h = hex.replace('#','').trim();
-      const bigint = parseInt(h.length===3 ? h.split('').map(x=>x+x).join('') : h, 16);
-      const r=(bigint>>16)&255, g=(bigint>>8)&255, b=bigint&255;
-      return `rgba(${r}, ${g}, ${b}, ${a})`;
-    };
+      if (e.key === 'Escape') return close()
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        active = Math.min(active + 1, items.length - 1)
+        setActive(active)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        active = Math.max(active - 1, 0)
+        setActive(active)
+      } else if (e.key === 'Enter') {
+        if (active >= 0 && items[active]) {
+          e.preventDefault()
+          window.location.href = items[active].url
+        }
+      }
+    })
+
+    box.addEventListener('mousedown', (e) => {
+      const row = e.target.closest('.quick-item')
+      if (!row) return
+      const i = Number(row.dataset.i)
+      if (Number.isFinite(i) && items[i]) window.location.href = items[i].url
+    })
+
+    document.addEventListener('click', (e) => {
+      if (e.target === inp || box.contains(e.target)) return
+      close()
+    })
+  }
+  
+  /* ===== Selector de mes ===== */
+  document.getElementById('mesPicker')?.addEventListener('change', (e) => {
+    const ym = e.target.value || ''
+    const url = new URL(window.location.href)
+    url.searchParams.set('mes', ym)
+    window.location.assign(url.toString())
+  })
+
+  /* ===== Chart: Pagos del mes ===== */
+  const el = document.getElementById('chartPagos')
+  if (el) {
+    const payload = (() => { try { return JSON.parse(el.dataset.chart || '{}') } catch { return {} } })()
+    const labels = payload.labels || []
+    const data   = payload.data   || []
+
+    const cssVar = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
+    const BRAND  = cssVar('--brand') || '#00a81c'
+
+    const hexToRgba = (hex, a = 1) => {
+      const h = hex.replace('#', '').trim()
+      const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16)
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+      return `rgba(${r}, ${g}, ${b}, ${a})`
+    }
 
     new Chart(el.getContext('2d'), {
       type: 'bar',
@@ -120,10 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
           label: 'S/ por día',
           data,
           borderWidth: 2,
-          borderColor: ACCENT,
-          backgroundColor: hexToRgba(ACCENT, .15),
-          hoverBackgroundColor: hexToRgba(ACCENT, .25),
-          borderRadius: 6
+          borderColor: BRAND,
+          backgroundColor: hexToRgba(BRAND, 0.18),
+          hoverBackgroundColor: hexToRgba(BRAND, 0.28),
+          borderRadius: 10
         }]
       },
       options: {
@@ -131,22 +191,23 @@ document.addEventListener('DOMContentLoaded', () => {
         maintainAspectRatio: false,
         animation: { duration: 250 },
         scales: {
-          x: { grid: { display:false } },
+          x: { grid: { display: false } },
           y: {
-            beginAtZero:true,
-            ticks: { callback:(v)=>'S/ '+Number(v).toLocaleString() }
+            beginAtZero: true,
+            ticks: { callback: (v) => 'S/ ' + Number(v).toLocaleString() }
           }
         },
         plugins: {
-          legend: { display:false },
+          legend: { display: false },
+          datalabels: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx)=> 'S/ ' + Number(ctx.parsed.y ?? 0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})
+              label: (ctx) =>
+                'S/ ' + Number(ctx.parsed.y ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             }
           }
         }
       }
-    });
-  })();
-
-});
+    })
+  }
+})

@@ -7,12 +7,12 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ClienteController;
-use App\Http\Controllers\ClienteLookupController;
 use App\Http\Controllers\PromesaController;
 use App\Http\Controllers\PromesaPdfController;
 use App\Http\Controllers\CnaController;
 use App\Http\Controllers\AutorizacionController;
 use App\Http\Controllers\AdminUsersController;
+use App\Http\Controllers\Clientes\ClienteSearchController;
 
 // Reportes Normalizados
 use App\Http\Controllers\ReporteCnaController;
@@ -51,9 +51,9 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     /* --- Clientes --- */
     Route::prefix('clientes')->middleware('block.cliente')->name('clientes.')->group(function () {
-        Route::get('/suggest', [ClienteLookupController::class, 'suggest'])->name('suggest');
-        Route::get('/lookup', [ClienteLookupController::class, 'quickLookup'])->name('quick');
-        Route::get('/{dni}', [ClienteController::class, 'show'])->name('show');
+        Route::get('/suggest', [ClienteSearchController::class, 'suggest'])->name('suggest');
+        Route::get('/lookup',  [ClienteSearchController::class, 'lookup'])->name('quick');
+        Route::get('/{dni}',   [ClienteController::class, 'show'])->name('show');  
         Route::post('/{dni}/promesas', [PromesaController::class, 'store'])->name('promesas.store');
         Route::post('/{dni}/cnas', [CnaController::class, 'store'])->name('cna.store');
         Route::post('/{dni}/pagos/delete', [ClienteController::class, 'deletePagos'])->name('pagos.delete');

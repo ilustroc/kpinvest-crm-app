@@ -6,12 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#00a81c">
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="clientes-suggest-url" content="{{ route('clientes.suggest') }}">
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
   <link rel="shortcut icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
-
+  
   @vite(['resources/css/layout/app.css', 'resources/js/layout/app.js'])
 
   @stack('head')
@@ -45,7 +46,7 @@
                 lg:sticky lg:top-0 lg:h-screen
                 border-r border-slate-200/70 bg-white/70 backdrop-blur-xl
                 shadow-[0_18px_60px_rgba(2,6,23,.10)]
-                transition-transform duration-200 ease-out">
+                transition-transform duration-200 ease-out flex flex-col">
 
     {{-- Brand --}}
     <div class="flex items-center gap-3 px-4 py-4 border-b border-slate-200/70">
@@ -71,8 +72,32 @@
       </div>
     </div>
 
+    {{-- Quick DNI (entre User y GENERAL) --}}
+    @auth
+      <div class="px-4 py-3 border-b border-slate-200/70">
+        <form id="frmQuickDni" data-show-url="{{ route('clientes.show','__DNI__') }}" class="relative">
+          <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-700">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+          </span>
+
+          <input id="inpQuickDni"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="8"
+                placeholder="Buscar DNI..."
+                class="w-full rounded-2xl border border-emerald-600/25 bg-white/70 pl-9 pr-3 py-2 text-sm
+                        text-slate-900 placeholder:text-slate-400 shadow-sm outline-none transition
+                        focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/15">
+        </form>
+      </div>
+    @endauth
+
     {{-- Nav --}}
-    <nav class="px-2 py-2 overflow-auto max-h-[calc(100vh-210px)]">
+    <nav class="px-2 py-2 overflow-y-auto overflow-x-hidden flex-1">
       @auth
 
         <div class="{{ $labCls }}">GENERAL</div>
@@ -249,11 +274,12 @@
 
     {{-- Appbar --}}
     <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl">
-      <div class="mx-auto max-w-[1220px] px-4 sm:px-6 py-3 flex items-center gap-3">
+      <div class="mx-auto max-w-[1220px] px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
+
         <button id="kpMenuBtn" type="button"
                 class="lg:hidden inline-flex items-center justify-center rounded-xl
-                       border border-emerald-600/25 bg-white/70 p-2.5 text-emerald-700
-                       hover:bg-emerald-500/10 transition"
+                      border border-emerald-600/25 bg-white/70 p-2.5 text-emerald-700
+                      hover:bg-emerald-500/10 transition"
                 aria-label="Abrir menú">
           <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
@@ -263,6 +289,7 @@
         <div class="text-base font-extrabold tracking-tight text-slate-700">
           @yield('crumb','')
         </div>
+
       </div>
     </header>
 

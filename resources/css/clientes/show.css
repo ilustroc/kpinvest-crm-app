@@ -1,131 +1,319 @@
-/* public/css/clientes/show.css */
+/* resources/css/clientes/show.css */
+@reference "tailwindcss";
 
-/* ====== Marca KP: verde primario + azul acento (fallback si el layout está cacheado) ====== */
-:root{
-  --brand:#00a81c;
-  --brand-ink:#008517;
-  --accent:#0b4ea2;
-  --accent-ink:#093f82;
-
-  --surface:#ffffff; --surface-2:#f3f6fb; --border:#e8ecf3;
-  --ink:#151a23; --muted:#6d7b8a;
+/* Tokens (por si el layout está cacheado) */
+@layer base{
+  :root{
+    --brand:#00a81c;
+    --brand-ink:#008517;
+    --accent:#0b4ea2;
+    --accent-ink:#093f82;
+  }
 }
 
-/* ====== CCD en encabezado ====== */
-.kpi-ccd .label-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.35rem;
-  font-size:.83rem;
-  color:var(--muted);
+/* =========================  
+   helpers
+   ========================= */
+@layer components{
+
+  /* ---- layout helpers ---- */
+  .d-flex{ @apply flex; }
+  .flex-wrap{ @apply flex-wrap; }
+
+  .justify-content-between{ @apply justify-between; }
+  .justify-content-center{ @apply justify-center; }
+  .align-items-center{ @apply items-center; }
+  .align-items-start{ @apply items-start; }
+  .align-items-stretch{ @apply items-stretch; }
+
+  .text-secondary{ @apply text-slate-500; }
+  .text-muted{ @apply text-slate-400; }
+  .text-center{ @apply text-center; }
+  .text-end{ @apply text-right; }
+  .text-nowrap{ @apply whitespace-nowrap; }
+
+  .small{ @apply text-xs; }
+  .fw-bold{ @apply font-bold; }
+  .visually-hidden{ @apply sr-only; }
+
+  .me-1{ @apply mr-1; } .me-2{ @apply mr-2; }
+  .ms-1{ @apply ml-1; } .ms-2{ @apply ml-2; }
+  .mt-1{ @apply mt-1; } .mt-2{ @apply mt-2; } .mt-3{ @apply mt-3; }
+  .mb-0{ @apply mb-0; } .mb-1{ @apply mb-1; } .mb-2{ @apply mb-2; } .mb-3{ @apply mb-3; }
+
+  .h5{ @apply text-lg font-extrabold; }
+  .h6{ @apply text-base font-extrabold; }
+
+  /* ---- cards ---- */
+  .card{
+    @apply rounded-[1.25rem] border border-white/60 bg-white/70 backdrop-blur-xl;
+    @apply shadow-[0_18px_55px_rgba(2,6,23,.10)];
+  }
+  .pad{ @apply p-4; }
+
+  /* ---- alerts ---- */
+  .alert{
+    @apply rounded-2xl border bg-white/70 backdrop-blur-xl px-4 py-3 shadow-sm;
+    @apply flex items-start gap-2;
+  }
+  .alert-success{ @apply border-emerald-500/20; }
+  .alert-danger{ @apply border-rose-500/20; }
+
+  /* ---- forms ---- */
+  .form-label{
+    @apply block text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500 mb-2;
+  }
+  .form-text{ @apply text-xs text-slate-500; }
+
+  .form-control, .form-select, textarea.form-control{
+    @apply w-full rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-2.5 text-sm;
+    @apply text-slate-900 placeholder:text-slate-400 shadow-sm outline-none transition;
+    @apply focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/15;
+  }
+
+  input[type="checkbox"] {
+    @apply cursor-pointer transition-all focus:ring-emerald-500;
+  }
+
+  .form-check{ @apply flex items-center gap-2; }
+  .form-check-label{ @apply text-sm text-slate-600; }
+  .form-check-input{
+    /* si quieres usar tu switch KP real, cambia el input en blade a class="kp-switch" */
+    @apply h-5 w-9 rounded-full border border-slate-300 bg-slate-200;
+  }
+
+  /* ---- buttons ---- */
+  .btn{
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5;
+    @apply text-sm font-extrabold transition active:scale-[0.99] border border-transparent;
+  }
+  .btn-sm{ @apply rounded-xl px-3 py-2 text-xs; }
+
+  .btn-primary{
+    @apply text-white bg-gradient-to-r from-emerald-600 to-emerald-500;
+    @apply hover:from-emerald-700 hover:to-emerald-600;
+    @apply shadow-[0_12px_35px_rgba(16,185,129,.22)];
+  }
+  .btn-success{
+    @apply text-white bg-emerald-600 hover:bg-emerald-700;
+  }
+  .btn-danger{
+    @apply text-white bg-rose-600 hover:bg-rose-700;
+  }
+
+  .btn-outline-secondary{
+    @apply text-slate-700 bg-white/60 border border-slate-200/70;
+    @apply hover:bg-white/80 hover:border-slate-300/70;
+  }
+
+  .btn-outline-primary {
+    @apply bg-blue-600/5 text-blue-700 border-blue-600/20 hover:bg-blue-600 hover:text-white;
+  }
+  
+  .btn-outline-primary:hover{
+    @apply text-white;
+    background: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+
+  .btn-outline-success{
+    @apply border border-emerald-600/40 text-emerald-700 bg-white/60;
+    @apply hover:bg-emerald-600 hover:text-white;
+  }
+
+  .btn-outline-danger{
+    @apply border border-rose-600/40 text-rose-700 bg-white/60;
+    @apply hover:bg-rose-600 hover:text-white;
+  }
+
+  .btn-close{
+    @apply h-9 w-9 rounded-xl grid place-items-center;
+    @apply border border-slate-200/70 bg-white/60 text-slate-700;
+    @apply hover:bg-white/80 transition;
+  }
+
+  /* ---- badges ---- */
+  .badge{ @apply inline-flex items-center justify-center font-extrabold; }
+  .rounded-pill{ @apply rounded-full; }
+  .text-bg-light{
+    @apply bg-white/70 text-slate-700 border border-slate-200/70;
+  }
+
+  /* ---- tables ---- */
+  .table-responsive{
+    @apply overflow-auto rounded-2xl border border-slate-200/70 bg-white/60;
+  }
+
+  .table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    @apply text-sm;
+  }
+  .table.align-middle td, .table.align-middle th{ vertical-align:middle; }
+
+  .table> :not(caption)>*>*{ @apply px-4 py-3 border-b border-slate-200/50; }
+  .table-sm> :not(caption)>*>*{ @apply px-3 py-2; }
+
+  .tbl-compact thead th{
+    position: sticky; top: 0; z-index: 1;
+    @apply bg-white/80 backdrop-blur-xl;
+    @apply text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500;
+    @apply border-b border-slate-200/70;
+    box-shadow:0 3px 8px rgba(15,23,42,.06);
+  }
+
+  .table-striped tbody tr:nth-child(even) > *{
+    @apply bg-slate-50/40;
+  }
+  .table-hover tbody tr:hover > *{
+    @apply bg-emerald-500/5;
+  }
+
+  .tbl-compact tfoot td{
+    @apply bg-slate-50/60 font-extrabold border-t border-slate-200/70;
+  }
+
+  /* ---- collapse ---- */
+  .collapse{ display:none; }
+  .collapse.show{ display:block; }
+
+  /* ---- dropdown ---- */
+  .dropdown{ @apply relative; }
+
+  .dropdown-toggle{ @apply w-full; }
+
+  .dropdown-menu{
+    @apply absolute right-0 top-full mt-2 min-w-[14rem] overflow-hidden;
+    @apply rounded-2xl border border-slate-200/70 bg-white/90 backdrop-blur-xl;
+    @apply shadow-[0_18px_55px_rgba(2,6,23,.10)];
+    display:none;
+
+    z-index: 9999;
+  }
+  .dropdown-menu.show{ display:block; }
+
+  .dropdown-menu-end{ @apply right-0; }
+
+  .dropdown-item{
+    @apply block px-4 py-2.5 text-sm font-semibold text-slate-700;
+    @apply hover:bg-emerald-500/10;
+  }
+
+  /* ---- modal (si sigues usando bootstrap JS, esto lo “pinta” bonito) ---- */
+  .modal{
+    @apply fixed inset-0 z-50 hidden;
+  }
+  .modal.show{ @apply block; }
+
+  .modal-dialog{ @apply w-full max-w-2xl mx-auto p-4; }
+  .modal-dialog-centered{ @apply min-h-screen flex items-center; }
+
+  .modal-content{
+    @apply rounded-2xl overflow-hidden;
+    @apply border border-white/60 bg-white/80 backdrop-blur-xl;
+    @apply shadow-[0_30px_80px_rgba(2,6,23,.18)];
+  }
+
+  .modal-header{ @apply flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200/70; }
+  .modal-title{ @apply font-extrabold text-slate-800; }
+  .modal-body{ @apply px-5 py-4; }
+  .modal-footer{ @apply px-5 py-4 border-t border-slate-200/70 flex items-center justify-end gap-2; }
+
+  /* backdrop típico bootstrap */
+  .modal-backdrop{
+    @apply fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px];
+  }
+  .modal-backdrop.fade{ opacity:0; }
+  .modal-backdrop.show{ opacity:1; }
+
+  /* ---- spinner (CNA “en proceso”) ---- */
+  .spinner-border{
+    @apply inline-block align-[-0.125em] border-2 border-slate-300 border-t-slate-600 rounded-full;
+    width:1rem; height:1rem;
+    animation: spin .7s linear infinite;
+  }
+  .spinner-border-sm{ width:.85rem; height:.85rem; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- list helpers ---- */
+  .list-unstyled{ @apply list-none p-0 m-0; }
+
+  /* =========================
+     Tus estilos “KP” del show
+     (rehechos en Tailwind)
+     ========================= */
+
+  .max-h-320{ max-height:320px; overflow:auto; }
+  .max-h-260{ max-height:260px; overflow:auto; }
+
+  /* Encabezado */
+  .cli-head {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  .cli-head .dni-pill{
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1;
+    @apply border border-emerald-500/25 bg-emerald-500/10 text-emerald-700;
+    @apply text-xs font-extrabold;
+  }
+
+  .cli-head .meta{ @apply flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500; }
+
+  .kpi-mini {
+    @apply rounded-2xl border border-slate-200/70 p-4 transition-all duration-200;
+  }
+
+  .kpi-mini .label{ @apply text-[11px] font-extrabold uppercase tracking-[0.16em] text-slate-500; }
+  .kpi-mini .value{ @apply text-lg font-extrabold leading-tight; }
+
+  /* CCD */
+  .kpi-ccd .label-row{
+    @apply flex items-center justify-between gap-2 text-sm text-slate-500;
+  }
+  .kpi-ccd .badge-count{
+    @apply rounded-full px-2 py-0.5 text-xs font-extrabold;
+    @apply border border-sky-600/30 bg-sky-600/10 text-sky-800;
+  }
+  .kpi-ccd .value{ @apply font-bold; }
+
+  /* Promesas */
+  .promesas .table>tbody>tr{ transition: box-shadow .2s ease, transform .05s ease; }
+  .promesas .table>tbody>tr:hover{ box-shadow:0 1px 0 rgba(15,23,42,.06) inset, 0 2px 10px rgba(15,23,42,.06); }
+
+  .promesas .pp-state-preaprobada{ box-shadow: 4px 0 0 0 var(--accent) inset; background: rgba(11,78,162,.10); }
+  .promesas .pp-state-aprobada{ box-shadow: 4px 0 0 0 var(--brand) inset; background: rgba(0,168,28,.10); }
+  .promesas .pp-state-rechazada{ box-shadow: 4px 0 0 0 #e38074 inset; background: rgba(227,128,116,.12); }
+  .promesas .pp-state-pendiente{ box-shadow: 4px 0 0 0 #cfd7e1 inset; background: rgba(207,215,225,.16); }
+
+  .promesas .card-head{ @apply flex items-center justify-between gap-3 mb-2; }
+  .promesas .hint{ @apply text-sm text-slate-500; }
+
+  .nota-clamp{
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+    max-width: 28rem;
+  }
+
+  /* Decisiones */
+  .decision-cell{ min-width:260px; }
+  .decision-cell .nota-clamp{ -webkit-line-clamp:2; max-width:32rem; }
+  .decision-cell .meta{ @apply text-xs text-slate-500; }
+
+  .decision-box{
+    @apply rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2;
+    border-left-width:4px;
+  }
+  .decision-box.is-preaprobada{ border-left-color: var(--accent); background: rgba(11,78,162,.10); }
+  .decision-box.is-aprobada{ border-left-color: var(--brand); background: rgba(0,168,28,.10); }
+  .decision-box.is-rechazada{ border-left-color:#e38074; background: rgba(227,128,116,.12); }
+
+  /* scroll thumb */
+  .table-responsive::-webkit-scrollbar{ height: 6px; width: 6px; }
+  .table-responsive::-webkit-scrollbar-thumb{
+    @apply bg-slate-300 rounded-full hover:bg-emerald-400;
+  }
 }
-.kpi-ccd .badge-count{
-  border-radius:999px;
-  padding:.1rem .45rem;
-  font-size:.75rem;
-  font-weight:600;
-  background:color-mix(in oklab, var(--accent) 10%, transparent);
-  color:var(--accent-ink);
-  border:1px solid color-mix(in oklab, var(--accent) 30%, transparent);
-}
-.kpi-ccd .value{ font-size:.95rem; font-weight:600; }
-.kpi-ccd .dropdown-toggle{
-  width:100%;
-  font-size:.8rem;
-  padding:.25rem .45rem;
-}
-
-/* ====== Densidad / helpers ====== */
-.tbl-compact.table> :not(caption)>*>*{ padding:.5rem .65rem }
-.max-h-320{ max-height:320px; overflow:auto }
-.max-h-260{ max-height:260px; overflow:auto }
-
-/* ====== Encabezado ====== */
-.cli-head .dni-pill{
-  display:inline-flex; align-items:center; gap:.4rem;
-  background:color-mix(in oklab, var(--brand) 10%, transparent);
-  color:var(--brand);
-  border:1px solid color-mix(in oklab, var(--brand) 25%, transparent);
-  padding:.18rem .55rem; border-radius:999px; font-weight:600
-}
-.cli-head .meta{ display:flex; flex-wrap:wrap; gap:.5rem 1rem; color:var(--muted) }
-.kpi-mini{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px }
-.kpi-mini .label{ color:var(--muted); font-size:.83rem }
-.kpi-mini .value{ font-weight:800; font-size:1.15rem; line-height:1.1 }
-
-/* ====== Tablas ====== */
-.tbl-compact thead th{
-  position: sticky; top: 0; z-index: 1;
-  background: color-mix(in oklab, var(--surface-2) 55%, transparent);
-  color: var(--ink);
-  text-transform: uppercase; font-size:.8rem; letter-spacing:.3px;
-  border-bottom:1px solid var(--border);
-  box-shadow:0 3px 8px rgba(15,23,42,.06);
-}
-.tbl-compact tbody tr:nth-child(even){
-  background: color-mix(in oklab, var(--surface-2) 14%, transparent);
-}
-.tbl-compact tbody tr:hover{
-  background: color-mix(in oklab, var(--accent) 10%, var(--brand) 6%);
-}
-.tbl-compact tfoot td{
-  background: color-mix(in oklab, var(--surface-2) 35%, transparent);
-  font-weight:700; border-top:1px solid var(--border);
-}
-
-/* ====== Promesas ====== */
-.promesas .table>tbody>tr{ transition:box-shadow .2s ease, transform .05s ease }
-.promesas .table>tbody>tr:hover{ box-shadow:0 1px 0 rgba(15,23,42,.06) inset, 0 2px 10px rgba(15,23,42,.06) }
-
-.promesas .pp-state-preaprobada  { box-shadow: 4px 0 0 0 var(--accent) inset; background: color-mix(in oklab, var(--accent) 18%, transparent) }
-.promesas .pp-state-aprobada     { box-shadow: 4px 0 0 0 var(--brand) inset;  background: color-mix(in oklab, var(--brand) 18%, transparent) }
-.promesas .pp-state-rechazada    { box-shadow: 4px 0 0 0 #e38074 inset;       background: color-mix(in oklab,#e38074 16%, transparent) }
-.promesas .pp-state-pendiente    { box-shadow: 4px 0 0 0 #cfd7e1 inset;       background: color-mix(in oklab,#cfd7e1 16%, transparent) }
-
-.promesas .card-head{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.5rem }
-.promesas .hint{ color:var(--muted); font-size:.85rem }
-.promesas .nota-clamp{
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
-  overflow:hidden; max-width: 28rem;
-}
-
-.badge-pill{ border-radius:999px; padding:.18rem .6rem; font-weight:700 }
-.badge-pp-warning{ background:#f7e9c4; color:#7a5a00; border:1px solid #e7d08d }
-.badge-pp-info{ background:#dfeffd; color:#0b4e9b; border:1px solid #b7d3fb }
-.badge-pp-success{ background:#dff7ea; color:#0a6b3a; border:1px solid #bce9d0 }
-.badge-pp-danger{ background:#fde0de; color:#8a1a10; border:1px solid #f3b7b2 }
-.badge-pp-secondary{ background:#e9edf3; color:#495869; border:1px solid #cfd7e1 }
-
-.badge-soft{
-  background:color-mix(in oklab, var(--brand) 12%, transparent);
-  color:var(--brand);
-  border:1px solid color-mix(in oklab, var(--brand) 24%, transparent);
-  border-radius:999px; padding:.18rem .55rem; font-weight:600
-}
-
-.table-responsive::-webkit-scrollbar{ height:10px }
-.table-responsive::-webkit-scrollbar-thumb{ background: color-mix(in oklab, var(--accent) 22%, transparent); border-radius:10px }
-
-/* ====== DECISIONES ====== */
-.decision-cell{ min-width:260px }
-.decision-cell .nota-clamp{ -webkit-line-clamp:2; max-width:32rem }
-.decision-cell .meta{ color:var(--muted); font-size:.82rem }
-
-.decision-box{
-  border:1px solid var(--border);
-  border-left-width:4px;
-  border-radius:12px;
-  padding:.45rem .6rem;
-  background:var(--surface);
-}
-.decision-box.is-preaprobada{ border-left-color:var(--accent); background:color-mix(in oklab, var(--accent) 20%, transparent) }
-.decision-box.is-aprobada{ border-left-color:var(--brand); background:color-mix(in oklab, var(--brand) 20%, transparent) }
-.decision-box.is-rechazada{ border-left-color:#e38074; background:color-mix(in oklab,#e38074 20%, transparent) }
-
-/* ====== Botones ====== */
-.btn-primary{ background:var(--brand); border-color:var(--brand) }
-.btn-primary:hover{ background:var(--brand-ink); border-color:var(--brand-ink) }
-
-.btn-outline-primary{ color:var(--accent); border-color:var(--accent) }
-.btn-outline-primary:hover{ color:#fff; background:var(--accent-ink); border-color:var(--accent-ink) }

@@ -4,8 +4,8 @@
 @section('crumb','Resumen')
 
 @push('head')
-  <link rel="stylesheet" href="{{ asset('css/panel/resumen.css') }}?v={{ @filemtime(public_path('css/panel/resumen.css')) }}">
-  <meta name="clientes-suggest-url" content="{{ route('clientes.suggest') }}">
+  <meta name="quick-suggest-url" content="{{ route('clientes.suggest') }}">
+  @vite(['resources/css/panel/resumen.css', 'resources/js/panel/resumen.js'])
 @endpush
 
 @section('content')
@@ -23,67 +23,85 @@
   $cnaRes = $cnaRes ?? collect();
 @endphp
 
-<div class="container-fluid">
-  <div class="row g-3">
-    {{-- ===== Izquierda ===== --}}
-    <div class="col-lg-8">
+<div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    {{-- ================= IZQUIERDA ================= --}}
+    <div class="lg:col-span-8 space-y-4">
 
       {{-- Bienvenida + buscador --}}
-      <div class="card pad shadow-soft">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
           <div>
-            <h5 class="mb-1">¡Bienvenido(a)!</h5>
-            <div class="text-secondary small">Panel inicial.</div>
+            <h1 class="text-base sm:text-lg font-extrabold text-slate-900">¡Bienvenido(a)!</h1>
+            <div class="text-sm text-slate-500">Panel inicial.</div>
 
             @if (session('quick_error'))
-              <div class="alert alert-warning py-1 px-2 mt-2 mb-0" role="alert">
-                <i class="bi bi-exclamation-triangle me-1"></i> {{ session('quick_error') }}
+              <div class="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-50 text-amber-800 ring-1 ring-amber-200 px-3 py-2 text-sm">
+                <span class="font-extrabold">⚠</span>
+                <span class="font-semibold">{{ session('quick_error') }}</span>
               </div>
             @endif
           </div>
 
-          <form id="frmQuick" class="position-relative d-flex align-items-center" role="search"
-                action="{{ route('clientes.quick') }}" method="GET" autocomplete="off">
-            <input id="inpQuick"
-                   name="q"
-                   class="form-control form-control-sm me-2"
-                   placeholder="DNI / Operación / Nombre"
-                   aria-label="Buscar por DNI, Operación o Nombre">
-            <button class="btn btn-primary btn-sm" type="submit">
-              <i class="bi bi-search me-1"></i> Buscar
-            </button>
+          <form id="frmQuick" class="relative w-full sm:w-auto flex items-center gap-2"
+                role="search" action="{{ route('clientes.quick') }}" method="GET" autocomplete="off">
+            <div class="relative w-full sm:w-[360px]">
+              <input id="inpQuick" name="q"
+                     class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
+                            focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400"
+                     placeholder="DNI / Operación / Nombre" aria-label="Buscar por DNI, Operación o Nombre">
+              <div id="quickSug" class="quick-menu"></div>
+            </div>
 
-            {{-- Dropdown de sugerencias --}}
-            <div id="quickSug" class="quick-menu"></div>
+            <button class="inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-extrabold
+                           bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                    type="submit">
+              Buscar
+            </button>
           </form>
         </div>
       </div>
 
-      {{-- Lista de coincidencias ambigua (opcional) --}}
+      {{-- Coincidencias (si aplica) --}}
       @if (session('quick_list'))
-        <div class="card pad mt-2">
-          <h6 class="mb-2">Coincidencias</h6>
-          <div class="table-responsive">
-            <table class="table align-middle mb-0">
-              <thead><tr><th>DNI</th><th>Nombre</th><th>Operación</th><th>Cosecha</th><th></th></tr></thead>
-              <tbody>
-              @foreach(session('quick_list') as $r)
-                @php
-                  $dni      = data_get($r, 'dni');
-                  $nombre   = data_get($r, 'nombre');
-                  $operacion= data_get($r, 'operacion');
-                  $cosecha  = data_get($r, 'cosecha');
-                @endphp
-                <tr>
-                  <td class="text-nowrap">{{ $dni }}</td>
-                  <td>{{ $nombre }}</td>
-                  <td class="text-nowrap">{{ $operacion }}</td>
-                  <td class="text-nowrap">{{ $cosecha }}</td>
-                  <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" href="{{ route('clientes.show', $dni) }}">Ver</a>
-                  </td>
+        <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5">
+          <div class="text-sm font-extrabold text-slate-900 mb-3">Coincidencias</div>
+
+          <div class="overflow-auto rounded-2xl ring-1 ring-slate-200/70">
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="bg-slate-50 text-xs uppercase tracking-wide text-slate-700">
+                  <th class="px-3 py-3 text-left">DNI</th>
+                  <th class="px-3 py-3 text-left">Nombre</th>
+                  <th class="px-3 py-3 text-left">Operación</th>
+                  <th class="px-3 py-3 text-left">Cosecha</th>
+                  <th class="px-3 py-3 text-right"></th>
                 </tr>
-              @endforeach
+              </thead>
+              <tbody>
+                @foreach(session('quick_list') as $r)
+                  @php
+                    $dni      = data_get($r, 'dni');
+                    $nombre   = data_get($r, 'nombre');
+                    $operacion= data_get($r, 'operacion');
+                    $cosecha  = data_get($r, 'cosecha');
+                  @endphp
+                  <tr class="border-t border-slate-100">
+                    <td class="px-3 py-3 font-semibold text-slate-900 whitespace-nowrap">{{ $dni }}</td>
+                    <td class="px-3 py-3 text-slate-700">{{ $nombre }}</td>
+                    <td class="px-3 py-3 text-slate-700 whitespace-nowrap">{{ $operacion }}</td>
+                    <td class="px-3 py-3 text-slate-700 whitespace-nowrap">{{ $cosecha }}</td>
+                    <td class="px-3 py-3 text-right">
+                      <a class="inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-extrabold
+                                ring-1 ring-slate-200 hover:bg-slate-50"
+                         href="{{ route('clientes.show', $dni) }}">
+                        Ver
+                      </a>
+                    </td>
+                  </tr>
+                @endforeach
               </tbody>
             </table>
           </div>
@@ -91,337 +109,289 @@
       @endif
 
       {{-- KPIs --}}
-      <div class="row g-3">
-        <div class="col-sm-6">
-          <div class="kpi shadow-soft">
-            <div class="ico"><i class="bi bi-clipboard2-check"></i></div>
-            <div>
-              <div class="lbl">Promesas creadas hoy</div>
-              <div class="val">{{ number_format($kpiPromHoy) }}</div>
-            </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5 flex items-center gap-3">
+          <div class="h-11 w-11 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-700 font-extrabold">✓</div>
+          <div>
+            <div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Promesas creadas hoy</div>
+            <div class="text-xl font-extrabold text-slate-900">{{ number_format($kpiPromHoy) }}</div>
           </div>
         </div>
-        <div class="col-sm-6">
-          <div class="kpi shadow-soft">
-            <div class="ico"><i class="bi bi-cash-coin"></i></div>
-            <div>
-              <div class="lbl">Pagos registrados hoy</div>
-              <div class="val">S/ {{ number_format($kpiPagosHoy,2) }}</div>
-            </div>
+
+        <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5 flex items-center gap-3">
+          <div class="h-11 w-11 rounded-xl grid place-items-center bg-emerald-500/10 text-emerald-700 font-extrabold">S/</div>
+          <div>
+            <div class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Pagos registrados hoy</div>
+            <div class="text-xl font-extrabold text-slate-900">S/ {{ number_format($kpiPagosHoy,2) }}</div>
           </div>
         </div>
       </div>
 
-      {{-- Gráfica: Pagos del mes --}}
-      <div class="card pad shadow-soft chart-card">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0 d-flex align-items-center gap-2">
-            <i class="bi bi-bar-chart-steps" style="color:var(--accent)"></i> Pagos del mes
-          </h6>
-          <div class="toolbar">
+      {{-- Chart Pagos --}}
+      <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+          <div class="text-sm font-extrabold text-slate-900">Pagos del mes</div>
+
+          <div class="flex items-center gap-2">
             @php $curr = \Carbon\Carbon::createFromFormat('Y-m',$mes); @endphp
-            <a class="btn btn-outline-secondary btn-sm"
-               href="{{ url()->current().'?mes='.$curr->copy()->subMonth()->format('Y-m') }}"><i class="bi bi-chevron-left"></i></a>
-            <input type="month" id="mesPicker" class="form-control form-control-sm" value="{{ $curr->format('Y-m') }}">
-            <a class="btn btn-outline-secondary btn-sm"
-               href="{{ url()->current().'?mes='.$curr->copy()->addMonth()->format('Y-m') }}"><i class="bi bi-chevron-right"></i></a>
+
+            <a class="h-9 w-9 grid place-items-center rounded-xl ring-1 ring-slate-200 hover:bg-slate-50"
+               href="{{ url()->current().'?mes='.$curr->copy()->subMonth()->format('Y-m') }}">‹</a>
+
+            <input type="month" id="mesPicker"
+                   class="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                   value="{{ $curr->format('Y-m') }}">
+
+            <a class="h-9 w-9 grid place-items-center rounded-xl ring-1 ring-slate-200 hover:bg-slate-50"
+               href="{{ url()->current().'?mes='.$curr->copy()->addMonth()->format('Y-m') }}">›</a>
           </div>
         </div>
+
         <div class="chart-wrap">
-          <canvas id="chartPagos" data-chart='@json(["labels"=>$chartLabels,"data"=>$chartData])'></canvas>
+          <canvas id="chartPagos"
+                  data-chart='@json(["labels"=>$chartLabels,"data"=>$chartData])'></canvas>
         </div>
       </div>
+
     </div>
 
-    {{-- ===== Derecha: Actividades ===== --}}
-    <div class="col-lg-4">
-      <div class="notifs shadow-soft sticky-right">
-        <div class="notifs-header">
-          <i class="bi bi-list-task"></i>
+    {{-- ================= DERECHA ================= --}}
+    <div class="lg:col-span-4">
+      <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 overflow-hidden lg:sticky lg:top-24">
+        <div class="px-4 py-3 bg-emerald-700 text-white font-extrabold">
           {{ $isAsesor ? 'Tus actividades' : 'Actividades' }}
         </div>
 
-        <div class="notifs-body">
-          {{-- ===== VISTA ASESOR ===== --}}
+        <div class="p-3 max-h-[70vh] overflow-auto">
+
+          {{-- ASESOR --}}
           @if($isAsesor)
-            {{-- Promesas del asesor --}}
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-clipboard-check"></i></div>
-                <span>Promesas — En Supervisor</span>
-                <span class="notif-count">{{ $misSup->count() }}</span>
-              </div>
-              <ul class="notif-list">
-                @forelse($misSup as $p)
-                  <li>
-                    <a href="{{ route('clientes.show',$p->dni) }}" class="notif-item">
-                      <div class="notif-dot"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">{{ $p->dni }}</span>
-                          <span class="text-secondary"> • {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
-                        </div>
-                        <div class="notif-sub">
-                          {{ $p->operacion ?: '—' }} — Pendiente de Supervisor
-                        </div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">Sin pendientes con Supervisor.</div>
-                @endforelse
-              </ul>
-            </section>
 
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-hourglass-split"></i></div>
-                <span>Promesas — Pre-aprobadas</span>
-                <span class="notif-count">{{ $misPre->count() }}</span>
-              </div>
-              <ul class="notif-list">
-                @forelse($misPre as $p)
-                  <li>
-                    <a href="{{ route('clientes.show',$p->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:var(--accent)"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">{{ $p->dni }}</span>
-                          <span class="text-secondary"> • {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
-                        </div>
-                        <div class="notif-sub">
-                          {{ $p->operacion ?: '—' }} — Pre-aprobada (esperando Administración)
-                        </div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">No hay pre-aprobadas.</div>
-                @endforelse
-              </ul>
-            </section>
+            @php
+              $groups = [
+                ['title'=>'Promesas — En Supervisor','count'=>$misSup->count(),'rows'=>$misSup,'dot'=>'bg-emerald-600'],
+                ['title'=>'Promesas — Pre-aprobadas','count'=>$misPre->count(),'rows'=>$misPre,'dot'=>'bg-emerald-500'],
+                ['title'=>'Promesas — Resueltas','count'=>$misRes->count(),'rows'=>$misRes,'dot'=>'bg-slate-400'],
+              ];
+            @endphp
 
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-check2-circle"></i></div>
-                <span>Promesas — Resueltas</span>
-                <span class="notif-count">{{ $misRes->count() }}</span>
-              </div>
-              <ul class="notif-list">
-                @forelse($misRes as $p)
-                  @php
-                    $estado = strtoupper($p->workflow_estado);
-                    $badgeC = 'var(--bs-success)';
-                    if ($estado==='RECHAZADA' || $estado==='RECHAZADA_SUP') $badgeC = 'var(--bs-danger)';
-                  @endphp
-                  <li>
-                    <a href="{{ route('clientes.show',$p->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:{{ $badgeC }}"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">{{ $p->dni }}</span>
-                          <span class="text-secondary"> • {{ ucfirst($p->workflow_estado) }}</span>
+            @foreach($groups as $g)
+              <div class="mb-4">
+                <div class="flex items-center gap-2 px-1 mb-2">
+                  <div class="text-sm font-extrabold text-slate-900">{{ $g['title'] }}</div>
+                  <span class="ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                    {{ $g['count'] }}
+                  </span>
+                </div>
+
+                <ul class="space-y-2">
+                  @forelse($g['rows'] as $p)
+                    <li>
+                      <a href="{{ route('clientes.show',$p->dni) }}"
+                         class="flex items-start gap-3 rounded-2xl ring-1 ring-slate-200/70 bg-white hover:bg-slate-50 p-3 transition">
+                        <span class="mt-2 h-2.5 w-2.5 rounded-full {{ $g['dot'] }}"></span>
+                        <div class="min-w-0">
+                          <div class="text-sm font-extrabold text-slate-900 truncate">
+                            {{ $p->dni }}
+                            <span class="text-slate-500 font-semibold">
+                              • {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}
+                            </span>
+                          </div>
+                          <div class="text-xs text-slate-500 truncate">
+                            {{ $p->operacion ?: '—' }}
+                          </div>
                         </div>
-                        <div class="notif-sub">{{ $p->operacion ?: '—' }}</div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">Aún no hay resoluciones.</div>
-                @endforelse
-              </ul>
-            </section>
-
-            {{-- CNA del asesor --}}
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-file-earmark-text"></i></div>
-                <span>CNA — En Supervisor</span>
-                <span class="notif-count">{{ $cnaSup->count() }}</span>
+                        <span class="ml-auto text-[11px] font-extrabold px-2 py-1 rounded-full ring-1 ring-slate-200 text-slate-700 whitespace-nowrap">
+                          Ver cliente
+                        </span>
+                      </a>
+                    </li>
+                  @empty
+                    <div class="text-xs text-slate-500 px-1">Sin registros.</div>
+                  @endforelse
+                </ul>
               </div>
-              <ul class="notif-list">
-                @forelse($cnaSup as $c)
-                  <li>
-                    <a href="{{ route('clientes.show',$c->dni) }}" class="notif-item">
-                      <div class="notif-dot"></div>
-                      <div class="notif-body">
-                        <div class="notif-main"><span class="fw-semibold">DNI {{ $c->dni }}</span></div>
-                        <div class="notif-sub">Pendiente de Supervisor</div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">Sin CNA en supervisor.</div>
-                @endforelse
-              </ul>
-            </section>
+            @endforeach
 
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-hourglass-split"></i></div>
-                <span>CNA — Pre-aprobadas</span>
-                <span class="notif-count">{{ $cnaPre->count() }}</span>
-              </div>
-              <ul class="notif-list">
-                @forelse($cnaPre as $c)
-                  <li>
-                    <a href="{{ route('clientes.show',$c->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:var(--accent)"></div>
-                      <div class="notif-body">
-                        <div class="notif-main"><span class="fw-semibold">DNI {{ $c->dni }}</span></div>
-                        <div class="notif-sub">Pre-aprobada (esperando Administración)</div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">Sin CNA pre-aprobadas.</div>
-                @endforelse
-              </ul>
-            </section>
+            {{-- CNA (igual estilo) --}}
+            @php
+              $cnaGroups = [
+                ['title'=>'CNA — En Supervisor','count'=>$cnaSup->count(),'rows'=>$cnaSup,'dot'=>'bg-emerald-600','sub'=>'Pendiente de Supervisor'],
+                ['title'=>'CNA — Pre-aprobadas','count'=>$cnaPre->count(),'rows'=>$cnaPre,'dot'=>'bg-emerald-500','sub'=>'Pre-aprobada (esperando Administración)'],
+                ['title'=>'CNA — Resueltas','count'=>$cnaRes->count(),'rows'=>$cnaRes,'dot'=>'bg-slate-400','sub'=>'Resuelta'],
+              ];
+            @endphp
 
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-check2-circle"></i></div>
-                <span>CNA — Resueltas</span>
-                <span class="notif-count">{{ $cnaRes->count() }}</span>
-              </div>
-              <ul class="notif-list">
-                @forelse($cnaRes as $c)
-                  @php
-                    $estado = strtoupper($c->workflow_estado);
-                    $badgeC = 'var(--bs-success)';
-                    if ($estado==='RECHAZADA' || $estado==='RECHAZADA_SUP') $badgeC = 'var(--bs-danger)';
-                  @endphp
-                  <li>
-                    <a href="{{ route('clientes.show',$c->dni) }}" class="notif-item">
-                      <div class="notif-dot" style="background:{{ $badgeC }}"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">DNI {{ $c->dni }}</span>
-                          <span class="text-secondary"> • {{ ucfirst($c->workflow_estado) }}</span>
+            @foreach($cnaGroups as $g)
+              <div class="mb-4">
+                <div class="flex items-center gap-2 px-1 mb-2">
+                  <div class="text-sm font-extrabold text-slate-900">{{ $g['title'] }}</div>
+                  <span class="ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                    {{ $g['count'] }}
+                  </span>
+                </div>
+
+                <ul class="space-y-2">
+                  @forelse($g['rows'] as $c)
+                    <li>
+                      <a href="{{ route('clientes.show',$c->dni) }}"
+                         class="flex items-start gap-3 rounded-2xl ring-1 ring-slate-200/70 bg-white hover:bg-slate-50 p-3 transition">
+                        <span class="mt-2 h-2.5 w-2.5 rounded-full {{ $g['dot'] }}"></span>
+                        <div class="min-w-0">
+                          <div class="text-sm font-extrabold text-slate-900 truncate">DNI {{ $c->dni }}</div>
+                          <div class="text-xs text-slate-500 truncate">{{ $g['sub'] }}</div>
                         </div>
-                        <div class="notif-sub">—</div>
-                      </div>
-                      <span class="notif-cta">Ver cliente</span>
-                    </a>
-                  </li>
-                @empty
-                  <div class="text-secondary small px-2 pb-2">Sin CNA resueltas.</div>
-                @endforelse
-              </ul>
-            </section>
+                        <span class="ml-auto text-[11px] font-extrabold px-2 py-1 rounded-full ring-1 ring-slate-200 text-slate-700 whitespace-nowrap">
+                          Ver cliente
+                        </span>
+                      </a>
+                    </li>
+                  @empty
+                    <div class="text-xs text-slate-500 px-1">Sin registros.</div>
+                  @endforelse
+                </ul>
+              </div>
+            @endforeach
 
           @else
-          {{-- ===== VISTA SUPERVISOR / ADMIN ===== --}}
+            {{-- ================= SUPERVISOR / ADMIN ================= --}}
 
             {{-- Promesas por aprobar --}}
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-clipboard-check"></i></div>
-                <span>Promesas por aprobar</span>
-                <span class="notif-count">{{ $ppPendCount }}</span>
+            <div class="mb-4">
+              <div class="flex items-center gap-2 px-1 mb-2">
+                <div class="text-sm font-extrabold text-slate-900">Promesas por aprobar</div>
+                <span class="ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                  {{ $ppPendCount }}
+                </span>
               </div>
-              <ul class="notif-list">
+
+              <ul class="space-y-2">
                 @forelse($ppPend as $p)
                   <li>
-                    <a href="{{ route('autorizacion') }}" class="notif-item">
-                      <div class="notif-dot"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">{{ $p->dni }}</span>
-                          <span class="text-secondary"> • {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
+                    <a href="{{ route('autorizacion') }}"
+                      class="flex items-start gap-3 rounded-2xl ring-1 ring-slate-200/70 bg-white hover:bg-slate-50 p-3 transition">
+                      <span class="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-600"></span>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-extrabold text-slate-900 truncate">
+                          {{ $p->dni }}
+                          <span class="text-slate-500 font-semibold">
+                            • {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}
+                          </span>
                         </div>
-                        <div class="notif-sub">
-                          {{ $p->operacion ?: '—' }} — {{ \Carbon\Carbon::parse($p->fecha_promesa)->format('Y-m-d') }}
-                          • <b>S/ {{ number_format($p->monto_mostrar,2) }}</b>
+
+                        <div class="text-xs text-slate-500 truncate">
+                          {{ $p->operacion ?: '—' }}
+                          — {{ \Carbon\Carbon::parse($p->fecha_promesa)->format('Y-m-d') }}
+                        </div>
+
+                        <div class="mt-1 text-xs font-extrabold text-slate-900">
+                          S/ {{ number_format((float)$p->monto_mostrar,2) }}
                         </div>
                       </div>
-                      <span class="notif-cta">Revisar</span>
+
+                      <span class="ml-auto text-[11px] font-extrabold px-2 py-1 rounded-full ring-1 ring-slate-200 text-slate-700 whitespace-nowrap">
+                        Revisar
+                      </span>
                     </a>
                   </li>
                 @empty
-                  <div class="text-secondary small px-2 pb-2">Nada pendiente aquí.</div>
+                  <div class="text-xs text-slate-500 px-1">Nada pendiente aquí.</div>
                 @endforelse
               </ul>
-            </section>
+            </div>
 
             {{-- CNA por aprobar --}}
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-file-earmark-text"></i></div>
-                <span>Solicitudes de CNA</span>
-                <span class="notif-count">{{ $cnaPendCount }}</span>
+            <div class="mb-4">
+              <div class="flex items-center gap-2 px-1 mb-2">
+                <div class="text-sm font-extrabold text-slate-900">Solicitudes de CNA</div>
+                <span class="ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                  {{ $cnaPendCount }}
+                </span>
               </div>
-              <ul class="notif-list">
+
+              <ul class="space-y-2">
                 @forelse($cnaPend as $c)
                   @php $ops = collect((array)$c->operaciones)->filter()->implode(', '); @endphp
                   <li>
-                    <a href="{{ route('autorizacion') }}#cna" class="notif-item">
-                      <div class="notif-dot" style="background:var(--accent)"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">CNA #{{ $c->nro_carta }}</span>
-                          <span class="text-secondary"> • DNI {{ $c->dni }}</span>
+                    <a href="{{ route('autorizacion') }}#cna"
+                      class="flex items-start gap-3 rounded-2xl ring-1 ring-slate-200/70 bg-white hover:bg-slate-50 p-3 transition">
+                      <span class="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-extrabold text-slate-900 truncate">
+                          CNA #{{ $c->nro_carta }}
+                          <span class="text-slate-500 font-semibold">• DNI {{ $c->dni }}</span>
                         </div>
-                        <div class="notif-sub">{{ $ops ?: '—' }} — {{ optional($c->created_at)->format('Y-m-d') }}</div>
+
+                        <div class="text-xs text-slate-500 truncate">
+                          {{ $ops ?: '—' }}
+                          — {{ optional($c->created_at)->format('Y-m-d') }}
+                        </div>
                       </div>
-                      <span class="notif-cta">Revisar</span>
+
+                      <span class="ml-auto text-[11px] font-extrabold px-2 py-1 rounded-full ring-1 ring-slate-200 text-slate-700 whitespace-nowrap">
+                        Revisar
+                      </span>
                     </a>
                   </li>
                 @empty
-                  <div class="text-secondary small px-2 pb-2">Sin nuevas CNA.</div>
+                  <div class="text-xs text-slate-500 px-1">Sin nuevas CNA.</div>
                 @endforelse
               </ul>
-            </section>
+            </div>
 
-            {{-- Próximos vencimientos --}}
-            <section class="notif-group">
-              <div class="notif-title">
-                <div class="icon"><i class="bi bi-calendar-event"></i></div>
-                <span>Cuotas en los próximos 7 días</span>
-                <span class="notif-count">{{ $vencCount }}</span>
+            {{-- Vencimientos próximos --}}
+            <div class="mb-1">
+              <div class="flex items-center gap-2 px-1 mb-2">
+                <div class="text-sm font-extrabold text-slate-900">Cuotas próximos 7 días</div>
+                <span class="ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200">
+                  {{ $vencCount }}
+                </span>
               </div>
-              <ul class="notif-list">
+
+              <ul class="space-y-2">
                 @forelse($venc as $v)
                   <li>
-                    <div class="notif-item">
-                      <div class="notif-dot" style="background:var(--bs-warning)"></div>
-                      <div class="notif-body">
-                        <div class="notif-main">
-                          <span class="fw-semibold">{{ \Carbon\Carbon::parse($v->fecha)->format('d/m') }}</span>
-                          <span class="text-secondary"> • DNI {{ $v->dni }}</span>
+                    <div class="flex items-start gap-3 rounded-2xl ring-1 ring-slate-200/70 bg-white p-3">
+                      <span class="mt-2 h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="text-sm font-extrabold text-slate-900 truncate">
+                          {{ \Carbon\Carbon::parse($v->fecha)->format('d/m') }}
+                          <span class="text-slate-500 font-semibold">• DNI {{ $v->dni }}</span>
                         </div>
-                        <div class="notif-sub">
-                          {{ $v->operacion ?: '—' }} — {{ $v->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }} #{{ $v->nro }}
+
+                        <div class="text-xs text-slate-500 truncate">
+                          {{ $v->operacion ?: '—' }}
+                          — {{ $v->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }} #{{ $v->nro }}
                         </div>
                       </div>
-                      <span class="notif-cta">S/ {{ number_format((float)$v->monto,2) }}</span>
+
+                      <span class="ml-auto text-[11px] font-extrabold px-2 py-1 rounded-full ring-1 ring-slate-200 text-slate-700 whitespace-nowrap">
+                        S/ {{ number_format((float)$v->monto,2) }}
+                      </span>
                     </div>
                   </li>
                 @empty
-                  <div class="text-secondary small px-2 pb-2">No hay vencimientos próximos.</div>
+                  <div class="text-xs text-slate-500 px-1">No hay vencimientos próximos.</div>
                 @endforelse
               </ul>
-            </section>
+            </div>
           @endif
+
         </div>
 
         @unless($isAsesor)
-          <div class="notifs-footer text-end">
-            <a class="small" href="{{ route('autorizacion') }}">Ver bandeja completa →</a>
+          <div class="px-4 py-3 border-t border-slate-200 text-right">
+            <a class="text-sm font-semibold text-emerald-700 hover:underline" href="{{ route('autorizacion') }}">
+              Ver bandeja completa →
+            </a>
           </div>
         @endunless
       </div>
     </div>
+
   </div>
 </div>
 @endsection
-@push('scripts')
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-  <script src="{{ asset('js/panel/resumen.js') }}?v={{ @filemtime(public_path('js/panel/resumen.js')) }}"></script>
-@endpush

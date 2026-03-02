@@ -11,7 +11,11 @@ export default {
         brand: {
           DEFAULT: '#00a81c',
           700: '#008517',
-        }
+        },
+        accent: {
+          DEFAULT: '#0b4ea2',
+          700: '#093f82',
+        },
       }
     },
   },

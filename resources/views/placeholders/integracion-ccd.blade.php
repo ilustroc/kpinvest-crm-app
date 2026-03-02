@@ -55,8 +55,6 @@
         <h2 class="text-base font-extrabold text-slate-900">Clientes CCD</h2>
         <div class="text-sm text-slate-500 mt-1">
           Cargar/actualizar la tabla <span class="font-semibold text-slate-700">ccd</span> con datos del cliente y PDF.
-          Encabezados esperados:
-          <span class="font-semibold text-slate-700">dni, nombre, cartera, pdf</span>
         </div>
       </div>
 

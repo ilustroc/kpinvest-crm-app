@@ -36,21 +36,6 @@
     {{-- ===== Desktop (sm+) ===== --}}
     <div class="hidden flex-1 sm:flex sm:items-center sm:justify-between gap-3">
 
-      {{-- "Showing ..." --}}
-      <div class="text-xs font-semibold text-slate-500">
-        {!! __('Showing') !!}
-        @if ($paginator->firstItem())
-          <span class="text-slate-700">{{ $paginator->firstItem() }}</span>
-          {!! __('to') !!}
-          <span class="text-slate-700">{{ $paginator->lastItem() }}</span>
-        @else
-          <span class="text-slate-700">{{ $paginator->count() }}</span>
-        @endif
-        {!! __('of') !!}
-        <span class="text-slate-700">{{ $paginator->total() }}</span>
-        {!! __('results') !!}
-      </div>
-
       {{-- Controls --}}
       <div class="inline-flex items-center gap-2">
         <div class="inline-flex overflow-hidden rounded-2xl border border-slate-200 bg-white/70 shadow-sm divide-x divide-slate-200 rtl:flex-row-reverse">

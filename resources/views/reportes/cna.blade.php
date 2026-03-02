@@ -206,9 +206,7 @@
 
         <div class="flex-1"></div>
 
-        <div id="summary" class="text-sm text-slate-500"></div>
-
-        <a id="btnExport" href="#" class="kp-btn kp-btn-success">
+        <a id="btnExport" href="#" class="kp-btn kp-btn-primary kp-btn-success">
           Exportar
         </a>
       </div>

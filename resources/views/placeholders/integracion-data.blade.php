@@ -57,9 +57,6 @@
           Cargar/actualizar la tabla única
           <span class="font-semibold text-slate-700">clientes_cuentas</span>.
         </div>
-        <div class="text-xs text-slate-500 mt-2">
-          Encabezados mínimos: <strong class="text-slate-700">NUMDOC, OPERACION, CUENTA, ENTIDAD, DPTO</strong> …
-        </div>
       </div>
 
       <a class="kp-btn kp-btn-outline inline-flex items-center gap-2"
