@@ -10,3 +10,58 @@
 .admin-compact .struct .kp-table thead{
   box-shadow: 0 8px 18px rgba(2,6,23,.06);
 }
+
+/* --- FIX: flecha del <select> (chevron) alineada a la derecha --- */
+select.kp-input{
+  /* reserva espacio para el ícono */
+  padding-right: 2.75rem;
+
+  /* si algún contenedor mete RTL, esto lo corrige */
+  direction: ltr;
+
+  /* quita el estilo nativo para poder posicionar el chevron */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  /* chevron propio */
+  background-repeat: no-repeat;
+  background-position: right .95rem center;
+  background-size: 16px 16px;
+
+  /* SVG inline (negro, tipo tu captura) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23111827' d='M5.3 7.7a1 1 0 0 1 1.4 0L10 11l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z'/%3E%3C/svg%3E");
+}
+
+/* opcional: en Windows viejo puede salir el desplegable extra */
+select.kp-input::-ms-expand{ display:none; }
+
+/* Botón del ojo: SIN pastilla/círculo, solo ícono */
+.kp-eye{
+  position:absolute;
+  right:.6rem;
+  top:50%;
+  width:2.25rem;
+  height:2.25rem;
+  display:grid;
+  place-items:center;
+
+  background:transparent;   /* <- quita el “div” */
+  border:0;                 /* <- quita borde */
+  padding:0;
+  border-radius:9999px;
+
+  color:#111827;            /* <- asegura que el SVG se vea (currentColor) */
+  z-index:2;
+}
+
+.kp-eye:hover{ background: rgba(2,6,23,.06); } /* hover suave (opcional) */
+
+.kp-eye svg{
+  width:20px;
+  height:20px;
+  display:block;
+}
+
+/* Asegura que hidden realmente oculte */
+.kp-eye svg.hidden{ display:none !important; }

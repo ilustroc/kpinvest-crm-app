@@ -13,6 +13,7 @@ use App\Http\Controllers\CnaController;
 use App\Http\Controllers\AutorizacionController;
 use App\Http\Controllers\AdminUsersController;
 use App\Http\Controllers\Clientes\ClienteSearchController;
+use App\Http\Controllers\Autorizacion\AutorizacionApiController;
 
 // Reportes Normalizados
 use App\Http\Controllers\ReporteCnaController;
@@ -84,8 +85,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     /* --- Autorizaciones & Acciones --- */
     Route::middleware('role:administrador,supervisor')->group(function () {
         Route::get('/autorizacion', [AutorizacionController::class, 'index'])->name('autorizacion');
-        Route::get('/autorizacion/pagos/{dni}', [AutorizacionController::class, 'pagosDni'])->name('autorizacion.pagos');
-
+        Route::get('/autorizacion/pagos/{dni}', [AutorizacionApiController::class, 'pagosDni'])->name('autorizacion.pagos');
+        
         // Promesas
         Route::post('/autorizacion/{promesa}/preaprobar', [AutorizacionController::class, 'preaprobar'])->name('autorizacion.preaprobar');
         Route::post('/autorizacion/{promesa}/rechazar-sup', [AutorizacionController::class, 'rechazarSup'])->name('autorizacion.rechazar.sup');

@@ -1,5 +1,4 @@
 // resources/js/auth/autorizacion.js
-
 document.addEventListener('DOMContentLoaded', () => {
     // ==========================
     // 1. Helpers de Formato
@@ -89,101 +88,160 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================
     // 4. Lógica de Ficha Promesa
     // ==========================
-    document.querySelectorAll('.js-ver-ficha').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const d = btn.dataset;
-            const tipoRaw = (d.tipo || '').toLowerCase();
 
-            // 1. Llenado de cabecera y campos básicos
-            if($('f_dni'))      $('f_dni').textContent = d.dni || '—';
-            if($('f_op'))       $('f_op').textContent = d.operacion || '—';
-            if($('t_titular'))  $('t_titular').textContent = d.titular || '—';
-            if($('t_deuda'))    $('t_deuda').textContent = `S/ ${d.deuda || '0.00'}`;
-            if($('t_neg'))      $('t_neg').textContent = `S/ ${d.negociado || '0.00'}`;
-            if($('t_fecha'))    $('t_fecha').textContent = d.fecha || '—';
-            
-            // Asesor Responsable (Importante: debe venir en el data-asesor del botón)
-            if($('t_asesor'))   $('t_asesor').textContent = d.asesor || 'No asignado';
+    // Helpers robustos (una sola vez)
+    const parseJSON = (raw) => { try { return JSON.parse(raw); } catch { return null; } };
 
-            // Tipo de acuerdo con estilo de badge
-            if($('t_tipo')) {
-                const esCancelacion = tipoRaw === 'cancelacion';
-                $('t_tipo').textContent = esCancelacion ? 'Cancelación' : 'Convenio';
-                $('t_tipo').className = esCancelacion 
-                    ? 'px-2 py-1 rounded-md bg-rose-50 text-rose-700 ring-1 ring-rose-200 text-sm font-bold'
-                    : 'px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-bold';
-            }
+    // Devuelve SIEMPRE string limpio (arregla "campa\u00f1a" y comillas)
+    const readText = (val) => {
+    if (val == null) return '';
+    const s = String(val).trim();
+    const j = parseJSON(s);
+    return (typeof j === 'string') ? j : s;
+    };
 
-            // 2. Notas dinámicas (Asesor y Supervisor)
-            const notaGen = (d.notaGen || '').trim();
-            const notaSup = (d.notaSup || '').trim();
-            
-            if ($('nota_general_wrap')) {
-                $('nota_general_wrap').classList.toggle('hidden', !notaGen);
-                if (notaGen) $('nota_general_txt').textContent = notaGen;
-            }
+    // Devuelve SIEMPRE array (arregla data-crono/data-cuentas en cualquier formato)
+    const readArrayAttr = (el, attr) => {
+    const raw = el.getAttribute(attr);
+    if (!raw) return [];
 
-            if ($('nota_sup_wrap')) {
-                $('nota_sup_wrap').classList.toggle('hidden', !notaSup);
-                if (notaSup) $('nota_sup_txt').textContent = notaSup;
-            }
+    let v = parseJSON(raw);
 
-            // 3. Renderizado de Cuentas Incluidas (Acordeón)
-            const acc = $('acc_cuentas');
-            if (acc) {
-                let cuentas = [];
-                try { cuentas = JSON.parse(btn.getAttribute('data-cuentas') || '[]'); } catch (e) { console.error("Error parse cuentas", e); }
-                
-                acc.innerHTML = !cuentas.length 
-                    ? '<div class="autz-box text-center text-slate-500">No hay cuentas detalladas.</div>'
-                    : cuentas.map((c, i) => `
-                        <details class="autz-acc group" ${i === 0 ? 'open' : ''}>
-                            <summary class="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 rounded-xl transition-all">
-                                <div class="flex flex-col">
-                                    <span class="text-xs font-bold text-slate-500 uppercase">Op. ${c.operacion || '—'}</span>
-                                    <span class="text-sm font-extrabold text-slate-800">${c.entidad || 'Entidad'}</span>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-emerald-600 font-black">S/ ${fmt2(c.deuda_total)}</span>
-                                    <svg class="w-4 h-4 inline ml-2 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"></path></svg>
-                                </div>
-                            </summary>
-                            <div class="p-4 bg-slate-50/50 rounded-b-xl grid grid-cols-2 gap-4 border-t border-slate-100">
-                                <div class="autz-kv bg-white"><div class="autz-k">Producto</div><div class="autz-v">${c.producto || '—'}</div></div>
-                                <div class="autz-kv bg-white"><div class="autz-k">Cosecha</div><div class="autz-v">${c.cosecha || '—'}</div></div>
-                                <div class="autz-kv bg-white col-span-2"><div class="autz-k">Capital</div><div class="autz-v text-emerald-700">S/ ${fmt2(c.saldo_capital)}</div></div>
-                            </div>
-                        </details>
-                    `).join('');
-            }
+    // Caso: viene como string JSON dentro ( "\"[{...}]\"" )
+    if (typeof v === 'string') v = parseJSON(v);
 
-            // 4. Cronograma de Cuotas
-            const cronoWrap = $('crono_wrap');
-            if (cronoWrap) {
-                let cuotas = [];
-                try { cuotas = JSON.parse(btn.getAttribute('data-crono') || '[]'); } catch (e) {}
+    // Caso: objeto {cuotas:[...]} o {data:[...]}
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+        if (Array.isArray(v.cuotas)) return v.cuotas;
+        if (Array.isArray(v.data)) return v.data;
+    }
 
-                if (tipoRaw === 'cancelacion' || !cuotas.length) {
-                    cronoWrap.classList.add('hidden');
-                } else {
-                    cronoWrap.classList.remove('hidden');
-                    if($('crono_total')) $('crono_total').textContent = d.negociado;
-                    
-                    const tbody = $('crono_body');
-                    tbody.innerHTML = cuotas.map(c => `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-4 py-3 text-center font-mono text-slate-500">${String(c.nro).padStart(2, '0')}</td>
-                            <td class="px-4 py-3 text-center font-medium">${toDMY(c.fecha)}</td>
-                            <td class="px-4 py-3 text-end font-black text-slate-900">S/ ${fmt2(c.monto)}</td>
-                        </tr>
-                    `).join('');
-                }
-            }
+    return Array.isArray(v) ? v : [];
+    };
 
-            openModal('modalFicha');
-        });
+    // ✅ Delegación: un solo listener para todos los botones (paginación OK)
+    document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.js-ver-ficha');
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+        const d = btn.dataset;
+        const tipoRaw = (d.tipo || '').toLowerCase();
+
+        // Básicos
+        if ($('f_dni'))     $('f_dni').textContent = d.dni || '—';
+        if ($('f_op'))      $('f_op').textContent = d.operacion || '—';
+        if ($('t_titular')) $('t_titular').textContent = readText(d.titular) || '—';
+        if ($('t_deuda'))   $('t_deuda').textContent = `S/ ${money(d.deuda || 0)}`;
+        if ($('t_neg'))     $('t_neg').textContent   = `S/ ${money(d.negociado || 0)}`;
+        if ($('t_fecha'))   $('t_fecha').textContent = toDMY(d.fecha);
+        if ($('t_asesor'))  $('t_asesor').textContent = readText(d.asesor) || 'No asignado';
+
+        if ($('t_tipo')) $('t_tipo').textContent = (tipoRaw === 'cancelacion') ? 'Cancelación' : 'Convenio';
+
+        // Notas (arregla unicode/quotes)
+        const notaGen = readText(d.notaGen).trim();
+        const notaSup = readText(d.notaSup).trim();
+
+        if ($('nota_general_wrap')) {
+        $('nota_general_wrap').classList.toggle('hidden', !notaGen);
+        if (notaGen) $('nota_general_txt').textContent = notaGen;
+        }
+
+        if ($('nota_sup_wrap')) {
+        $('nota_sup_wrap').classList.toggle('hidden', !notaSup);
+        if (notaSup) $('nota_sup_txt').textContent = notaSup;
+        }
+
+        const notesGrid = document.getElementById('notes_grid');
+        if (notesGrid) {
+        const visibleCount = (notaGen ? 1 : 0) + (notaSup ? 1 : 0);
+        notesGrid.classList.toggle('is-single', visibleCount === 1);
+        }
+        
+        // Cuentas
+        const cuentas = readArrayAttr(btn, 'data-cuentas');
+        const acc = $('acc_cuentas');
+
+        if (acc) {
+        acc.innerHTML = !cuentas.length
+            ? `<div class="kf-empty">No hay cuentas detalladas.</div>`
+            : cuentas.map((c, i) => `
+                <details ${i === 0 ? 'open' : ''}>
+                <summary>
+                    <div class="flex flex-col">
+                    <span class="text-[11px] font-black text-slate-500 uppercase">OP. ${c.operacion || '—'}</span>
+                    <span class="text-sm font-extrabold text-slate-900">${c.entidad || 'Entidad'}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                    <span class="text-indigo-700 font-black">S/ ${fmt2(c.deuda_total)}</span>
+                    <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-width="2" stroke-linecap="round" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                    </div>
+                </summary>
+
+                <div class="p-4 border-t border-slate-100 bg-white grid grid-cols-2 gap-3">
+                    <div class="kf-kv">
+                    <div class="kf-k">Producto</div>
+                    <div class="kf-v">${c.producto || '—'}</div>
+                    </div>
+                    <div class="kf-kv">
+                    <div class="kf-k">Cosecha</div>
+                    <div class="kf-v">${c.cosecha || '—'}</div>
+                    </div>
+                    <div class="kf-kv col-span-2">
+                    <div class="kf-k">Capital</div>
+                    <div class="kf-v text-indigo-700 font-black">S/ ${fmt2(c.saldo_capital)}</div>
+                    </div>
+                </div>
+                </details>
+            `).join('');
+        }
+
+        // Cronograma (aquí se arregla “no sale”)
+        const cuotas = readArrayAttr(btn, 'data-crono');
+        const cronoWrap = $('crono_wrap');
+        const tbody = $('crono_body');
+        const empty = $('crono_empty');
+
+        if (cronoWrap) cronoWrap.classList.remove('hidden');
+
+        if ($('crono_total')) $('crono_total').textContent = money(d.negociado || 0);
+
+        if (tipoRaw === 'cancelacion') {
+        if (tbody) tbody.innerHTML = '';
+        if (empty) { empty.classList.remove('hidden'); empty.textContent = 'No aplica cronograma porque es una cancelación.'; }
+        } else if (!cuotas.length) {
+        if (tbody) tbody.innerHTML = '';
+        if (empty) { empty.classList.remove('hidden'); empty.textContent = 'No hay cronograma cargado para esta propuesta.'; }
+        } else {
+        if (empty) empty.classList.add('hidden');
+
+        const total = cuotas.reduce((a, c) => a + (Number(c.monto) || 0), 0);
+        if ($('crono_total')) $('crono_total').textContent = money(total);
+
+        if (tbody) {
+            tbody.innerHTML = cuotas.map(c => `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="text-center font-mono text-slate-500">${String(c.nro ?? '').padStart(2,'0')}</td>
+                <td class="text-center font-semibold text-slate-800">${toDMY(c.fecha)}</td>
+                <td class="text-end font-black text-slate-900">S/ ${fmt2(c.monto)}</td>
+            </tr>
+            `).join('');
+        }
+        }
+
+    } catch (err) {
+        console.error('Error al abrir ficha:', err);
+    } finally {
+        openModal('modalFicha');
+    }
     });
-
+    
     // ==========================
     // 5. Modales de Acción (Aprobar/Rechazar)
     // ==========================

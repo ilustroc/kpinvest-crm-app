@@ -355,7 +355,7 @@
             <div>
               <label class="kp-label">Rol</label>
               <select name="role" class="kp-input" required id="createRole">
-                <option value="">Selecciona…</option>
+                <option value="">Selecciona...</option>
                 @foreach($roleOptions as $val=>$label)
                   <option value="{{ $val }}">{{ $label }}</option>
                 @endforeach

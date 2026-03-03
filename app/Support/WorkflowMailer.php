@@ -12,27 +12,50 @@ use Illuminate\Support\Facades\View;
 class WorkflowMailer
 {
     /* ======================== PROMESAS ======================== */
-
     public static function promesaPendiente(PromesaPago $p): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::promesaContext($p);
+        [$asesor, $supervisor, $admins, $d] = self::promesaContext($p);
 
-        $views = ['mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
+        // ponemos primero tu nueva vista
+        $views = ['mail.workflow','mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
 
+        // SUPERVISOR => autorización
         if ($supervisor && filter_var($supervisor->email, FILTER_VALIDATE_EMAIL)) {
             self::send($views, $supervisor->email, [
-                'banner'     => '.: CRM :. Pre-aprobación pendiente',
-                'cta'        => 'Abrir Autorización',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, ".: CRM :. Pre-aprobación pendiente — DNI {$p->dni} - Cliente: {$data['cliente']}");
+                'banner'   => '.: CRM :. Pre-aprobación pendiente',
+                'subtitle' => "DNI {$d['dni']} — Cliente: {$d['cliente']}",
+                'status'   => 'Pendiente (requiere pre-aprobación)',
+                'intro'    => 'Se requiere su atención para pre-aprobar la siguiente propuesta:',
+                'cta'      => 'Abrir Autorización',
+                'link'     => route('autorizacion', ['q' => $d['dni']]),
+                'fields'   => [
+                    ['label' => 'N° Propuesta', 'value' => $d['nro']],
+                    ['label' => 'Cliente',      'value' => $d['cliente']],
+                    ['label' => 'Documento',    'value' => $d['dni']],
+                    ['label' => 'Operación',    'value' => $d['operacion']],
+                ],
+                'note'     => $d['nota'],
+                'noteTitle'=> 'Nota del asesor',
+            ], ".: CRM :. Pre-aprobación pendiente — DNI {$d['dni']} - Cliente: {$d['cliente']}");
         }
 
+        // ASESOR => ver estado en cliente
         if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
             self::send($views, $asesor->email, [
-                'banner'     => 'Tu propuesta fue ENVIADA — esperando a Supervisor',
-                'cta'        => 'Ver estado',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, 'Propuesta enviada — esperando a Supervisor');
+                'banner'   => 'Tu propuesta fue ENVIADA — esperando a Supervisor',
+                'subtitle' => "DNI {$d['dni']} — Cliente: {$d['cliente']}",
+                'status'   => 'En revisión por Supervisor',
+                'intro'    => 'Tu propuesta fue subida correctamente y está esperando la pre-aprobación del supervisor:',
+                'cta'      => 'Ver estado',
+                'link'     => route('clientes.show', $d['dni']),
+                'fields'   => [
+                    ['label' => 'Cliente',   'value' => $d['cliente']],
+                    ['label' => 'Documento', 'value' => $d['dni']],
+                    ['label' => 'Operación', 'value' => $d['operacion']],
+                ],
+                'note'     => $d['nota'],
+                'noteTitle'=> 'Detalle',
+            ], 'Propuesta enviada — esperando a Supervisor');
         }
     }
 
@@ -183,19 +206,13 @@ class WorkflowMailer
             : (string)($p->operacion ?? '');
 
         $data = [
-            'tipo'        => $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio',
-            'dni'         => $p->dni,
-            'cliente'     => $cliente ?: '—',
-            'nro'         => $p->id,
-            'operacion'   => $ops ?: '—',
-            'procede'     => $supervisor?->name ?: '—',
-            'link'        => route('autorizacion'),
-            // opcionales para la vista:
-            'nota'        => (string)($p->nota ?? ''),
-            'observa'     => (string)($p->nota ?? ''),
-            'banner'      => $data['banner'] ?? null,
-            'cta'         => $data['cta'] ?? null,
-            'label_nro'   => 'N° Propuesta',
+            'tipo'      => $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio',
+            'dni'       => (string)$p->dni,
+            'cliente'   => $cliente ?: '—',
+            'nro'       => (string)$p->id,
+            'operacion' => $ops ?: '—',
+            'procede'   => $supervisor?->name ?: '—',
+            'nota'      => (string)($p->nota ?? ''),
         ];
 
         return [$asesor, $supervisor, $admins, $data];
@@ -235,27 +252,24 @@ class WorkflowMailer
     private static function send(string|array $view, string $to, array $data, string $subject): void
     {
         $candidates = is_array($view) ? $view : [$view];
+
         $chosen = null;
         foreach ($candidates as $v) {
-            if (is_string($v) && View::exists($v)) { $chosen = $v; break; }
+            if (is_string($v) && View::exists($v)) {
+                $chosen = $v;
+                break;
+            }
         }
 
-        if ($chosen) {
-            Mail::send($chosen, $data, function ($m) use ($to, $subject) {
+        if (!$chosen) {
+            // si no existe ninguno, usa fallback simple
+            Mail::raw('Notificación CRM', function ($m) use ($to, $subject) {
                 $m->to($to)->subject($subject);
             });
             return;
         }
 
-        // Fallback en texto plano y log para diagnosticar
-        \Log::warning('Email view not found. Using raw fallback.', [
-            'to'         => $to,
-            'subject'    => $subject,
-            'candidates' => $candidates,
-        ]);
-
-        $text = self::fallbackText($data);
-        Mail::raw($text, function ($m) use ($to, $subject) {
+        Mail::send($chosen, $data, function ($m) use ($to, $subject) {
             $m->to($to)->subject($subject);
         });
     }

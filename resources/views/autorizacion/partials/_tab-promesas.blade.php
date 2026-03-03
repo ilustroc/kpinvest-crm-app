@@ -54,10 +54,10 @@
                                 <button type="button" class="autz-btn autz-btn-sm autz-btn-ghost js-ver-ficha" 
                                     data-tipo="{{ $p->tipo }}" data-dni="{{ $p->dni }}" data-operacion="{{ $p->operacion ?? '' }}"
                                     data-fecha="{{ $fechaDmy }}" data-asesor="{{ $p->asesor_nombre ?: $p->creador_nombre ?: '—' }}"
-                                    data-titular="{{ $p->titular ?? '—' }}" data-deuda="{{ number_format((float)($p->deuda_total ?? 0),2) }}"
-                                    data-negociado="{{ number_format($montoMostrar, 2) }}" data-nota-sup="{{ $p->nota_preaprobacion ?? '' }}"
-                                    data-nota-gen="{{ $p->nota ?? '' }}" data-crono='@json($p->cuotas_json ?? [])'
-                                    data-hasbalon="{{ ($p->has_balon ?? false) ? 1 : 0 }}" data-cuentas='@json($p->cuentas_cliente_json ?? [])'>
+                                    data-titular="{{ $p->titular ?? '—' }}" data-deuda="{{ (float)($p->deuda_total ?? 0) }}"
+                                    data-negociado="{{ (float)$montoMostrar }}" data-nota-sup='@json($p->nota_preaprobacion ?? "")'
+                                    data-nota-gen='@json($p->nota ?? "")' data-crono='@json($p->cronograma_json ?? [])'
+                                    data-hasbalon="{{ ($p->has_balon ?? false) ? 1 : 0 }}" data-cuentas='@json($p->cuentas_cliente_json ? json_decode($p->cuentas_cliente_json, true) : [])'>
                                     Ficha
                                 </button>
                                 @if($isSupervisor)

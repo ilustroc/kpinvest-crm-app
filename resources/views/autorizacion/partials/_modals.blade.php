@@ -59,109 +59,158 @@
 
 {{-- Modal: FICHA PROMESA --}}
 <div id="modalFicha" class="kp-modal hidden" aria-hidden="true">
-    <div class="kp-modal-backdrop"></div>
-    <div class="kp-modal-card kp-modal-lg">
-        <div class="kp-modal-head bg-slate-50">
-            <div>
-                <h2 class="text-lg font-extrabold text-slate-900">Detalle de Propuesta</h2>
-                <p class="text-xs text-slate-500 flex items-center gap-2">
-                    <span class="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-slate-700" id="f_op">--</span>
-                    <span class="text-slate-300">|</span>
-                    <span id="t_fecha">--</span>
-                </p>
-            </div>
-            <button class="kp-x" data-modal-close>&times;</button>
+  <div class="kp-modal-backdrop" data-modal-close></div>
+
+  <div class="kp-modal-card kp-modal-lg" role="dialog" aria-modal="true">
+    {{-- HEADER --}}
+    <div class="kf-head">
+      <div>
+        <div class="kf-title">Detalle de Propuesta</div>
+        <div class="kf-meta">
+          <span class="kf-chip">
+            <span class="opacity-70">OP</span>
+            <span class="font-mono font-black" id="f_op">--</span>
+          </span>
+
+          <span class="kf-chip">
+            <span class="opacity-70">Fecha</span>
+            <span class="font-black" id="t_fecha">--</span>
+          </span>
+
+          <span class="kf-chip">
+            <span class="opacity-70">Tipo</span>
+            <span id="t_tipo" class="font-black">--</span>
+          </span>
         </div>
+      </div>
 
-        <div class="kp-modal-body p-0">
-            {{-- Resumen de Montos --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 border-b border-slate-100">
-                <div class="p-5 border-r border-slate-100 bg-slate-50/50">
-                    <label class="kp-label">Deuda Total</label>
-                    <div class="text-xl font-bold text-slate-400 line-through" id="t_deuda">S/ 0.00</div>
-                </div>
-                <div class="p-5 border-r border-slate-100 bg-emerald-50/30">
-                    <label class="kp-label text-emerald-700">Monto Negociado</label>
-                    <div class="text-3xl font-black text-emerald-600 tracking-tighter" id="t_neg">S/ 0.00</div>
-                </div>
-                <div class="p-5 bg-slate-50/50">
-                    <label class="kp-label">Tipo de Acuerdo</label>
-                    <div class="mt-1"><span class="autz-badge autz-badge-info" id="t_tipo">--</span></div>
-                </div>
-            </div>
-
-            <div class="p-6 space-y-8">
-                {{-- Info Cliente --}}
-                <section>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                        <div class="autz-kv border-none bg-transparent p-0">
-                            <div class="autz-k">Titular</div>
-                            <div class="autz-v text-base" id="t_titular">--</div>
-                        </div>
-                        <div class="autz-kv border-none bg-transparent p-0">
-                            <div class="autz-k">DNI / Documento</div>
-                            <div class="autz-v text-base font-mono" id="f_dni">--</div>
-                        </div>
-                        <div class="autz-kv border-none bg-transparent p-0">
-                            <div class="autz-k text-emerald-600">Asesor Responsable</div>
-                            <div class="autz-v text-base" id="t_asesor">--</div>
-                        </div>
-                    </div>
-                </section>
-
-                {{-- Notas --}}
-                <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div id="nota_general_wrap" class="autz-box bg-blue-50 border-blue-100 hidden">
-                        <span class="text-[10px] font-black text-blue-600 uppercase block mb-1">Nota del Asesor</span>
-                        <p id="nota_general_txt" class="text-blue-900 italic"></p>
-                    </div>
-                    <div id="nota_sup_wrap" class="autz-box bg-amber-50 border-amber-100 hidden">
-                        <span class="text-[10px] font-black text-amber-600 uppercase block mb-1">Nota de Pre-Aprobación</span>
-                        <p id="nota_sup_txt" class="text-amber-900 italic"></p>
-                    </div>
-                </section>
-
-                {{-- Cuentas y Cronograma --}}
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
-                        <h3 class="autz-title mb-4 flex items-center gap-2">
-                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                            Cuentas Incluidas
-                        </h3>
-                        <div id="acc_cuentas" class="autz-acc space-y-2"></div>
-                    </div>
-
-                    <div id="crono_wrap" class="hidden">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="autz-title" id="crono_titulo">Cronograma</h3>
-                            <span class="autz-chip autz-chip-info hidden" id="crono_balon">BALÓN</span>
-                        </div>
-                        <div class="autz-table-wrap ring-slate-200">
-                            <table class="autz-table">
-                                <thead>
-                                    <tr class="!bg-slate-100">
-                                        <th class="text-center w-16">Cuota</th>
-                                        <th class="text-center">Vencimiento</th>
-                                        <th class="text-end">Monto</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="crono_body"></tbody>
-                                <tfoot>
-                                    <tr class="bg-slate-900 text-white font-bold">
-                                        <td colspan="2" class="px-4 py-3 text-right text-xs uppercase">Total Convenio</td>
-                                        <td class="px-4 py-3 text-right text-emerald-400 text-base" id="crono_total">0.00</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="kp-modal-foot bg-slate-50">
-            <button class="kp-btn kp-btn-ghost" data-modal-close>Cerrar Ficha</button>
-        </div>
+      <button class="kf-x" type="button" data-modal-close aria-label="Cerrar">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+      </button>
     </div>
+
+    {{-- BODY --}}
+    <div class="kp-modal-body kf-body p-0">
+
+      {{-- Datos cliente --}}
+      <div class="kf-pad">
+        <div class="kf-card">
+          <div class="kf-card-h">
+            <div class="kf-card-t">
+              <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-width="2" stroke-linecap="round" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <path stroke-width="2" stroke-linecap="round" d="M12 11a4 4 0 100-8 4 4 0 000 8z"/>
+              </svg>
+              Datos del cliente
+            </div>
+          </div>
+
+          <div class="kf-card-b">
+            <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-3 gap-3">
+              <div class="kf-kv">
+                <div class="kf-k">Documento / RUC</div>
+                <div class="kf-v" id="f_dni">--</div>
+              </div>
+              <div class="kf-kv">
+                <div class="kf-k">Titular</div>
+                <div class="kf-v" id="t_titular">--</div>
+              </div>
+              <div class="kf-kv">
+                <div class="kf-k">Deuda total</div>
+                <div class="kf-v" id="t_deuda">S/ 0.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{-- GRID --}}
+      <div class="kf-grid">
+        {{-- LEFT --}}
+        <div class="kf-left">
+          {{-- STATS --}}
+          <div class="kf-stats">
+
+            <div class="kf-stat">
+              <div class="lbl">Monto negociado</div>
+              <div class="val" id="t_neg">S/ 0.00</div>
+            </div>
+
+            <div class="kf-stat">
+              <div class="lbl">Asesor responsable</div>
+              <div class="val" id="t_asesor">--</div>
+            </div>
+          </div>
+
+          {{-- Notas --}}
+          <div id="notes_grid" class="kf-notes grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div id="nota_general_wrap" class="kf-note is-ases hidden">
+              <div class="t">Nota del asesor</div>
+              <div class="p" id="nota_general_txt"></div>
+            </div>
+
+            <div id="nota_sup_wrap" class="kf-note is-sup hidden">
+              <div class="t">Nota de pre-aprobación</div>
+              <div class="p" id="nota_sup_txt"></div>
+            </div>
+          </div>
+
+          {{-- Cuentas --}}
+          <div class="kf-card">
+            <div class="kf-card-h">
+              <div class="kf-card-t">
+                <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-width="2" stroke-linecap="round" d="M3 7h18M3 12h18M3 17h18"/>
+                </svg>
+                Cuentas incluidas
+              </div>
+            </div>
+
+            <div class="kf-card-b">
+              <div id="acc_cuentas" class="kf-acc space-y-2"></div>
+            </div>
+          </div>
+        </div>
+
+        {{-- RIGHT --}}
+        <div class="kf-right">
+          <div id="crono_wrap" class="kf-crono">
+            <div class="kf-crono-h">
+              <div class="kf-crono-t" id="crono_titulo">Cronograma de pagos</div>
+              <span class="kf-chip hidden" id="crono_balon">BALÓN</span>
+            </div>
+
+            <div class="kf-crono-scroll">
+              <table class="kf-table">
+                <thead>
+                  <tr>
+                    <th class="w-16 text-center">#</th>
+                    <th class="text-center">Vencimiento</th>
+                    <th class="text-end">Monto</th>
+                  </tr>
+                </thead>
+                <tbody id="crono_body"></tbody>
+              </table>
+
+              <div id="crono_empty" class="kf-empty hidden">No hay cronograma...</div>
+            </div>
+
+            <div class="kf-total">
+              <div class="lbl">Total convenio</div>
+              <div class="val">S/ <span id="crono_total">0.00</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {{-- FOOT --}}
+    <div class="kf-foot">
+      <button class="kp-btn kp-btn-ghost" type="button" data-modal-close>Cerrar ficha</button>
+    </div>
+  </div>
 </div>
 
 {{-- Modal: CNA FICHA --}}
