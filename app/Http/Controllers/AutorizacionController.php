@@ -135,9 +135,9 @@ class AutorizacionController extends Controller
             })
             ->filter()->unique()->values()->all();
 
-        $ccByOp = [];
-        if (!empty($opsAll)) {
-            $ccByOp = DB::table('clientes_cuentas')
+        $ccByDniOp = [];
+        if (!empty($opsAll) && !empty($dnis)) {
+            $ccByDniOp = DB::table('clientes_cuentas')
                 ->select([
                     'operacion',
                     'numdoc as dni',
@@ -150,29 +150,40 @@ class AutorizacionController extends Controller
                     'fecha_castigo',
                 ])
                 ->whereIn('operacion', $opsAll)
+                ->whereIn('numdoc', $dnis)
                 ->get()
-                ->keyBy('operacion');
+                ->mapWithKeys(function ($r) {
+                    $dni = trim((string)$r->dni);
+                    $op  = trim((string)$r->operacion);
+                    return ["{$dni}|{$op}" => $r];
+                })
+                ->all();
         }
 
         // ===== Enriquecer filas de promesas
-        $rows = $rows->map(function ($p) use ($opsByDni, $ccByOp, $clienteByDni, $ccAllByDni) {
+        $rows = $rows->map(function ($p) use ($opsByDni, $ccByDniOp, $clienteByDni, $ccAllByDni) {
+
+            $dni = trim((string)$p->dni);
 
             $ops = $p->relationLoaded('operaciones') && $p->operaciones->count()
-                ? $p->operaciones->pluck('operacion')->map(fn($x) => (string)$x)->values()
+                ? $p->operaciones->pluck('operacion')->map(fn($x) => trim((string)$x))->filter()->values()
                 : collect(array_filter(array_map('trim', explode(',', (string)($p->operacion ?? '')))));
 
             if ($ops->isEmpty()) {
-                $ops = collect($opsByDni[$p->dni] ?? []);
+                $ops = collect($opsByDni[$dni] ?? [])->map(fn($x) => trim((string)$x))->filter()->values();
             }
 
             $p->operacion = $ops->implode(', ');
             $p->ops_list  = $ops->values();
 
-            $sumCap = 0.0; $sumDeu = 0.0;
+            $sumCap = 0.0;
+            $sumDeu = 0.0;
             $cuentasIncluidas = [];
 
             foreach ($ops as $op) {
-                $cc = $ccByOp[$op] ?? null;
+                $key = $dni . '|' . trim((string)$op);
+                $cc  = $ccByDniOp[$key] ?? null;
+
                 if (!$cc) continue;
 
                 $sumCap += (float)($cc->deuda_capital ?? 0);
@@ -190,18 +201,11 @@ class AutorizacionController extends Controller
                 ];
             }
 
-            // ✅ Titular por DNI
-            $p->titular = (string)($clienteByDni[$p->dni] ?? '—');
-
-            // Totales solo de operaciones incluidas en la promesa
+            $p->titular = (string)($clienteByDni[$dni] ?? '—');
             $p->deuda_total   = $sumDeu;
             $p->saldo_capital = $sumCap;
-
-            // Cuentas incluidas (promesa)
             $p->cuentas_json  = $cuentasIncluidas;
-
-            // ✅ Todas las operaciones del cliente (por DNI)
-            $p->cuentas_cliente_json = $ccAllByDni[$p->dni] ?? [];
+            $p->cuentas_cliente_json = $ccAllByDni[$dni] ?? [];
 
             return $p;
         });
