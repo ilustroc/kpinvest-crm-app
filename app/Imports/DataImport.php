@@ -68,7 +68,17 @@ class DataImport
         $map = [];
         foreach ($headers as $i => $h) {
             $norm = $this->toUtf8($h);
-            if ($norm === 'ENTIDAD_FINANCIERA') $norm = 'ENTIDAD';
+            if ($norm !== null) {
+                $norm = str_replace("\xEF\xBB\xBF", '', $norm);
+                $norm = preg_replace('/^\x{FEFF}/u', '', $norm);
+                $norm = trim($norm);
+                $norm = strtoupper($norm);
+                $norm = preg_replace('/\s+/', '_', $norm);
+                $norm = preg_replace('/[^A-Z0-9_]/', '', $norm);
+            }
+            if ($norm === 'ENTIDAD_FINANCIERA') {
+                $norm = 'ENTIDAD';
+            }
             $map[$i] = $norm;
         }
         return $map;

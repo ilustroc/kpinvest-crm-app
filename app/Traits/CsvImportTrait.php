@@ -10,14 +10,17 @@ trait CsvImportTrait
         return (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
     }
 
-    protected function toUtf8(?string $s): ?string {
-        if ($s === null) return null;
-        $s = trim(preg_replace('/^\xEF\xBB\xBF/u', '', $s)); // Limpia BOM
-        if ($s === '') return null;
+    protected function toUtf8(?string $s): ?string
+    {
+        if ($s === null) { return null; }
+        $s = str_replace("\xEF\xBB\xBF", '', $s);
+        $s = preg_replace('/^\x{FEFF}/u', '', $s);
+        $s = trim($s);
+        if ($s === '') { return null;}
         if (!mb_check_encoding($s, 'UTF-8')) {
-            $s = mb_convert_encoding($s, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+            $s = mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1, Windows-1252, UTF-8');
         }
-        return preg_replace('/[\x00-\x1F\x7F]/u', '', $s);
+        return trim($s);
     }
 
     protected function parseDate(?string $v): ?string {
