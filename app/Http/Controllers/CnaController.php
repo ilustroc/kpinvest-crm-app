@@ -431,7 +431,7 @@ class CnaController extends Controller
         $kpi  = [
             'BBVA1','BBVA2','CAJAAQP1','CAJAAQP2','CAJAAQP4','CAJAAQP5','COMPARTAMOS_1','COMPARTAMOS_2','CONFIANZA','CONFIANZA_2','CONFIANZA_3',
             'CONFIANZA_4','CONFIANZA_6','CONFIANZA_7','CONFIANZA_8','CONFIANZA_9','CONFIANZA_10',
-            'CONFIANZA_11','CONFIANZA_12','SEMBRANDO',
+            'CONFIANZA_11','CONFIANZA_12','SEMBRANDO','WANDOO_1'
         ];
 
         if (in_array($c, $faa, true))  return 'FONDO ACREENCIA AREQUIPA';
