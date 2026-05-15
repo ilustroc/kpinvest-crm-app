@@ -23,12 +23,66 @@ El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
 - [+] Componentes UI base existen con Tailwind.
 - [+] Administracion de usuarios fue seleccionada y migrada como pantalla piloto.
 - [+] Dashboard fue migrado como segunda pantalla piloto.
+- [+] Reportes fueron migrados como primer modulo bajo arquitectura frontend V3.
+- [+] Se creo `resources/js/core` para utilidades compartidas.
+- [+] Se crearon componentes `forms`, `tables`, `feedback` y `reportes`.
 - [+] `chart.js` se gestiona por npm y Vite para Dashboard.
 - [+] `npm run dev` se ejecuto y respondio correctamente.
 - [+] `npm run build` se ejecuto correctamente.
 - [+] `public/build/manifest.json` confirmado.
 - [!] `npm audit` reporta vulnerabilidades moderadas en Vite/esbuild; `npm audit fix --force` implica salto mayor a Vite 8.
 - [!] Bootstrap sigue cargando de forma condicional para pantallas legacy no migradas.
+
+## Fase 7 - Arquitectura frontend V3
+
+La Fase 7 amplia el enfoque: no se trata solo de reemplazar Bootstrap por Tailwind, sino de ordenar donde vive cada pieza del frontend.
+
+Documentos nuevos:
+
+- `docs/19_arquitectura_frontend_v3.md`.
+- `docs/20_inventario_frontend_legacy.md`.
+
+Reglas confirmadas:
+
+- No agregar CSS nuevo en `public/css`.
+- No agregar JS nuevo en `public/js`.
+- No agregar scripts grandes embebidos en Blade.
+- Toda pantalla migrada usa `@section('tailwind_only', true)`.
+- Toda logica JS nueva vive en `resources/js/modules`.
+- JS compartido vive en `resources/js/core`.
+- Todo componente repetible debe convertirse en Blade Component.
+
+Estructura creada:
+
+```text
+resources/views/components/forms/
+resources/views/components/tables/
+resources/views/components/feedback/
+resources/views/components/reportes/
+resources/views/components/clientes/
+resources/views/components/cna/
+resources/views/components/promesas/
+
+resources/js/core/
+resources/js/modules/reportes/
+resources/js/modules/integracion/
+resources/js/modules/clientes/
+resources/js/modules/autorizacion/
+resources/js/modules/cna/
+resources/js/modules/promesas/
+```
+
+Reportes migrados:
+
+- `resources/views/reportes/pagos.blade.php`.
+- `resources/views/reportes/pdp.blade.php`.
+- `resources/views/reportes/cna.blade.php`.
+- `resources/js/modules/reportes/pagos.js`.
+- `resources/js/modules/reportes/promesas.js`.
+- `resources/js/modules/reportes/cna.js`.
+- `resources/js/modules/reportes/filters.js`.
+
+Los archivos `public/css/reportes/*` y `public/js/reportes/*` quedan sin referencia activa desde Blade, pero se conservan temporalmente hasta validacion visual final.
 
 ## Situacion actual
 
@@ -301,6 +355,13 @@ Estado actual:
 ```text
 resources/js/
   app.js
+  core/
+    dom.js
+    http.js
+    forms.js
+    modal.js
+    dropdown.js
+    toast.js
   modules/
     clientes/
       show.js
@@ -335,7 +396,7 @@ Orden recomendado:
 5. Tablas simples.
 6. Administracion de usuarios.
 7. Dashboard.
-8. Reportes.
+8. Reportes. Estado: migrado en Fase 7.
 9. Clientes.
 10. CNA y Promesas al final.
 

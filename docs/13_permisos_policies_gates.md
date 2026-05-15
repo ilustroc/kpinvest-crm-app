@@ -9,6 +9,8 @@
 - [+] Gates iniciales registrados.
 - [+] Documentacion inicial creada.
 - [+] Roles `sistemas` y `usuario` eliminados como roles validos de V3.
+- [+] Accesos basicos por rol final validados con `tests/Feature/V3RoleAccessTest.php`.
+- [+] Usuario inactivo validado con test de login bloqueado.
 - [!] Permisos internos de Promesas, CNA y Cliente aun mezclan controladores, rutas y vistas.
 
 ## Roles actuales
@@ -146,4 +148,7 @@ Orden recomendado:
 - [+] Administracion de usuarios usa `UserPolicy`.
 - [+] Roles finales reducidos a `administrador`, `supervisor`, `asesor`, `soporte`.
 - [+] Migracion de limpieza de roles creada.
+- [+] Administrador, supervisor, asesor y soporte validados contra rutas principales.
+- [+] `sistemas` y `usuario` rechazados como roles creables.
+- [!] Supervisor y soporte conservan acceso a administracion segun reglas actuales, pero no con alcance total de administrador.
 - [!] Promesas, CNA y Cliente quedan para una fase posterior de refactor fino porque son flujos criticos.

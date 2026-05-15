@@ -12,9 +12,12 @@ Eliminar Bootstrap progresivamente y reemplazarlo por Tailwind CSS v4, component
 - [+] Sidebar/topbar migrados a Tailwind.
 - [+] Administracion de usuarios migrada a Tailwind.
 - [+] Dashboard migrado a Tailwind.
+- [+] Reportes migrados a Tailwind/Vite en Fase 7.
 - [+] Componentes Blade base creados.
+- [+] Arquitectura frontend V3 creada.
 - [+] Modal reutilizable creado.
 - [+] JS modular creado para Administracion y Dashboard.
+- [+] JS modular creado para Reportes.
 - [!] Bootstrap legacy se mantiene condicional para vistas no migradas.
 - [ ] Bootstrap eliminado globalmente.
 
@@ -73,6 +76,33 @@ Estado:
 - [+] JS legacy de dashboard ya no se carga en esa vista.
 - [!] Requiere revision visual manual del grafico y responsive.
 
+### Reportes
+
+Archivos:
+
+- `resources/views/reportes/pagos.blade.php`.
+- `resources/views/reportes/pagos_table.blade.php`.
+- `resources/views/reportes/pdp.blade.php`.
+- `resources/views/reportes/pdp_table.blade.php`.
+- `resources/views/reportes/cna.blade.php`.
+- `resources/views/reportes/cna_table.blade.php`.
+- `resources/js/modules/reportes/filters.js`.
+- `resources/js/modules/reportes/pagos.js`.
+- `resources/js/modules/reportes/promesas.js`.
+- `resources/js/modules/reportes/cna.js`.
+
+Estado:
+
+- [+] Reporte de pagos migrado a Tailwind.
+- [+] Reporte de promesas migrado a Tailwind.
+- [+] Reporte CNA migrado a Tailwind.
+- [+] Filtros multiselect migrados a componente `x-reportes.multiselect`.
+- [+] Tablas migradas a componentes `x-tables.*`.
+- [+] JS movido desde `public/js/reportes` hacia Vite.
+- [+] CSS especifico de reportes dejo de cargarse desde `public/css/reportes`.
+- [+] Reportes usan `@section('tailwind_only', true)`.
+- [!] Archivos legacy de reportes en `public/` quedan pendientes de eliminacion tras validacion visual.
+
 ## Componentes disponibles
 
 Componentes UI:
@@ -91,6 +121,28 @@ Componentes UI:
 - `x-ui.empty-state`.
 - `x-ui.confirm-dialog`.
 
+Componentes V3 por categoria:
+
+- `x-forms.field`.
+- `x-forms.label`.
+- `x-forms.error`.
+- `x-forms.input`.
+- `x-forms.select`.
+- `x-forms.textarea`.
+- `x-forms.date`.
+- `x-tables.table`.
+- `x-tables.th`.
+- `x-tables.td`.
+- `x-tables.empty-row`.
+- `x-tables.pagination`.
+- `x-feedback.alert`.
+- `x-feedback.empty-state`.
+- `x-feedback.confirm-dialog`.
+- `x-feedback.loading`.
+- `x-layout.page-header`.
+- `x-layout.page-shell`.
+- `x-reportes.multiselect`.
+
 Componentes layout:
 
 - `x-layout.sidebar`.
@@ -104,6 +156,9 @@ Entradas actuales:
 import './modules/layout/sidebar';
 import './modules/admin/users';
 import './modules/dashboard/stats';
+import './modules/reportes/pagos';
+import './modules/reportes/promesas';
+import './modules/reportes/cna';
 ```
 
 Regla:
@@ -114,9 +169,9 @@ Regla:
 
 ## Orden recomendado pendiente
 
-1. Reporte de pagos.
-2. Reporte de promesas.
-3. Reporte CNA.
+1. Reporte de pagos. Estado: migrado.
+2. Reporte de promesas. Estado: migrado.
+3. Reporte CNA. Estado: migrado.
 4. Integraciones.
 5. Panel principal `/`.
 6. Clientes.

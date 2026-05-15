@@ -222,62 +222,121 @@ Regla actual:
 - Administracion y Dashboard ya no cargan Bootstrap desde el layout.
 - Bootstrap no debe eliminarse globalmente hasta migrar vistas legacy con modales, tablas o JS dependiente.
 
-### Fase 5 - Refactor backend por modulos
+### Fase 5 - Baseline de migraciones y limpieza de roles
+
+Estado:
+
+- [+] Migraciones historicas incompletas revisadas.
+- [+] Migraciones historicas incompletas eliminadas.
+- [+] Migraciones V3 generadas desde `u480021566_kpinvest_bd.sql`.
+- [+] Baseline V3 probado en base limpia desechable `kpinvest_v3_migrate_test`.
+- [+] `php artisan migrate` ejecutado correctamente en base limpia.
+- [+] `php artisan migrate:status` validado en base limpia.
+- [+] Rollback de migraciones probado en base desechable.
+- [+] Migraciones bajaron y volvieron a subir correctamente.
+- [+] Roles finales definidos: `administrador`, `supervisor`, `asesor`, `soporte`.
+- [+] Roles `sistemas` y `usuario` eliminados como roles validos de V3.
+- [+] Selects, validaciones, Gates y Policies actualizados.
+- [+] Tests y build pasaron despues de la limpieza.
+- [!] En la base local principal las migraciones V3 aparecen pendientes porque el baseline no debe ejecutarse sobre tablas existentes.
+- [!] Produccion no debe ejecutar el baseline sin una estrategia especifica.
 
 Objetivo:
 
-- Separar controladores por dominio.
-- Extraer servicios y actions.
-- Crear ViewModels.
-- Centralizar permisos.
-
-Avance:
-
-- Estructura de carpetas por dominio creada.
-- Servicio piloto `UserStatusService` creado para administracion.
-- ViewModel piloto `UserIndexViewModel` creado para la pantalla de usuarios.
-- `AdminUsersController` empezo a delegar logica simple sin cambiar rutas ni nombres.
-- `DashboardController` ya usa `DashboardStatsService`.
-- Permisos iniciales se centralizaron en `Roles`, `UserPolicy` y Gates.
+- Reconstruir migraciones Laravel desde la estructura real conocida.
+- Dejar una base limpia para nuevos entornos V3.
+- Normalizar roles y cerrar la lista de roles permitidos.
+- Documentar diferencias entre SQL real historico y V3.
 
 Regla:
 
-- No cambiar comportamiento visible mientras se refactoriza.
+- El baseline se prueba en base limpia o desechable.
+- No se ejecuta sobre la base local importada ni sobre produccion sin estrategia de baseline.
 
-### Fase 6 - Pruebas funcionales
+### Fase 6 - Pruebas funcionales reales
+
+Estado:
+
+- [+] Fase actual.
+- [+] `php artisan route:list --except-vendor`.
+- [+] `php artisan migrate:status`.
+- [+] Rollback/migrate validado en `kpinvest_v3_migrate_test`.
+- [+] `php -l` en PHP nuevo/modificado.
+- [+] `php artisan test`.
+- [+] `npm run build`.
+- [+] Tests de acceso por rol creados.
+- [+] Tests de flujos V3 creados.
 
 Objetivo:
 
-- Validar localmente todos los flujos criticos.
+- Validar localmente los flujos criticos antes de avanzar con refactors de Fase 7 o deploy.
 
-Verificaciones tecnicas iniciales:
-
-- [+] `php artisan route:list --except-vendor`.
-- [+] `php artisan view:clear`.
-- [+] `php artisan cache:clear`.
-- [+] `php artisan view:cache`.
-- [+] `php -l` en PHP nuevo/modificado.
-- [+] `npm run build`.
-- [+] `php artisan test`.
-- [+] Smoke tests locales contra base importada.
-
-Flujos minimos:
+Flujos validados por pruebas automatizadas:
 
 - [+] Login/redireccion.
+- [+] Login bloqueado para usuario inactivo.
+- [+] Dashboard.
+- [+] Administracion de usuarios.
+- [+] Crear usuario.
+- [+] Activar/desactivar usuario.
+- [+] Cambiar contrasena.
 - [+] Clientes: busqueda y vista.
-- [+] Promesas: bandeja de autorizacion renderiza.
-- [+] CNA: bandeja de autorizacion renderiza.
-- [+] Pagos: reporte renderiza.
+- [+] Promesas: crear cancelacion.
+- [+] Promesas: crear convenio.
+- [+] Promesas: crear convenio con cuota balon.
+- [+] Promesas: preaprobar, aprobar y rechazar.
+- [+] Generar acuerdo de promesa con fallback DOCX local.
+- [+] CNA: crear solicitud.
+- [+] CNA: preaprobar, aprobar y rechazar.
+- [+] CNA: descargar DOCX.
+- [+] CNA: validar fallback PDF a DOCX cuando iLovePDF no tiene claves.
 - [+] Reportes: pagos, promesas y CNA renderizan.
-- [+] Importaciones: pantallas principales renderizan.
-- [+] Administracion.
-- [!] Pendiente prueba manual de POST reales: aprobaciones, creacion de promesas/CNA, imports CSV y cambios de usuarios.
+- [+] Exports de reportes: pagos, promesas y CNA.
+- [+] Imports CSV: pagos, data maestra, asignaciones y CCD.
 
-### Fase 7 - Deploy controlado
+Pendientes de validacion manual:
+
+- [!] Consola del navegador sin errores.
+- [!] Modales en navegador real.
+- [!] Filtros AJAX y paginacion AJAX en navegador real.
+- [!] Vista desktop y responsive/mobile.
+- [!] Prueba con archivos CSV reales de negocio mas grandes.
+
+### Fase 7 - Arquitectura frontend V3 + migracion Tailwind
 
 Objetivo:
 
-- Preparar despliegue solo cuando V3 este probada localmente.
+- Ordenar frontend completo antes de seguir migrando pantallas criticas.
+- Consolidar Blade + Blade Components + Tailwind CSS v4 + Vite + JS modular.
+- Reducir dependencia de Bootstrap, `public/css`, `public/js`, CDN y scripts embebidos.
+
+Estado:
+
+- [+] Arquitectura frontend documentada en `docs/19_arquitectura_frontend_v3.md`.
+- [+] Inventario legacy creado en `docs/20_inventario_frontend_legacy.md`.
+- [+] Componentes `forms`, `tables`, `feedback` y `reportes` creados.
+- [+] Estructura futura `resources/views/pages/*` creada.
+- [+] Utilidades JS compartidas creadas en `resources/js/core`.
+- [+] Modulos JS de reportes creados en `resources/js/modules/reportes`.
+- [+] Reporte de pagos migrado a Tailwind/Vite.
+- [+] Reporte de promesas migrado a Tailwind/Vite.
+- [+] Reporte CNA migrado a Tailwind/Vite.
+- [!] Bootstrap sigue condicional para vistas legacy.
+- [!] Archivos antiguos de reportes en `public/css/reportes` y `public/js/reportes` quedan obsoletos pero aun presentes hasta validacion visual.
+
+Reglas:
+
+- No agregar CSS nuevo en `public/css`.
+- No agregar JS nuevo en `public/js`.
+- No agregar scripts grandes embebidos en Blade.
+- Toda pantalla migrada usa `@section('tailwind_only', true)`.
+- Toda logica JS nueva vive en `resources/js/modules`.
+
+### Fase 8 - Deploy controlado
+
+Objetivo:
+
+- Preparar despliegue solo cuando V3 este probada localmente y sobre un dump reciente.
 
 Antes de produccion:
 
@@ -297,10 +356,15 @@ Antes de produccion:
 4. Migrar layout principal sin cambiar flujos.
 5. Migrar pantalla piloto de bajo riesgo.
 6. Separar rutas por modulo.
-7. Extraer servicios de modulos criticos.
-8. Crear pruebas funcionales.
-9. Ordenar migraciones desde baseline.
-10. Preparar deploy controlado.
+7. Crear baseline de migraciones desde SQL real.
+8. Limpiar roles historicos.
+9. Crear pruebas funcionales reales por rol y flujo.
+10. Ejecutar validaciones tecnicas completas.
+11. Ordenar arquitectura frontend V3.
+12. Migrar Reportes.
+13. Migrar Integraciones.
+14. Extraer servicios/actions de modulos criticos con cobertura.
+15. Preparar deploy controlado.
 
 ## Pantalla piloto recomendada
 

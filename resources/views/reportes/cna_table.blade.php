@@ -3,59 +3,48 @@
        data-page="{{ method_exists($rows,'currentPage') ? $rows->currentPage() : '' }}"
        data-total="{{ method_exists($rows,'total') ? $rows->total() : '' }}"></div>
 
-  <div class="table-responsive">
-    <table class="table table-sm align-middle">
-      <thead>
-        <tr>
-          <th>Documento</th>
-          <th>Cliente</th>
-          <th>Entidad</th>
-          <th>Cna_Nro</th>
-          <th>Cna_Fec</th>
-          <th>Fondo_Inv</th>
-          <th>Año_Mes</th>
-          <th class="text-end">Cna_Imp</th>
-          <th>Nro_Cuenta</th>
-          <th>Nro_Operacion</th>
-          <th>Gestor</th>
-          <th>Estado</th>
-          <th>Gen_Gestor</th>
-          <th>Apr_Gestor</th>
-        </tr>
-      </thead>
-      <tbody>
+  <x-tables.table>
+    <thead>
+      <tr>
+        <x-tables.th>Documento</x-tables.th>
+        <x-tables.th>Cliente</x-tables.th>
+        <x-tables.th>Entidad</x-tables.th>
+        <x-tables.th>Cna_Nro</x-tables.th>
+        <x-tables.th>Cna_Fec</x-tables.th>
+        <x-tables.th>Fondo_Inv</x-tables.th>
+        <x-tables.th>Anio_Mes</x-tables.th>
+        <x-tables.th align="right">Cna_Imp</x-tables.th>
+        <x-tables.th>Nro_Cuenta</x-tables.th>
+        <x-tables.th>Nro_Operacion</x-tables.th>
+        <x-tables.th>Gestor</x-tables.th>
+        <x-tables.th>Estado</x-tables.th>
+        <x-tables.th>Gen_Gestor</x-tables.th>
+        <x-tables.th>Apr_Gestor</x-tables.th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-kp-border bg-white">
       @forelse($rows as $r)
         <tr>
-          <td class="nowrap text-mono">{{ $r->documento }}</td>
-          <td class="nowrap">{{ $r->cliente }}</td>
-          <td class="nowrap">{{ $r->entidad ?? '' }}</td>
-          <td class="nowrap">{{ $r->cna_nro }}</td>
-          <td class="nowrap text-mono">{{ $r->cna_fec }}</td>
-          <td class="nowrap">{{ $r->fondo_inv }}</td>
-          <td class="nowrap text-mono">{{ $r->anio_mes }}</td>
-          <td class="text-end text-mono">{{ $r->cna_imp!==null ? number_format((float)$r->cna_imp,2) : '' }}</td>
-          <td class="nowrap text-mono">{{ $r->nro_cuenta }}</td>
-          <td class="nowrap text-mono">{{ $r->nro_operacion }}</td>
-          <td class="nowrap">{{ $r->gestor }}</td>
-          <td class="nowrap">{{ $r->estado }}</td>
-          <td class="nowrap">{{ $r->gen_gestor }}</td>
-          <td class="nowrap">{{ $r->apr_gestor }}</td>
+          <x-tables.td>{{ $r->documento }}</x-tables.td>
+          <x-tables.td class="min-w-56">{{ $r->cliente }}</x-tables.td>
+          <x-tables.td>{{ $r->entidad ?? '' }}</x-tables.td>
+          <x-tables.td>{{ $r->cna_nro }}</x-tables.td>
+          <x-tables.td>{{ $r->cna_fec }}</x-tables.td>
+          <x-tables.td class="min-w-64">{{ $r->fondo_inv }}</x-tables.td>
+          <x-tables.td>{{ $r->anio_mes }}</x-tables.td>
+          <x-tables.td align="right">{{ $r->cna_imp !== null ? number_format((float) $r->cna_imp, 2) : '' }}</x-tables.td>
+          <x-tables.td>{{ $r->nro_cuenta }}</x-tables.td>
+          <x-tables.td>{{ $r->nro_operacion }}</x-tables.td>
+          <x-tables.td>{{ $r->gestor }}</x-tables.td>
+          <x-tables.td>{{ $r->estado }}</x-tables.td>
+          <x-tables.td>{{ $r->gen_gestor }}</x-tables.td>
+          <x-tables.td>{{ $r->apr_gestor }}</x-tables.td>
         </tr>
       @empty
-        <tr><td colspan="15" class="text-secondary">Sin resultados.</td></tr>
+        <x-tables.empty-row colspan="14" />
       @endforelse
-      </tbody>
-    </table>
-  </div>
+    </tbody>
+  </x-tables.table>
 
-  <div class="d-flex justify-content-between align-items-center mt-2">
-    <div class="small text-muted">
-      Mostrando {{ method_exists($rows,'firstItem') ? ($rows->firstItem() ?? 0) : 0 }}–{{ method_exists($rows,'lastItem') ? ($rows->lastItem() ?? 0) : 0 }}
-      @if(method_exists($rows,'total')) de {{ $rows->total() }} @endif
-    </div>
-
-    @if(method_exists($rows,'links'))
-      {{ $rows->onEachSide(1)->withQueryString()->links('pagination::bootstrap-5') }}
-    @endif
-  </div>
+  <x-tables.pagination :paginator="$rows" class="mt-3" />
 </div>

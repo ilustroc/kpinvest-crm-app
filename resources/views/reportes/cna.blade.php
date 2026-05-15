@@ -1,143 +1,55 @@
 @extends('layouts.app')
-@section('title','Reportes ▸ CNA')
-@section('crumb','Reportes ▸ CNA')
+@section('title','Reportes - CNA')
+@section('crumb','Reportes - CNA')
+@section('tailwind_only', true)
 
 @push('head')
   <meta name="rpt-cna-export" content="{{ route('reportes.cna.export') }}">
   <meta name="rpt-cna-facets" content="{{ route('reportes.cna.facets') }}">
-  <link rel="stylesheet" href="{{ asset('css/reportes/cna.css') }}">
 @endpush
 
 @section('content')
-<div class="card pad rpt-cna">
+<x-layout.page-shell data-module="reportes-cna">
+  <x-layout.page-header
+    title="Reporte CNA"
+    subtitle="Consulta solicitudes CNA por fecha, estado, gestor o entidad.">
+    <x-slot:actions>
+      <x-ui.button href="#" variant="secondary" data-report-export>
+        Exportar
+      </x-ui.button>
+    </x-slot:actions>
+  </x-layout.page-header>
 
-  <form id="filtros" class="row g-2 align-items-end filters" method="GET" action="{{ route('reportes.cna') }}">
-
-    <div class="col-6 col-md-2">
-      <label class="form-label">Desde</label>
-      <input type="date" name="from" class="form-control"
-             value="{{ $from }}" data-default="{{ $defaultFrom }}">
-    </div>
-
-    <div class="col-6 col-md-2">
-      <label class="form-label">Hasta</label>
-      <input type="date" name="to" class="form-control"
-             value="{{ $to }}" data-default="{{ $defaultTo }}">
-    </div>
-
-    {{-- Estado --}}
-    <div class="col-12 col-md-3">
-      <label class="form-label">Estado</label>
-      <div class="dropdown w-100" data-multiselect="estado" data-title="Estado" data-empty="Todos">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Estado: Todos
-        </button>
-
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar estado…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($estados as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="estado[]" value="{{ $v }}"
-                       @checked(in_array($v, $estadoSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin estados en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
-          </div>
-        </div>
+  <x-ui.card>
+    <form id="filtros" data-report-filters class="grid gap-3 lg:grid-cols-12 lg:items-end" method="GET" action="{{ route('reportes.cna') }}">
+      <div class="lg:col-span-2">
+        <x-forms.date label="Desde" name="from" value="{{ $from }}" data-default="{{ $defaultFrom }}" />
       </div>
-    </div>
 
-    {{-- Gestor --}}
-    <div class="col-12 col-md-3">
-      <label class="form-label">Gestor</label>
-      <div class="dropdown w-100" data-multiselect="gestor" data-title="Gestor" data-empty="Todos">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Gestor: Todos
-        </button>
-
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar gestor…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($gestores as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="gestor[]" value="{{ $v }}"
-                       @checked(in_array($v, $gestorSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin gestores en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
-          </div>
-        </div>
+      <div class="lg:col-span-2">
+        <x-forms.date label="Hasta" name="to" value="{{ $to }}" data-default="{{ $defaultTo }}" />
       </div>
-    </div>
 
-    {{-- Entidad --}}
-    <div class="col-12 col-md-4">
-      <label class="form-label">Entidad</label>
-      <div class="dropdown w-100" data-multiselect="entidad" data-title="Entidad" data-empty="Todas">
-        <button class="btn btn-ms dropdown-toggle w-100 text-start" type="button"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" data-ms-button>
-          Entidad: Todas
-        </button>
-
-        <div class="dropdown-menu p-2 w-100 shadow-sm">
-          <input type="text" class="form-control form-control-sm mb-2" placeholder="Buscar entidad…" data-ms-search>
-          <div class="ms-list" data-ms-list>
-            @forelse($entidades as $v)
-              <label class="ms-item">
-                <input class="form-check-input" type="checkbox" name="entidad[]" value="{{ $v }}"
-                       @checked(in_array($v, $entidadSel, true))>
-                <span class="ms-text">{{ $v }}</span>
-              </label>
-            @empty
-              <div class="text-muted small px-1">Sin entidades en este rango.</div>
-            @endforelse
-          </div>
-          <div class="d-flex gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-ms-clear>Limpiar</button>
-            <button type="button" class="btn btn-sm btn-success ms-auto" data-ms-apply>Aplicar</button>
-          </div>
-        </div>
+      <div class="lg:col-span-2">
+        <x-reportes.multiselect name="estado" title="Estado" empty="Todos" :options="$estados" :selected="$estadoSel" placeholder="Buscar estado..." />
       </div>
-    </div>
 
-    <div class="col-12">
-      <div class="toolbar mt-1">
-        <button class="btn btn-clean" id="btnLimpiar" type="button">
-          <i class="bi bi-eraser me-1"></i> Limpiar
-        </button>
-
-        <div class="spacer"></div>
-        <div id="summary" class="tiny"></div>
-
-        <a class="btn btn-export" id="btnExport" href="#">
-          <i class="bi bi-download me-1"></i> Exportar
-        </a>
+      <div class="lg:col-span-3">
+        <x-reportes.multiselect name="gestor" title="Gestor" empty="Todos" :options="$gestores" :selected="$gestorSel" placeholder="Buscar gestor..." />
       </div>
-    </div>
-  </form>
 
-  <hr class="my-3">
+      <div class="lg:col-span-3">
+        <x-reportes.multiselect name="entidad" title="Entidad" empty="Todas" :options="$entidades" :selected="$entidadSel" placeholder="Buscar entidad..." />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 lg:col-span-12 lg:justify-end">
+        <x-ui.button type="button" variant="secondary" data-report-search>Aplicar filtros</x-ui.button>
+        <x-ui.button type="button" variant="ghost" data-report-clear>Limpiar</x-ui.button>
+        <div class="w-full text-sm text-kp-muted lg:w-auto" data-report-summary></div>
+      </div>
+    </form>
+  </x-ui.card>
 
   @include('reportes.cna_table', ['rows' => $rows])
-
-</div>
+</x-layout.page-shell>
 @endsection
-
-@push('scripts')
-  <script src="{{ asset('js/reportes/cna.js') }}" defer></script>
-@endpush

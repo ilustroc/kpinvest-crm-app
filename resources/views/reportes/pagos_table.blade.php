@@ -1,46 +1,38 @@
-{{-- resources/views/reportes/pagos_table.blade.php --}}
 <div id="tablaPagos">
   <div id="pagMeta" data-page="{{ $rows->currentPage() }}" data-total="{{ $rows->total() }}"></div>
 
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead>
+  <x-tables.table>
+    <thead>
+      <tr>
+        <x-tables.th>Fecha</x-tables.th>
+        <x-tables.th>DNI</x-tables.th>
+        <x-tables.th>Nombre</x-tables.th>
+        <x-tables.th>Operacion</x-tables.th>
+        <x-tables.th align="right">Monto</x-tables.th>
+        <x-tables.th>Agente</x-tables.th>
+        <x-tables.th>Cosecha</x-tables.th>
+        <x-tables.th>Cuenta Recaudo</x-tables.th>
+        <x-tables.th>Entidad Financiera</x-tables.th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-kp-border bg-white">
+      @forelse($rows as $r)
         <tr>
-          <th>Fecha</th>
-          <th>DNI</th>
-          <th>Nombre</th>
-          <th>Operacion</th>
-          <th class="text-end">Monto</th>
-          <th>Agente</th>
-          <th>Cosecha</th>
-          <th>Cuenta Recaudo</th>
-          <th>Entidad Financiera</th>
+          <x-tables.td>{{ optional($r->fecha)->format('Y-m-d') }}</x-tables.td>
+          <x-tables.td>{{ $r->dni }}</x-tables.td>
+          <x-tables.td class="min-w-56">{{ $r->nombre_cliente }}</x-tables.td>
+          <x-tables.td>{{ $r->operacion }}</x-tables.td>
+          <x-tables.td align="right">{{ number_format((float)$r->monto_pagado, 2) }}</x-tables.td>
+          <x-tables.td>{{ $r->gestor }}</x-tables.td>
+          <x-tables.td>{{ $r->cosecha }}</x-tables.td>
+          <x-tables.td>{{ $r->cuenta_recaudo }}</x-tables.td>
+          <x-tables.td>{{ $r->entidad }}</x-tables.td>
         </tr>
-      </thead>
-      <tbody>
-        @forelse($rows as $r)
-          <tr>
-            <td class="text-nowrap">{{ optional($r->fecha)->format('Y-m-d') }}</td>
-            <td class="text-nowrap">{{ $r->dni }}</td>
-            <td>{{ $r->nombre_cliente }}</td>
-            <td class="text-nowrap">{{ $r->operacion }}</td>
-            <td class="text-end">{{ number_format((float)$r->monto_pagado, 2) }}</td>
-            <td>{{ $r->gestor }}</td>
-            <td>{{ $r->cosecha }}</td>
-            <td>{{ $r->cuenta_recaudo }}</td>
-            <td>{{ $r->entidad }}</td>
-          </tr>
-        @empty
-          <tr><td colspan="9" class="text-secondary">Sin resultados.</td></tr>
-        @endforelse
-      </tbody>
-    </table>
-  </div>
+      @empty
+        <x-tables.empty-row colspan="9" />
+      @endforelse
+    </tbody>
+  </x-tables.table>
 
-  <div class="d-flex justify-content-between align-items-center mt-2">
-    <div class="small text-muted">
-      Mostrando {{ $rows->firstItem() ?? 0 }}–{{ $rows->lastItem() ?? 0 }} de {{ $rows->total() }}.
-    </div>
-    {{ $rows->onEachSide(1)->withQueryString()->links('pagination::bootstrap-5') }}
-  </div>
+  <x-tables.pagination :paginator="$rows" class="mt-3" />
 </div>

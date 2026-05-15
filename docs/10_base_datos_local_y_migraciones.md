@@ -15,6 +15,7 @@ La estrategia de base de datos V3 ya parte de un entorno local listo:
 - [+] Migraciones antiguas eliminadas.
 - [+] Baseline V3 creado desde `u480021566_kpinvest_bd.sql`.
 - [+] Migraciones V3 probadas en base local limpia `kpinvest_v3_migrate_test`.
+- [+] Rollback/migrate de migraciones V3 probado en `kpinvest_v3_migrate_test`.
 - [+] Estructura generada exportada en `estructura_generada_v3.sql`.
 - [!] Diferencia intencional detectada: `users.role` ya no incluye `sistemas` ni `usuario`.
 - [!] Produccion no debe ejecutar estas migraciones todavia.
@@ -114,6 +115,8 @@ Resultado:
 
 - [+] Migracion completada correctamente.
 - [+] `php artisan migrate:status` muestra todas las migraciones V3 como `Ran`.
+- [+] `php artisan migrate:rollback` bajo todas las migraciones en base desechable.
+- [+] `php artisan migrate` volvio a subir todas las migraciones despues del rollback.
 - [+] Indices coinciden con la base real.
 - [+] FKs coinciden con la base real.
 - [+] Tablas coinciden con la base real.
@@ -279,13 +282,13 @@ Recomendacion:
 Cuando se creen migraciones V3:
 
 - [+] Revisar `php artisan migrate:status`.
-- [ ] Ejecutarlas solo en local cuando existan migraciones nuevas.
-- [ ] Revisar estructura de tablas afectadas.
-- [ ] Confirmar indices.
-- [ ] Confirmar FKs.
-- [ ] Confirmar que no se perdieron datos.
-- [ ] Probar rollback si aplica.
-- [ ] Probar flujos funcionales.
+- [+] Ejecutarlas solo en local cuando existan migraciones nuevas.
+- [+] Revisar estructura de tablas afectadas.
+- [+] Confirmar indices.
+- [+] Confirmar FKs.
+- [+] Confirmar que no se perdieron datos en base desechable.
+- [+] Probar rollback si aplica.
+- [+] Probar flujos funcionales iniciales.
 - [ ] Revisar logs.
 
 ## Comparar estructura local vs esperada

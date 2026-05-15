@@ -53,6 +53,7 @@ Archivos actualizados:
 - `resources/views/clientes/show.blade.php`.
 - `resources/views/panel/resumen.blade.php`.
 - `tests/Feature/V3LocalFlowTest.php`.
+- `tests/Feature/V3RoleAccessTest.php`.
 
 ## Migracion de limpieza
 
@@ -100,14 +101,33 @@ No habia usuarios locales con rol `sistemas` ni `usuario`.
 - [+] `rg` para localizar referencias a `sistemas` y `usuario` como roles.
 - [+] Codigo actualizado para usar solo roles finales.
 - [+] Migracion probada en base limpia.
+- [+] Rollback/migrate probado en base limpia desechable.
+- [+] `tests/Feature/V3RoleAccessTest.php` valida accesos por rol final.
+- [+] `tests/Feature/V3RoleAccessTest.php` valida que `sistemas` y `usuario` no puedan crearse desde administracion.
 - [+] `php artisan route:list --except-vendor`.
 - [+] `php artisan test`.
 - [+] `npm run build`.
 - [+] `php -l` en archivos PHP nuevos/modificados.
 
+## Resultado de busqueda de referencias
+
+Busqueda ejecutada:
+
+```bash
+rg -n "sistemas|usuario" app routes resources tests database --glob "!storage/**"
+```
+
+Resultado interpretado:
+
+- [+] No aparecen `sistemas` ni `usuario` como roles validos en `app/Support/Authorization/Roles.php`.
+- [+] No aparecen como opciones validas en `StoreUserRequest`, Policies, Gates, middleware o vistas operativas.
+- [+] Las apariciones de `usuario` en rutas/vistas/mails son texto generico o nombres de rutas como `administracion.usuarios.*`.
+- [+] Las apariciones en `tests/Feature/V3RoleAccessTest.php` son pruebas negativas para confirmar rechazo.
+- [!] Las apariciones en migraciones V3 son intencionales: el baseline inicial reproduce el enum historico y `2026_05_15_000007_normalize_user_roles_v3.php` lo cierra a roles finales.
+
 ## Pendiente antes de produccion
 
 - Revisar dump productivo reciente para contar usuarios con `sistemas` o `usuario`.
 - Decidir si algun usuario `sistemas` debe pasar a `administrador` en vez de `soporte`.
-- Validar permisos manualmente con cuentas de cada rol final.
-- Confirmar accesos a reportes, integraciones, administracion, autorizacion, clientes y dashboard.
+- Validar permisos manualmente en navegador con cuentas de cada rol final.
+- Confirmar accesos visuales en desktop/mobile para reportes, integraciones, administracion, autorizacion, clientes y dashboard.

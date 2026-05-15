@@ -6,14 +6,25 @@
 - [ ] Pendiente.
 - [!] Riesgo o requiere revision.
 
+## Mapa de fases V3
+
+- [+] Fase 1 - Entorno local seguro.
+- [+] Fase 2 - Arquitectura MVC modular por dominios.
+- [+] Fase 3 - Tailwind CSS v4 con Vite.
+- [+] Fase 4 - Migracion inicial Bootstrap -> Tailwind.
+- [+] Fase 5 - Baseline de migraciones + limpieza de roles.
+- [+] Fase 6 - Pruebas funcionales reales con cobertura inicial completada.
+- [+] Fase 7 - Arquitectura frontend V3 + migracion Tailwind iniciada.
+- [ ] Fase 8 - Deploy controlado.
+
 ## 1. Rama y codigo
 
 - [+] Confirmar que el trabajo esta en rama V3.
 - [+] Confirmar que `main` no fue modificado directamente.
-- [ ] Confirmar que el PR o merge contiene solo cambios esperados.
-- [ ] Revisar que no haya archivos temporales, logs o dumps sensibles versionados.
-- [ ] Revisar que `.env` no este incluido en commits.
-- [ ] Revisar `git diff` completo antes de merge.
+- [+] Confirmar que el PR o merge contiene solo cambios esperados.
+- [+] Revisar que no haya archivos temporales, logs o dumps sensibles versionados.
+- [+] Revisar que `.env` no este incluido en commits.
+- [+] Revisar `git diff` completo antes de merge.
 
 ## 2. Base de datos local
 
@@ -92,12 +103,31 @@
 - [+] Crear componentes adicionales: textarea, date, dropdown, empty-state, confirm-dialog.
 - [+] Migrar dashboard.
 - [+] JS modular usado en Dashboard.
-- [ ] Migrar reportes.
+- [+] Migrar reportes.
 - [ ] Migrar clientes.
 - [ ] Migrar CNA.
 - [ ] Migrar promesas.
 - [!] CNA y Promesas deben quedar al final por criticidad.
 - [!] Clientes debe migrarse solo cuando exista validacion funcional suficiente.
+
+## 6.1 Arquitectura frontend V3
+
+- [+] Crear `docs/19_arquitectura_frontend_v3.md`.
+- [+] Crear `docs/20_inventario_frontend_legacy.md`.
+- [+] Crear estructura `resources/views/components/forms`.
+- [+] Crear estructura `resources/views/components/tables`.
+- [+] Crear estructura `resources/views/components/feedback`.
+- [+] Crear estructura `resources/views/components/reportes`.
+- [+] Crear estructura futura `resources/views/pages/*`.
+- [+] Crear `resources/js/core`.
+- [+] Crear modulos `resources/js/modules/reportes`.
+- [+] Migrar JS de reportes desde `public/js/reportes` hacia Vite.
+- [+] Migrar CSS de reportes desde `public/css/reportes` hacia Tailwind/componentes.
+- [+] Reporte de pagos sin Bootstrap en layout.
+- [+] Reporte de promesas sin Bootstrap en layout.
+- [+] Reporte CNA sin Bootstrap en layout.
+- [!] Archivos legacy de reportes en `public/` quedan pendientes de eliminacion tras validacion visual.
+- [!] Integraciones, Clientes y Autorizacion siguen como legacy.
 
 ## 7. Migraciones
 
@@ -112,7 +142,7 @@
 - [+] Ejecutar `php artisan migrate:status` en local.
 - [+] Comparar conceptualmente SQL/base local vs migraciones disponibles.
 - [+] Confirmar indices y claves foraneas.
-- [ ] Probar rollback si aplica.
+- [+] Probar rollback si aplica.
 - [+] Confirmar si se requieren seeders: no se requirieron en esta fase.
 - [ ] Si se requieren seeders, confirmar que son idempotentes.
 - [+] Baseline V3 creado.
@@ -133,41 +163,42 @@
 - [+] `php -l` en archivos PHP nuevos/modificados.
 - [+] `php artisan test`.
 - [+] Login correcto: validada redireccion de invitado y pagina login.
-- [ ] Login bloqueado para usuario inactivo.
+- [+] Login bloqueado para usuario inactivo.
 - [+] Busqueda rapida de cliente.
 - [+] Vista de cliente carga cuentas.
 - [+] Vista de cliente carga pagos.
 - [+] Vista de cliente carga promesas.
 - [+] Vista de cliente carga CNA.
-- [ ] Crear promesa de cancelacion.
-- [ ] Crear promesa de convenio.
-- [ ] Crear promesa con cuota balon.
-- [ ] Preaprobar promesa como supervisor.
-- [ ] Aprobar promesa como administrador.
-- [ ] Rechazar promesa como supervisor.
-- [ ] Rechazar promesa como administrador.
-- [ ] Crear CNA.
-- [ ] Preaprobar CNA.
-- [ ] Aprobar CNA.
-- [ ] Generar/descargar DOCX CNA.
-- [ ] Generar/descargar PDF CNA o validar fallback.
-- [ ] Generar acuerdo de promesa.
-- [ ] Importar pagos CSV.
-- [ ] Importar data maestra CSV.
-- [ ] Importar asignaciones CSV.
-- [ ] Importar CCD CSV.
+- [+] Crear promesa de cancelacion.
+- [+] Crear promesa de convenio.
+- [+] Crear promesa con cuota balon.
+- [+] Preaprobar promesa como supervisor.
+- [+] Aprobar promesa como administrador.
+- [+] Rechazar promesa como supervisor.
+- [+] Rechazar promesa como administrador.
+- [+] Crear CNA.
+- [+] Preaprobar CNA.
+- [+] Aprobar CNA.
+- [+] Generar/descargar DOCX CNA.
+- [+] Generar/descargar PDF CNA o validar fallback.
+- [+] Generar acuerdo de promesa.
+- [+] Importar pagos CSV.
+- [+] Importar data maestra CSV.
+- [+] Importar asignaciones CSV.
+- [+] Importar CCD CSV.
 - [+] Reporte de pagos.
-- [ ] Export reporte de pagos.
+- [+] Export reporte de pagos.
 - [+] Reporte de promesas.
-- [ ] Export reporte de promesas.
+- [+] Export reporte de promesas.
 - [+] Reporte CNA.
-- [ ] Export reporte CNA.
+- [+] Export reporte CNA.
 - [+] Administracion de usuarios.
-- [ ] Activar/desactivar usuarios.
-- [ ] Cambiar contrasena.
+- [+] Activar/desactivar usuarios.
+- [+] Cambiar contrasena.
 - [+] Dashboard.
 - [+] Pantallas de importacion principales renderizan.
-- [!] POST reales, exports y uploads quedan pendientes de validacion manual/controlada.
+- [+] POST principales, exports e imports CSV validados con tests Feature y datos locales transaccionales.
+- [!] Pruebas manuales en navegador real aun pendientes.
 
 ## 9. Assets y build
 
@@ -178,8 +209,8 @@
 - [+] Confirmar que las vistas migradas cargan JS por Vite.
 - [!] Confirmar que no hay errores en consola del navegador: pendiente manual.
 - [!] Confirmar que modales funcionan: requiere prueba manual de acciones.
-- [ ] Confirmar que filtros AJAX funcionan.
-- [ ] Confirmar que paginacion AJAX funciona.
+- [+] Confirmar que filtros AJAX funcionan en reportes mediante Feature tests.
+- [+] Confirmar que paginacion AJAX funciona en reportes mediante Feature tests.
 - [ ] Confirmar desktop.
 - [ ] Confirmar mobile si aplica.
 
@@ -218,7 +249,7 @@
 - [+] Confirmar usuarios administradores activos.
 - [+] Confirmar que al menos un administrador queda activo en reglas de servicio.
 - [+] Confirmar visibilidad de supervisor sobre su equipo en servicio/policy.
-- [ ] Confirmar restricciones para asesor con prueba manual.
+- [+] Confirmar restricciones para asesor con prueba automatizada.
 - [+] Confirmar restricciones para soporte en administracion.
 - [+] Confirmar acceso a integraciones por Gate.
 - [+] Confirmar acceso a reportes por Gate.
@@ -239,7 +270,8 @@
 - [ ] Definir plan para restaurar backup de base de datos.
 - [ ] Confirmar responsable del rollback.
 - [ ] Confirmar ventana de tiempo aceptable.
-- [ ] Confirmar que migraciones nuevas tienen `down` seguro o plan manual.
+- [+] Confirmar que migraciones nuevas tienen `down` funcional en base desechable.
+- [ ] Definir plan manual de rollback para produccion.
 - [ ] Confirmar que assets anteriores pueden restaurarse.
 
 ## 15. Antes de ejecutar en produccion

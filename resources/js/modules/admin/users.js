@@ -1,38 +1,4 @@
-function openModal(modal) {
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-
-    const firstInput = modal.querySelector('input, select, textarea, button');
-    setTimeout(() => firstInput?.focus(), 50);
-}
-
-function closeModal(modal) {
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-}
-
-function setupModals() {
-    document.addEventListener('click', (event) => {
-        const opener = event.target.closest('[data-modal-open]');
-        if (opener) {
-            const modal = document.querySelector(opener.getAttribute('data-modal-open'));
-            if (modal) openModal(modal);
-            return;
-        }
-
-        const closer = event.target.closest('[data-modal-close]');
-        if (closer) {
-            const modal = closer.closest('[data-modal]');
-            if (modal) closeModal(modal);
-        }
-    });
-
-    document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape') return;
-
-        document.querySelectorAll('[data-modal]:not(.hidden)').forEach(closeModal);
-    });
-}
+import { setupModals } from '../../core/modal';
 
 function setupPasswordToggles() {
     document.addEventListener('click', (event) => {
@@ -111,7 +77,7 @@ function setupSupervisorField() {
 function initAdminUsers() {
     if (!document.querySelector('[data-admin-users-page]')) return;
 
-    setupModals();
+    setupModals(document);
     setupPasswordToggles();
     setupInactiveSwitch();
     setupSearchShortcut();

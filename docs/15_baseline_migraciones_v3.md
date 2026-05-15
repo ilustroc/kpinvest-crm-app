@@ -103,6 +103,35 @@ Resultado:
 - [+] Indices coinciden con la base real.
 - [+] Claves foraneas coinciden con la base real.
 
+## Prueba de rollback en base desechable
+
+Base usada:
+
+```text
+kpinvest_v3_migrate_test
+```
+
+Comandos ejecutados:
+
+```bash
+php artisan migrate:rollback
+php artisan migrate
+php artisan migrate:status
+```
+
+Resultado:
+
+- [+] `migrate:rollback` bajo correctamente la migracion vendor de Sanctum y las migraciones V3.
+- [+] `php artisan migrate` volvio a crear todas las tablas del baseline.
+- [+] `php artisan migrate:status` quedo con todas las migraciones en estado `Ran`.
+- [+] Los metodos `down()` funcionaron en la base desechable.
+
+Alcance:
+
+- La prueba se hizo solo en `kpinvest_v3_migrate_test`.
+- No se uso la base local principal importada desde produccion.
+- No se toco produccion.
+
 ## Diferencias frente al SQL real
 
 Diferencia intencional:
@@ -166,6 +195,7 @@ Checklist minimo:
 - Probar estrategia de baseline.
 - Confirmar usuarios con roles antiguos.
 - Confirmar backups.
-- Confirmar rollback.
+- Confirmar rollback tecnico en copia reciente.
+- Definir rollback operativo para produccion.
 - Ejecutar pruebas funcionales completas.
 - No desplegar si una migracion falla sobre la copia reciente.
