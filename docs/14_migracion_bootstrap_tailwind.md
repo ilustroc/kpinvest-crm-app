@@ -101,7 +101,7 @@ Estado:
 - [+] JS movido desde `public/js/reportes` hacia Vite.
 - [+] CSS especifico de reportes dejo de cargarse desde `public/css/reportes`.
 - [+] Reportes usan `@section('tailwind_only', true)`.
-- [!] Archivos legacy de reportes en `public/` quedan pendientes de eliminacion tras validacion visual.
+- [+] Archivos legacy de reportes en `public/` eliminados tras confirmar que no tenian referencias activas.
 
 ## Componentes disponibles
 
@@ -185,9 +185,38 @@ Clientes, Autorizacion, CNA y Promesas deben quedar al final porque concentran f
 
 - [!] Algunas vistas legacy dependen de Bootstrap JS para modales, dropdowns o spinners.
 - [!] Bootstrap Icons sigue siendo usado en vistas legacy.
-- [!] Hay CSS antiguo en `public/css` que todavia puede estar activo en vistas no migradas.
-- [!] Hay JS antiguo en `public/js` que todavia puede estar activo en vistas no migradas.
+- [!] Login conserva CSS antiguo en `public/css/auth/login.css`.
+- [!] Login conserva JS antiguo en `public/js/auth/login.js`.
 - [!] El salto de dependencias por `npm audit fix --force` podria romper Vite.
+
+## Limpieza ejecutada
+
+Archivos eliminados:
+
+- `public/css/reportes/pagos.css`.
+- `public/css/reportes/promesas.css`.
+- `public/css/reportes/cna.css`.
+- `public/js/reportes/pagos.js`.
+- `public/js/reportes/promesas.js`.
+- `public/js/reportes/cna.js`.
+- `public/css/dashboard-stats.css`.
+- `public/js/dashboard-stats.js`.
+- `public/css/admin/admin.css`.
+- `public/js/admin/admin.js`.
+- `public/css/app.css`.
+- `public/js/app.js`.
+- `public/js/bootstrap.js`.
+- `public/css/layout/app.css`.
+- `public/js/layout/app.js`.
+
+Se mantienen:
+
+- `public/css/auth/login.css`.
+- `public/js/auth/login.js`.
+
+Motivo:
+
+- Login todavia no fue migrado a Tailwind/Vite.
 
 ## Validaciones realizadas
 

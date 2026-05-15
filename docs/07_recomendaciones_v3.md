@@ -108,7 +108,7 @@ Acciones:
 
 Acciones:
 
-- Extraer JS embebido de vistas grandes hacia `public/js` o Vite.
+- Extraer JS embebido de vistas grandes hacia `resources/js/modules` y cargarlo por Vite.
 - Reducir CSS embebido en `layouts/app.blade.php`.
 - Crear componentes Blade reutilizables para filtros, tablas, badges y modales.
 - Revisar dependencia de CDNs externos en produccion.
@@ -171,4 +171,3 @@ Acciones:
 3. Crear un ambiente staging con copia sanitizada.
 4. Definir estrategia de baseline de migraciones.
 5. Elegir el primer modulo para pruebas de regresion: recomendacion inicial, promesas y CNA.
-

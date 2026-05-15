@@ -321,8 +321,10 @@ Estado:
 - [+] Reporte de pagos migrado a Tailwind/Vite.
 - [+] Reporte de promesas migrado a Tailwind/Vite.
 - [+] Reporte CNA migrado a Tailwind/Vite.
+- [+] Assets legacy sin referencias eliminados de `public/css` y `public/js`.
+- [+] `welcome.blade.php`, `error_log` y `estructura_generada_v3.sql` eliminados del repositorio.
 - [!] Bootstrap sigue condicional para vistas legacy.
-- [!] Archivos antiguos de reportes en `public/css/reportes` y `public/js/reportes` quedan obsoletos pero aun presentes hasta validacion visual.
+- [!] Login conserva temporalmente `public/css/auth/login.css` y `public/js/auth/login.js` hasta migrarlo a Vite.
 
 Reglas:
 

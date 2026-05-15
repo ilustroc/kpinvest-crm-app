@@ -14,8 +14,9 @@ La aplicacion conserva la estructura clasica de Laravel:
 - `resources/views`: vistas Blade.
 - `routes/web.php`: rutas web principales.
 - `config`: configuracion Laravel y servicios externos.
-- `database/migrations`: migraciones parciales.
-- `public/css` y `public/js`: assets servidos directamente.
+- `database/migrations`: baseline V3 basado en el SQL real.
+- `resources/css` y `resources/js`: assets V3 compilados por Vite.
+- `public/css` y `public/js`: legacy temporal, actualmente solo Login.
 
 ## Directorios de aplicacion
 
@@ -99,17 +100,21 @@ Vistas principales:
 
 ## Frontend y assets
 
-El proyecto tiene Vite configurado, pero muchas vistas usan assets directos:
+V3 usa Tailwind CSS v4 y Vite como canal principal:
 
-- `public/css/app.css`
-- `public/css/layout/app.css`
-- `public/css/dashboard-stats.css`
-- `public/css/reportes/*.css`
-- `public/js/reportes/*.js`
-- `public/js/dashboard-stats.js`
-- `public/js/admin/admin.js`
+- `resources/css/app.css`
+- `resources/js/app.js`
+- `resources/js/core/*`
+- `resources/js/modules/*`
 
-Tambien hay CSS embebido extenso en `resources/views/layouts/app.blade.php` y JavaScript embebido en vistas grandes como `clientes/show.blade.php` y `panel/resumen.blade.php`.
+Assets directos que se mantienen temporalmente:
+
+- `public/css/auth/login.css`
+- `public/js/auth/login.js`
+
+Los assets antiguos de Administracion, Dashboard, Reportes y entradas genericas en `public/css` y `public/js` fueron eliminados al quedar sin referencias activas.
+
+Todavia hay CSS y JavaScript embebido en vistas grandes como `clientes/show.blade.php`, `autorizacion/index.blade.php` y `panel/resumen.blade.php`.
 
 ## Automatizaciones
 
@@ -125,4 +130,3 @@ Las pruebas actuales son las pruebas base de Laravel:
 - `tests/Unit/ExampleTest.php`
 
 No hay cobertura funcional para flujos criticos como promesas, CNA, importaciones, reportes o autorizaciones.
-

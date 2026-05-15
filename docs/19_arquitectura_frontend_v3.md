@@ -102,6 +102,8 @@ resources/css/app.css
 - [+] `resources/js/core/` creado.
 - [+] `resources/js/modules/reportes/` creado.
 - [+] Carpetas JS futuras creadas para integracion, clientes, autorizacion, CNA y promesas.
+- [+] Assets legacy no referenciados eliminados de `public/css` y `public/js`.
+- [+] `public/css` y `public/js` quedan reducidos a Login como legacy temporal.
 
 ## Convenciones de componentes
 
@@ -188,6 +190,18 @@ Vistas legacy principales:
 - Clientes.
 - Autorizacion.
 - Login.
+
+Archivos legacy activos en `public`:
+
+- `public/css/auth/login.css`.
+- `public/js/auth/login.js`.
+
+Archivos legacy eliminados:
+
+- Assets antiguos de Reportes.
+- Assets antiguos de Dashboard.
+- Assets antiguos de Administracion.
+- Assets genericos no referenciados en `public/css` y `public/js`.
 
 ## Decision
 

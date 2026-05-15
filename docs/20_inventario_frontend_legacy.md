@@ -4,7 +4,7 @@
 
 Registrar que partes del frontend siguen dependiendo de Bootstrap, CDN, CSS/JS en `public` o scripts embebidos.
 
-Este inventario sirve para migrar sin adivinar.
+Este inventario tambien deja constancia de los archivos legacy ya eliminados para evitar que vuelvan a agregarse sin necesidad.
 
 ## Estado global
 
@@ -21,6 +21,38 @@ Bootstrap sigue activo de forma condicional para vistas legacy que no declaran:
 ```blade
 @section('tailwind_only', true)
 ```
+
+## Limpieza ejecutada
+
+Archivos eliminados por no tener referencias activas desde Blade, Vite, PHP, rutas o tests:
+
+- `public/css/app.css`.
+- `public/css/layout/app.css`.
+- `public/css/admin/admin.css`.
+- `public/css/dashboard-stats.css`.
+- `public/css/reportes/pagos.css`.
+- `public/css/reportes/promesas.css`.
+- `public/css/reportes/cna.css`.
+- `public/js/app.js`.
+- `public/js/bootstrap.js`.
+- `public/js/layout/app.js`.
+- `public/js/admin/admin.js`.
+- `public/js/dashboard-stats.js`.
+- `public/js/reportes/pagos.js`.
+- `public/js/reportes/promesas.js`.
+- `public/js/reportes/cna.js`.
+- `resources/views/welcome.blade.php`.
+- `error_log`.
+- `estructura_generada_v3.sql`.
+
+Carpetas eliminadas al quedar vacias:
+
+- `public/css/admin`.
+- `public/css/layout`.
+- `public/css/reportes`.
+- `public/js/admin`.
+- `public/js/layout`.
+- `public/js/reportes`.
 
 ## CDN usados todavia
 
@@ -42,19 +74,9 @@ Activos por referencia directa desde Blade:
 
 - `public/css/auth/login.css`.
 
-No activos actualmente desde Blade, pero todavia presentes:
+Motivo:
 
-- `public/css/app.css`.
-- `public/css/layout/app.css`.
-- `public/css/admin/admin.css`.
-- `public/css/dashboard-stats.css`.
-- `public/css/reportes/pagos.css`.
-- `public/css/reportes/promesas.css`.
-- `public/css/reportes/cna.css`.
-
-Observacion:
-
-- Los CSS de reportes quedaron obsoletos despues de la migracion de Fase 7.
+- `resources/views/auth/login.blade.php` todavia no fue migrada a Tailwind/Vite.
 
 ## Archivos activos en public/js
 
@@ -62,20 +84,9 @@ Activos por referencia directa desde Blade:
 
 - `public/js/auth/login.js`.
 
-No activos actualmente desde Blade, pero todavia presentes:
+Motivo:
 
-- `public/js/app.js`.
-- `public/js/bootstrap.js`.
-- `public/js/layout/app.js`.
-- `public/js/admin/admin.js`.
-- `public/js/dashboard-stats.js`.
-- `public/js/reportes/pagos.js`.
-- `public/js/reportes/promesas.js`.
-- `public/js/reportes/cna.js`.
-
-Observacion:
-
-- Los JS de reportes quedaron obsoletos despues de la migracion a `resources/js/modules/reportes`.
+- `resources/views/auth/login.blade.php` todavia no fue migrada a Tailwind/Vite.
 
 ## Reportes
 
@@ -88,10 +99,7 @@ Estado:
 - [+] Filtros multiselect migrados a `x-reportes.multiselect`.
 - [+] JS migrado a `resources/js/modules/reportes`.
 - [+] Sin Bootstrap CDN al declarar `tailwind_only`.
-
-Legacy restante:
-
-- [!] Archivos antiguos en `public/css/reportes` y `public/js/reportes` aun existen, pero ya no estan referenciados desde Blade.
+- [+] Archivos antiguos de reportes en `public/css/reportes` y `public/js/reportes` eliminados.
 
 ## Integraciones
 
@@ -202,7 +210,7 @@ Vista:
 
 - `resources/views/auth/login.blade.php`.
 
-Legacy:
+Legacy activo:
 
 - Bootstrap CSS/JS por CDN.
 - Bootstrap Icons.
@@ -233,30 +241,33 @@ Pendiente:
 
 ### Welcome
 
-Vista:
+Estado:
 
-- `resources/views/welcome.blade.php`.
+- [+] `resources/views/welcome.blade.php` fue eliminado porque no tenia ruta activa.
 
-Legacy:
+## Estado actual de public
 
-- CSS embebido generado por Laravel starter.
+Despues de la limpieza, solo deben quedar activos:
 
-Pendiente:
+- `public/css/auth/login.css`.
+- `public/js/auth/login.js`.
 
-- Eliminar si no se usa o convertir en pantalla V3.
+Regla:
 
-## Orden recomendado de limpieza
+- No agregar nuevos archivos a `public/css` ni `public/js` salvo excepcion temporal documentada.
+- Todo asset nuevo debe vivir en `resources/css`, `resources/js` y cargarse por Vite.
 
-1. Eliminar referencias antiguas de reportes de `public/css/reportes` y `public/js/reportes` cuando se confirme visualmente.
-2. Migrar Integraciones.
-3. Migrar Login.
-4. Migrar Panel principal.
-5. Migrar Autorizacion.
-6. Migrar Clientes.
-7. Migrar CNA/Promesas finos.
-8. Retirar Bootstrap CDN del layout.
-9. Eliminar archivos legacy no referenciados de `public`.
+## Orden recomendado pendiente
+
+1. Migrar Integraciones.
+2. Migrar Login.
+3. Migrar Panel principal.
+4. Migrar Autorizacion.
+5. Migrar Clientes.
+6. Migrar CNA/Promesas finos.
+7. Retirar Bootstrap CDN del layout.
+8. Eliminar `public/css/auth/login.css` y `public/js/auth/login.js` cuando Login migre a Vite.
 
 ## Regla
 
-No borrar archivos legacy hasta confirmar que no hay referencias activas y que la pantalla equivalente ya funciona con Vite.
+No borrar archivos legacy dudosos. Primero confirmar referencias activas y tener reemplazo funcional por Vite/Tailwind.

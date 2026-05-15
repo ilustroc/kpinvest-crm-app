@@ -16,7 +16,8 @@ La estrategia de base de datos V3 ya parte de un entorno local listo:
 - [+] Baseline V3 creado desde `u480021566_kpinvest_bd.sql`.
 - [+] Migraciones V3 probadas en base local limpia `kpinvest_v3_migrate_test`.
 - [+] Rollback/migrate de migraciones V3 probado en `kpinvest_v3_migrate_test`.
-- [+] Estructura generada exportada en `estructura_generada_v3.sql`.
+- [+] Estructura generada exportada temporalmente en `estructura_generada_v3.sql`.
+- [+] `estructura_generada_v3.sql` eliminado del repositorio y agregado a `.gitignore`.
 - [!] Diferencia intencional detectada: `users.role` ya no incluye `sistemas` ni `usuario`.
 - [!] Produccion no debe ejecutar estas migraciones todavia.
 

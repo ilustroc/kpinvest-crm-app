@@ -104,6 +104,7 @@
 - [+] Migrar dashboard.
 - [+] JS modular usado en Dashboard.
 - [+] Migrar reportes.
+- [+] Eliminar assets legacy confirmados como no usados de Administracion, Dashboard y Reportes.
 - [ ] Migrar clientes.
 - [ ] Migrar CNA.
 - [ ] Migrar promesas.
@@ -126,8 +127,32 @@
 - [+] Reporte de pagos sin Bootstrap en layout.
 - [+] Reporte de promesas sin Bootstrap en layout.
 - [+] Reporte CNA sin Bootstrap en layout.
-- [!] Archivos legacy de reportes en `public/` quedan pendientes de eliminacion tras validacion visual.
+- [+] Archivos legacy de reportes en `public/` eliminados.
 - [!] Integraciones, Clientes y Autorizacion siguen como legacy.
+
+## 6.2 Limpieza de archivos legacy
+
+- [+] Revisar referencias antes de borrar archivos.
+- [+] Eliminar `public/css/reportes/*.css`.
+- [+] Eliminar `public/js/reportes/*.js`.
+- [+] Eliminar `public/css/dashboard-stats.css`.
+- [+] Eliminar `public/js/dashboard-stats.js`.
+- [+] Eliminar `public/css/admin/admin.css`.
+- [+] Eliminar `public/js/admin/admin.js`.
+- [+] Eliminar `public/css/app.css`.
+- [+] Eliminar `public/js/app.js`.
+- [+] Eliminar `public/js/bootstrap.js`.
+- [+] Eliminar `public/css/layout/app.css`.
+- [+] Eliminar `public/js/layout/app.js`.
+- [+] Eliminar `resources/views/welcome.blade.php` por no tener ruta activa.
+- [+] Eliminar `error_log`.
+- [+] Eliminar `estructura_generada_v3.sql`.
+- [+] Mantener `public/css/auth/login.css` porque Login todavia lo usa.
+- [+] Mantener `public/js/auth/login.js` porque Login todavia lo usa.
+- [+] Confirmar migraciones sin duplicados obsoletos.
+- [+] Actualizar `.gitignore` para logs, temporales y estructura generada.
+- [!] Bootstrap CDN sigue activo para vistas legacy.
+- [!] Login, Integraciones, Panel, Clientes y Autorizacion siguen pendientes de migracion completa.
 
 ## 7. Migraciones
 

@@ -1,222 +1,156 @@
 @extends('layouts.app')
 
-@section('title','Integración ▸ Subir Pagos')
-@section('crumb','Integración ▸ Subir Pagos')
-
-@push('head')
-<style>
-  .ui-compact .card.pad{ padding:14px 16px; border-radius:14px }
-  .ui-compact .form-control,
-  .ui-compact .form-select{ font-size:.92rem; padding:.4rem .6rem; height:auto; background:var(--surface); border-color:var(--border) }
-  .ui-compact .form-control:focus,
-  .ui-compact .form-select:focus{ border-color:var(--brand); box-shadow:0 0 0 .25rem color-mix(in oklab, var(--brand) 22%, transparent) }
-  .ui-compact .btn{ --bs-btn-padding-y:.36rem; --bs-btn-padding-x:.75rem; --bs-btn-border-radius:.55rem; font-size:.92rem }
-  .ui-compact .btn-primary{ background:var(--brand); border-color:var(--brand) }
-  .ui-compact .btn-primary:hover{ background:color-mix(in oklab, var(--brand) 85%, black); border-color:color-mix(in oklab, var(--brand) 85%, black) }
-
-  .upload-card a{ color:var(--brand) } .upload-card a:hover{ color:color-mix(in oklab, var(--brand) 85%, black) }
-
-  .pill{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--border);background:var(--surface);
-        border-radius:999px;padding:.18rem .6rem;font-size:.8rem}
-  .mini{font-size:.9rem;color:var(--muted)}
-  .ok{color:#0a7a3d} .err{color:#b42318} .warn{color:#8a6a00}
-
-  #precheckBoxPagos{ background:color-mix(in oklab, var(--surface-2) 35%, transparent); border:1px dashed var(--border); border-radius:12px; padding:.6rem .75rem }
-</style>
-@endpush
+@section('title', 'Integracion > Subir Pagos')
+@section('crumb', 'Integracion > Subir Pagos')
+@section('tailwind_only', true)
 
 @section('content')
-  {{-- ALERTAS --}}
-  @if(session('ok'))
-    <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>{!! nl2br(e(session('ok'))) !!}</div>
-  @endif
-  @if(session('warn'))
-    <div class="alert alert-warning"><pre class="mb-0" style="white-space:pre-wrap">{{ session('warn') }}</pre></div>
-  @endif
-  @if($errors->any())
-    <div class="alert alert-danger">{{ $errors->first() }}</div>
-  @endif
-
   @php
     $ultimoLote = $ultimoLote ?? ($ultimoLotePropia ?? null);
-    $pagos      = $pagos ?? ($pagosPropia ?? collect());
+    $pagos = $pagos ?? ($pagosPropia ?? collect());
   @endphp
 
-  <div class="ui-compact">
-    {{-- Subida --}}
-    <div class="card pad mb-3 upload-card">
-      <h5 class="mb-2 d-flex align-items-center gap-2"><i class="bi bi-upload"></i><span>Subida de archivo</span></h5>
-      <p class="text-secondary mb-2">
-        Formato aceptado: <strong>CSV UTF-8</strong>, delimitado por <strong>coma</strong>.
-        <a href="{{ route('integracion.pagos.template') }}">Descargar plantilla</a>.
-      </p>
+  <x-layout.page-shell data-module="integracion-imports">
+    <x-layout.page-header
+      title="Subir pagos"
+      subtitle="Carga pagos desde un archivo CSV local y revisa el ultimo lote importado."
+    >
+      <x-slot:actions>
+        <x-ui.button href="{{ route('integracion.pagos.template') }}" variant="secondary">
+          Descargar plantilla CSV
+        </x-ui.button>
+      </x-slot:actions>
+    </x-layout.page-header>
 
-      <form method="POST" action="{{ route('integracion.pagos.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end" id="formImportPagos">
+    @if(session('ok'))
+      <x-feedback.alert variant="success">{!! nl2br(e(session('ok'))) !!}</x-feedback.alert>
+    @endif
+
+    @if(session('warn'))
+      <x-feedback.alert variant="warning">
+        <pre class="whitespace-pre-wrap font-sans text-sm">{{ session('warn') }}</pre>
+      </x-feedback.alert>
+    @endif
+
+    @if($errors->any())
+      <x-feedback.alert variant="danger">{{ $errors->first() }}</x-feedback.alert>
+    @endif
+
+    <x-ui.card title="Subida de archivo" subtitle="Formato aceptado: CSV UTF-8 delimitado por coma.">
+      <form
+        method="POST"
+        action="{{ route('integracion.pagos.import') }}"
+        enctype="multipart/form-data"
+        id="formImportPagos"
+        class="space-y-4"
+      >
         @csrf
-        <div class="col-lg-7">
-          <label class="form-label">Archivo CSV</label>
-          <input type="file" name="archivo" id="csvFilePagos" class="form-control" accept=".csv,text/csv" required>
-          <div class="form-text">
-            Encabezados esperados:
-            <span class="pill"><i class="bi bi-card-checklist"></i> Fecha</span>
-            <span class="pill">DNI</span>
-            <span class="pill">Nombre</span>
-            <span class="pill">Operacion</span>
-            <span class="pill">Monto</span>
-            <span class="pill">Agente</span>
-            <span class="pill">Cosecha</span>
-            <span class="pill">Cuenta_Recaudo</span>
-            <span class="pill">Entidad Financiera</span>
+
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end">
+          <div class="space-y-2">
+            <x-forms.label for="csvFilePagos">Archivo CSV</x-forms.label>
+            <input
+              type="file"
+              name="archivo"
+              id="csvFilePagos"
+              class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-kp-green-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-kp-green-dark kp-focus"
+              accept=".csv,text/csv"
+              required
+            >
+            <x-forms.error name="archivo" />
+
+            <div class="flex flex-wrap gap-2 text-xs text-kp-muted">
+              <span class="font-semibold text-kp-ink">Encabezados:</span>
+              @foreach(['Fecha', 'DNI', 'Nombre', 'Operacion', 'Monto', 'Agente', 'Cosecha', 'Cuenta_Recaudo', 'Entidad Financiera'] as $header)
+                <x-ui.badge>{{ $header }}</x-ui.badge>
+              @endforeach
+            </div>
           </div>
-        </div>
-        <div class="col-lg-3">
-          <button class="btn btn-primary w-100" id="btnImportPagos" disabled>
-            <i class="bi bi-cloud-upload me-1"></i> Importar
-          </button>
+
+          <x-ui.button type="submit" id="btnImportPagos" class="w-full" disabled>
+            Importar
+          </x-ui.button>
         </div>
 
-        {{-- Pre-check --}}
-        <div class="col-12 d-none" id="precheckBoxPagos">
-          <hr class="my-2">
-          <div class="d-flex flex-wrap align-items-center gap-3">
-            <div><i class="bi bi-check-circle-fill ok me-1"></i><span class="mini" id="hdrMsgPagos" aria-live="polite">Validando encabezados…</span></div>
-            <div><i class="bi bi-123 warn me-1"></i><span class="mini" id="typeMsgPagos" aria-live="polite">Tipos por muestra: —</span></div>
+        <div id="precheckBoxPagos" class="hidden rounded-lg border border-dashed border-kp-border bg-slate-50 p-4">
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="size-2 rounded-full bg-emerald-500"></span>
+              <span id="hdrMsgPagos" class="text-kp-muted" aria-live="polite">Validando encabezados...</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="size-2 rounded-full bg-amber-500"></span>
+              <span id="typeMsgPagos" class="text-kp-muted" aria-live="polite">Tipos por muestra: -</span>
+            </div>
           </div>
-          <div class="table-responsive mt-2 d-none" id="issuesWrapPagos">
-            <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Fila</th><th>Columna</th><th>Valor</th><th>Detalle</th></tr></thead>
+
+          <div id="issuesWrapPagos" class="mt-3 hidden">
+            <x-tables.table>
+              <thead>
+                <tr>
+                  <x-tables.th>Fila</x-tables.th>
+                  <x-tables.th>Columna</x-tables.th>
+                  <x-tables.th>Valor</x-tables.th>
+                  <x-tables.th>Detalle</x-tables.th>
+                </tr>
+              </thead>
               <tbody id="issuesBodyPagos"></tbody>
-            </table>
+            </x-tables.table>
           </div>
         </div>
       </form>
-    </div>
+    </x-ui.card>
 
-    {{-- Último lote --}}
-    <div class="card pad">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> <span>Último lote importado</span></h5>
+    <x-ui.card>
+      <div class="mb-4 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 class="text-base font-bold text-kp-ink">Ultimo lote importado</h2>
+          <p class="text-sm text-kp-muted">Vista rapida de los registros mas recientes.</p>
+        </div>
+
         @if($ultimoLote)
-          <span class="text-secondary small">
-            Lote #{{ $ultimoLote->id }} · {{ $ultimoLote->created_at->format('Y-m-d H:i') }} · {{ $ultimoLote->total_registros }} registros
-          </span>
+          <x-ui.badge>
+            Lote #{{ $ultimoLote->id }} - {{ $ultimoLote->created_at->format('Y-m-d H:i') }} - {{ $ultimoLote->total_registros }} registros
+          </x-ui.badge>
         @endif
       </div>
 
       @if(!$ultimoLote)
-        <div class="text-secondary">Aún no hay importaciones.</div>
+        <x-feedback.empty-state title="Sin importaciones" message="Aun no hay lotes de pagos cargados." />
       @else
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead>
+        <x-tables.table>
+          <thead>
+            <tr>
+              <x-tables.th>Fecha</x-tables.th>
+              <x-tables.th>DNI</x-tables.th>
+              <x-tables.th>Operacion</x-tables.th>
+              <x-tables.th>Nombre</x-tables.th>
+              <x-tables.th>Entidad Financiera</x-tables.th>
+              <x-tables.th align="right">Monto</x-tables.th>
+              <x-tables.th>Agente</x-tables.th>
+              <x-tables.th>Cosecha</x-tables.th>
+              <x-tables.th>Cuenta_Recaudo</x-tables.th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse($pagos as $p)
               <tr>
-                <th>Fecha</th>
-                <th>DNI</th>
-                <th>Operacion</th>
-                <th>Nombre</th>
-                <th>Entidad Financiera</th>
-                <th class="text-end">Monto</th>
-                <th>Agente</th>
-                <th>Cosecha</th>
-                <th>Cuenta_Recaudo</th>
+                <x-tables.td>{{ optional($p->fecha)->format('Y-m-d') }}</x-tables.td>
+                <x-tables.td>{{ $p->dni }}</x-tables.td>
+                <x-tables.td>{{ $p->operacion }}</x-tables.td>
+                <x-tables.td class="min-w-56">{{ $p->nombre_cliente }}</x-tables.td>
+                <x-tables.td>{{ $p->entidad }}</x-tables.td>
+                <x-tables.td align="right">{{ number_format((float) $p->monto_pagado, 2) }}</x-tables.td>
+                <x-tables.td>{{ $p->gestor }}</x-tables.td>
+                <x-tables.td>{{ $p->cosecha }}</x-tables.td>
+                <x-tables.td>{{ $p->cuenta_recaudo }}</x-tables.td>
               </tr>
-            </thead>
-            <tbody>
-              @forelse($pagos as $p)
-                <tr>
-                  <td class="text-nowrap">{{ optional($p->fecha)->format('Y-m-d') }}</td>
-                  <td class="text-nowrap">{{ $p->dni }}</td>
-                  <td class="text-nowrap">{{ $p->operacion }}</td>
-                  <td>{{ $p->nombre_cliente }}</td>
-                  <td>{{ $p->entidad }}</td>
-                  <td class="text-end">{{ number_format((float)$p->monto_pagado, 2) }}</td>
-                  <td>{{ $p->gestor }}</td>
-                  <td>{{ $p->cosecha }}</td>
-                  <td>{{ $p->cuenta_recaudo }}</td>
-                </tr>
-              @empty
-                <tr><td colspan="9" class="text-secondary">Sin datos para mostrar.</td></tr>
-              @endforelse
-            </tbody>
-          </table>
-        </div>
+            @empty
+              <x-tables.empty-row colspan="9" />
+            @endforelse
+          </tbody>
+        </x-tables.table>
       @endif
-    </div>
-  </div>
+    </x-ui.card>
+  </x-layout.page-shell>
 @endsection
-
-@push('scripts')
-<script>
-(function(){
-  // Encabezados EXACTOS
-  const HEADERS = ["Fecha","DNI","Nombre","Operacion","Monto","Agente","Cosecha","Cuenta_Recaudo","Entidad Financiera"];
-
-  const $file = document.getElementById('csvFilePagos');
-  const $btn  = document.getElementById('btnImportPagos');
-  const $box  = document.getElementById('precheckBoxPagos');
-  const $hdr  = document.getElementById('hdrMsgPagos');
-  const $typ  = document.getElementById('typeMsgPagos');
-  const $wrap = document.getElementById('issuesWrapPagos');
-  const $body = document.getElementById('issuesBodyPagos');
-
-  function splitCSV(line, sep){
-    const out=[]; let cur=''; let q=false;
-    for(let i=0;i<line.length;i++){
-      const c=line[i];
-      if(c==='"'){ q=!q } else if(c===sep && !q){ out.push(cur); cur='' } else { cur+=c }
-    }
-    out.push(cur); return out.map(s=>s.replace(/^"|"$/g,'').trim());
-  }
-  function parseCSV(text){
-    text=(text||'').replace(/\r/g,'');
-    const lines=text.split(/\n+/).filter(Boolean);
-    if(!lines.length) return {rows:[],sep:','};
-    const sep=(lines[0].split(';').length > lines[0].split(',').length) ? ';' : ',';
-    return {rows:lines.map(l=>splitCSV(l,sep)), sep};
-  }
-  const isNumber=v=>{ if(v===''||v==null) return true; const x=(v+'').replace(/\s/g,'').replace(/,/g,'.'); return /^-?\d+(\.\d+)?$/.test(x) }
-  const parseDate=v=>{ if(!v) return null; const s=v.trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(m) return s; m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; return null }
-  const isDate=v=> v==='' || parseDate(v)!=null;
-
-  $file?.addEventListener('change', ev=>{
-    const file = ev.target.files?.[0];
-    if(!file){ $btn.disabled=true; return }
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const {rows}=parseCSV(e.target.result||'');
-      if(!rows.length){ $btn.disabled=true; return }
-
-      $box.classList.remove('d-none'); $body.innerHTML=''; $wrap.classList.add('d-none');
-
-      const header=rows[0];
-      const missing=HEADERS.filter(h=>!header.includes(h));
-      const extra=header.filter(h=>!HEADERS.includes(h));
-      const headerOk=missing.length===0;
-
-      $hdr.innerHTML = headerOk
-        ? `Encabezados: OK (<span class="ok">${header.length}</span>)`
-        : `Encabezados: faltan <span class="err">${missing.join(', ')||'-'}</span>${extra.length?`, extra: <span class='warn'>${extra.join(', ')}</span>`:''}`;
-
-      let issues=[], sampled=0;
-      for(let r=1; r<Math.min(rows.length,51); r++){
-        const row=rows[r]; if(!row||!row.length) continue; sampled++;
-        HEADERS.forEach((h,idx)=>{
-          const val=(row[idx]??'').trim(); let ok=true, detail='';
-          if(h==='Fecha'){ ok=isDate(val); if(!ok) detail='Fecha inválida. Use YYYY-MM-DD o DD/MM/YYYY' }
-          else if(h==='Monto'){ ok=isNumber(val); if(!ok) detail='Número inválido' }
-          if(!ok){ issues.push({r:r+1,col:h,val,detail}) }
-        });
-      }
-
-      $typ.textContent = `Tipos por muestra: ${sampled} fila(s) verificadas, ${issues.length} posible(s) problema(s)`;
-      if(issues.length){
-        $wrap.classList.remove('d-none');
-        $body.innerHTML = issues.slice(0,80).map(it=>`<tr><td>${it.r}</td><td>${it.col}</td><td>${(it.val||'').replace(/</g,'&lt;')}</td><td>${it.detail}</td></tr>`).join('');
-      }
-      $btn.disabled = !headerOk;
-    };
-    reader.readAsText(file,'UTF-8');
-  });
-})();
-</script>
-@endpush

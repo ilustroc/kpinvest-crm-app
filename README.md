@@ -38,8 +38,9 @@ El archivo `u480021566_kpinvest_bd.sql` es la referencia principal de la estruct
 - PHP 8.1 o superior, con plataforma Composer fijada a PHP 8.3.0.
 - Laravel Framework 10.x.
 - MySQL/MariaDB.
-- Bootstrap 5 por CDN en las vistas.
-- Vite disponible para assets, aunque gran parte del frontend se sirve desde `public/css` y `public/js`.
+- Bootstrap 5 por CDN solo para vistas legacy.
+- Tailwind CSS v4 y Vite como frontend objetivo de V3.
+- `public/css` y `public/js` quedan como legacy temporal; actualmente solo Login los usa directamente.
 - PhpSpreadsheet para exportaciones Excel.
 - PhpWord y DomPDF/mPDF/iLovePDF para generacion o conversion de documentos.
 - Sanctum instalado, aunque el uso principal del sistema es via sesion web.

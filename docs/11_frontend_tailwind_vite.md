@@ -82,7 +82,7 @@ Reportes migrados:
 - `resources/js/modules/reportes/cna.js`.
 - `resources/js/modules/reportes/filters.js`.
 
-Los archivos `public/css/reportes/*` y `public/js/reportes/*` quedan sin referencia activa desde Blade, pero se conservan temporalmente hasta validacion visual final.
+Los archivos `public/css/reportes/*` y `public/js/reportes/*` fueron eliminados despues de confirmar que ya no tenian referencias activas.
 
 ## Situacion actual
 
@@ -94,8 +94,8 @@ El frontend actual esta en transicion. Todavia existen partes legacy que usan:
 - Google Fonts via CDN.
 - Chart.js via CDN en algunas vistas.
 - CSS embebido en `resources/views/layouts/app.blade.php`.
-- CSS en `public/css`.
-- JS en `public/js`.
+- CSS legacy activo solo en `public/css/auth/login.css`.
+- JS legacy activo solo en `public/js/auth/login.js`.
 - JS embebido en vistas grandes.
 - Vite instalado, pero no como unico canal de assets.
 
@@ -432,11 +432,25 @@ Estado:
 - [+] Vista migrada a Tailwind.
 - [+] Filtros, KPIs, tablas y estados vacios usan componentes Blade.
 - [+] Bootstrap y Bootstrap Icons no cargan en esta vista.
-- [+] CSS legacy `public/css/dashboard-stats.css` ya no se carga en esta vista.
-- [+] JS legacy `public/js/dashboard-stats.js` ya no se carga en esta vista.
+- [+] CSS legacy `public/css/dashboard-stats.css` eliminado.
+- [+] JS legacy `public/js/dashboard-stats.js` eliminado.
 - [+] Grafico de pagos usa `resources/js/modules/dashboard/stats.js` con `chart.js` importado desde npm.
 - [+] Smoke test renderiza la pantalla contra base local.
 - [!] Falta validacion visual manual de grafico y responsive en navegador.
+
+## Limpieza de assets legacy
+
+Estado:
+
+- [+] Eliminados assets antiguos de Reportes en `public/css/reportes` y `public/js/reportes`.
+- [+] Eliminados assets antiguos de Dashboard: `public/css/dashboard-stats.css` y `public/js/dashboard-stats.js`.
+- [+] Eliminados assets antiguos de Administracion: `public/css/admin/admin.css` y `public/js/admin/admin.js`.
+- [+] Eliminados assets genericos no referenciados: `public/css/app.css`, `public/js/app.js`, `public/js/bootstrap.js`, `public/css/layout/app.css` y `public/js/layout/app.js`.
+- [!] Se mantiene Login como legacy temporal con `public/css/auth/login.css` y `public/js/auth/login.js`.
+
+Regla:
+
+- No volver a crear archivos nuevos en `public/css` o `public/js` salvo excepcion temporal documentada.
 
 ## Riesgos
 

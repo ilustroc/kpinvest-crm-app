@@ -147,6 +147,25 @@ Motivo:
 - V3 elimina los roles `sistemas` y `usuario`.
 - La migracion `2026_05_15_000007_normalize_user_roles_v3.php` convierte valores antiguos a `soporte`.
 
+## Revision de duplicados
+
+Estado despues de la limpieza del proyecto:
+
+- [+] No existe `2026_05_15_000007_create_laravel_system_tables.php`.
+- [+] No existe `2026_05_15_000008_normalize_user_roles_v3.php`.
+- [+] Existe una sola migracion de limpieza de roles: `2026_05_15_000007_normalize_user_roles_v3.php`.
+- [+] El orden de migraciones queda coherente del `000001` al `000007`.
+
+Migraciones actuales:
+
+- `2026_05_15_000001_create_users_table.php`.
+- `2026_05_15_000002_create_clientes_tables.php`.
+- `2026_05_15_000003_create_pagos_tables.php`.
+- `2026_05_15_000004_create_promesas_tables.php`.
+- `2026_05_15_000005_create_cna_solicitudes_table.php`.
+- `2026_05_15_000006_create_integracion_tables.php`.
+- `2026_05_15_000007_normalize_user_roles_v3.php`.
+
 ## Como probar de nuevo
 
 Crear base limpia local:
@@ -175,6 +194,12 @@ Exportar estructura:
 ```bash
 mysqldump -u root -p --no-data --skip-comments kpinvest_v3_migrate_test > estructura_generada_v3.sql
 ```
+
+Nota:
+
+- `estructura_generada_v3.sql` es un archivo temporal de comparacion.
+- No debe versionarse.
+- Esta incluido en `.gitignore`.
 
 ## Importante para produccion
 
