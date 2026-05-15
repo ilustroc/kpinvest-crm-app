@@ -11,9 +11,23 @@ El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
 - Sin romper pantallas criticas.
 - Migrando primero layout y componentes base.
 
+## Estado actual de implementacion
+
+- [+] `tailwindcss` esta instalado.
+- [+] `@tailwindcss/vite` esta instalado.
+- [+] `vite.config.js` esta configurado con Tailwind CSS v4.
+- [+] `resources/css/app.css` carga `@import "tailwindcss";`.
+- [+] `resources/js/app.js` carga modulos base.
+- [+] El layout principal usa `@vite(['resources/css/app.css', 'resources/js/app.js'])`.
+- [+] Sidebar y topbar base existen como componentes Blade con Tailwind.
+- [+] Componentes UI base existen con Tailwind.
+- [+] Administracion de usuarios fue seleccionada y migrada como pantalla piloto.
+- [+] `npm run build` se ejecuto correctamente.
+- [!] Bootstrap sigue cargando de forma condicional para pantallas legacy no migradas.
+
 ## Situacion actual
 
-El frontend actual usa:
+El frontend actual esta en transicion. Todavia existen partes legacy que usan:
 
 - Blade.
 - Bootstrap 5 via CDN.
@@ -25,6 +39,8 @@ El frontend actual usa:
 - JS en `public/js`.
 - JS embebido en vistas grandes.
 - Vite instalado, pero no como unico canal de assets.
+
+La pantalla piloto de administracion ya usa Tailwind y no carga Bootstrap desde el layout.
 
 ## Problemas actuales
 
@@ -138,13 +154,13 @@ Archivo:
 resources/css/app.css
 ```
 
-Contenido base:
+Contenido base aplicado:
 
 ```css
 @import "tailwindcss";
 ```
 
-Desde ahi se podran agregar tokens o estilos propios de V3 cuando sean necesarios.
+Ademas se agregaron tokens iniciales del CRM y una utilidad compartida de foco.
 
 ## Configuracion esperada de JS
 
@@ -160,11 +176,11 @@ Uso recomendado:
 - Importar modulos compartidos.
 - Evitar meter logica especifica de pantallas dentro de `app.js`.
 
-Ejemplo conceptual:
+Estado actual:
 
 ```js
-import './bootstrap';
 import './modules/layout/sidebar';
+import './modules/admin/users';
 ```
 
 Los scripts especificos deben vivir en:
@@ -183,6 +199,12 @@ El layout principal debe cargar assets usando:
 
 Esto debe reemplazar progresivamente links manuales a CSS/JS propios.
 
+Estado actual:
+
+- [+] `@vite` esta configurado en `resources/views/layouts/app.blade.php`.
+- [+] Las vistas migradas pueden usar `@section('tailwind_only', true)` para no cargar Bootstrap.
+- [!] Las vistas legacy siguen usando Bootstrap temporalmente para evitar quiebres.
+
 ## Retirar Bootstrap de forma controlada
 
 Bootstrap debe retirarse progresivamente desde:
@@ -200,6 +222,12 @@ Bootstrap debe retirarse progresivamente desde:
 - Alertas.
 
 No hacer todo de golpe.
+
+Estado actual:
+
+- [+] Bootstrap fue retirado para la pantalla piloto de administracion mediante `tailwind_only`.
+- [!] Bootstrap sigue disponible para vistas legacy.
+- [ ] Retirar Bootstrap globalmente cuando las pantallas dependientes hayan sido migradas.
 
 ## Retirar Bootstrap Icons
 
@@ -226,18 +254,28 @@ resources/views/components/
     button.blade.php
     badge.blade.php
     card.blade.php
-    modal.blade.php
     alert.blade.php
-    table.blade.php
-  forms/
     input.blade.php
     select.blade.php
-    textarea.blade.php
-    date.blade.php
+    table.blade.php
   layout/
     sidebar.blade.php
     topbar.blade.php
 ```
+
+Estado actual:
+
+- [+] `resources/views/components/ui/button.blade.php`.
+- [+] `resources/views/components/ui/card.blade.php`.
+- [+] `resources/views/components/ui/badge.blade.php`.
+- [+] `resources/views/components/ui/alert.blade.php`.
+- [+] `resources/views/components/ui/input.blade.php`.
+- [+] `resources/views/components/ui/select.blade.php`.
+- [+] `resources/views/components/ui/table.blade.php`.
+- [+] `resources/views/components/layout/sidebar.blade.php`.
+- [+] `resources/views/components/layout/topbar.blade.php`.
+- [ ] Crear componente modal reutilizable si mas pantallas lo necesitan.
+- [ ] Crear componentes textarea/date cuando se migren formularios mas grandes.
 
 ## Organizacion JS por modulos
 
@@ -282,7 +320,7 @@ Orden recomendado:
 
 ## Pantalla piloto
 
-Pantalla recomendada:
+Pantalla seleccionada:
 
 - Administracion de usuarios.
 
@@ -291,6 +329,14 @@ Por que:
 - Usa tabla, acciones, formulario y modales.
 - Es buena para probar componentes.
 - Es menos critica que cliente, CNA o promesas.
+
+Estado:
+
+- [+] Vista migrada a Tailwind.
+- [+] Tabla, filtros, botones, badges y formularios usan componentes Tailwind.
+- [+] Modales Bootstrap fueron reemplazados por modales simples con Blade y JS del modulo `resources/js/modules/admin/users.js`.
+- [+] Funcionalidad de crear usuario, cambiar contrasena y activar/desactivar se mantiene por las mismas rutas.
+- [!] Requiere validacion manual en navegador con usuarios reales de prueba.
 
 ## Riesgos
 

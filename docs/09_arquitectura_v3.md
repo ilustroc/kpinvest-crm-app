@@ -16,21 +16,26 @@ Primer avance completado:
 
 - [+] `routes/web.php` quedo como agregador.
 - [+] Se crearon archivos de rutas por dominio en `routes/web/`.
+- [+] Se creo la estructura base de carpetas por dominio.
 - [+] Se mantuvieron los mismos controladores actuales.
 - [+] Se mantuvieron las mismas URLs.
 - [+] Se mantuvieron los mismos nombres de rutas.
 - [+] Se mantuvieron los mismos middlewares.
 - [+] `php artisan route:list --except-vendor` lista correctamente las rutas.
+- [+] Se creo un servicio piloto: `app/Services/Admin/UserStatusService.php`.
+- [+] Se creo un ViewModel piloto: `app/ViewModels/Admin/UserIndexViewModel.php`.
+- [+] La pantalla piloto de administracion usa el flujo Controller -> Service/ViewModel -> Blade.
 
 Pendiente:
 
 - [ ] Mover controladores a carpetas por dominio.
-- [ ] Crear servicios por dominio donde falten.
-- [ ] Crear actions para operaciones puntuales.
-- [ ] Crear ViewModels para vistas complejas.
+- [ ] Crear servicios reales por dominio donde falten.
+- [ ] Crear actions reales para operaciones puntuales.
+- [ ] Crear ViewModels para vistas complejas restantes.
 - [ ] Centralizar Policies/Gates.
 
 Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
+La excepcion controlada es `AdminUsersController`, que comenzo a delegar logica simple en un servicio y un ViewModel sin cambiar rutas ni comportamiento esperado.
 
 ## Por que esta arquitectura
 
@@ -110,6 +115,8 @@ app/
     Cna/
     Reporte/
     Integracion/
+    Admin/
+    Dashboard/
     Documento/
 
   Actions/
@@ -117,17 +124,59 @@ app/
     Promesa/
     Cna/
     Importacion/
+    Admin/
 
   ViewModels/
     Cliente/
     Promesa/
     Cna/
     Reporte/
+    Admin/
     Dashboard/
+
+  DTOs/
+    Cliente/
+    Promesa/
+    Cna/
+    Reporte/
+    Integracion/
+
+  Support/
+    Formatters/
+    Helpers/
 
   Models/
   Policies/
 ```
+
+Estado actual de carpetas:
+
+- [+] `app/Services/Cliente`.
+- [+] `app/Services/Promesa`.
+- [+] `app/Services/Cna`.
+- [+] `app/Services/Reporte`.
+- [+] `app/Services/Integracion`.
+- [+] `app/Services/Admin`.
+- [+] `app/Services/Dashboard`.
+- [+] `app/Services/Documento`.
+- [+] `app/Actions/Cliente`.
+- [+] `app/Actions/Promesa`.
+- [+] `app/Actions/Cna`.
+- [+] `app/Actions/Importacion`.
+- [+] `app/Actions/Admin`.
+- [+] `app/ViewModels/Cliente`.
+- [+] `app/ViewModels/Promesa`.
+- [+] `app/ViewModels/Cna`.
+- [+] `app/ViewModels/Reporte`.
+- [+] `app/ViewModels/Admin`.
+- [+] `app/ViewModels/Dashboard`.
+- [+] `app/DTOs/Cliente`.
+- [+] `app/DTOs/Promesa`.
+- [+] `app/DTOs/Cna`.
+- [+] `app/DTOs/Reporte`.
+- [+] `app/DTOs/Integracion`.
+- [+] `app/Support/Formatters`.
+- [+] `app/Support/Helpers`.
 
 ### Rutas
 
@@ -180,10 +229,20 @@ resources/
       reportes/
       integracion/
       admin/
+      layout/
 
   css/
     app.css
 ```
+
+Estado actual de frontend V3:
+
+- [+] `resources/css/app.css` existe y carga Tailwind CSS v4.
+- [+] `resources/js/app.js` existe y carga modulos base.
+- [+] `resources/js/modules/layout/sidebar.js` maneja el menu lateral sin Bootstrap.
+- [+] `resources/js/modules/admin/users.js` maneja la pantalla piloto de administracion.
+- [+] `resources/views/components/ui/*` contiene componentes base Tailwind.
+- [+] `resources/views/components/layout/*` contiene sidebar y topbar Tailwind.
 
 ## Flujo recomendado
 
@@ -209,6 +268,30 @@ Ejemplo resumido:
 ```text
 ClienteController -> ClienteProfileService -> ClienteShowViewModel -> clientes/show.blade.php
 ```
+
+## Flujo piloto implementado
+
+La primera pantalla piloto usa este flujo:
+
+```text
+routes/web/admin.php
+  -> AdminUsersController@index
+    -> UserService
+    -> UserIndexViewModel
+    -> resources/views/placeholders/administracion.blade.php
+```
+
+Para activacion/desactivacion de usuarios:
+
+```text
+routes/web/admin.php
+  -> AdminUsersController@toggle
+    -> UserStatusService
+    -> User model
+    -> redirect con mensaje
+```
+
+Este piloto mantiene rutas, nombres y controladores actuales, pero empieza a separar responsabilidad.
 
 ## Responsabilidades por capa
 

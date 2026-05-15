@@ -1,0 +1,14 @@
+function toggleRail() {
+    document.getElementById('rail')?.classList.toggle('-translate-x-full');
+    document.getElementById('backdrop')?.classList.toggle('hidden');
+}
+
+window.toggleRail = toggleRail;
+
+document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-toggle-rail]');
+    if (!toggle) return;
+
+    event.preventDefault();
+    toggleRail();
+});

@@ -35,7 +35,9 @@
 - [+] Se usaran ViewModels para vistas complejas.
 - [+] Se usaran componentes Blade.
 - [+] Separar rutas por modulo.
-- [ ] Crear estructura de carpetas por dominios.
+- [+] Crear estructura de carpetas por dominios.
+- [+] Crear servicio piloto de bajo riesgo.
+- [+] Crear ViewModel piloto.
 - [ ] Definir Policies/Gates por modulo critico.
 - [!] No mover controladores criticos sin pruebas o validacion funcional.
 
@@ -44,41 +46,42 @@
 - [+] Se define Tailwind CSS v4 como frontend objetivo.
 - [+] Se usara Vite.
 - [+] Bootstrap sera eliminado progresivamente.
-- [ ] Instalar Tailwind CSS v4.
-- [ ] Configurar `vite.config.js`.
-- [ ] Configurar `resources/css/app.css`.
-- [ ] Revisar `resources/js/app.js`.
-- [ ] Ejecutar `npm run build`.
-- [ ] Eliminar Bootstrap del layout principal.
-- [ ] Reemplazar componentes Bootstrap por Tailwind.
+- [+] Instalar Tailwind CSS v4.
+- [+] Instalar `@tailwindcss/vite`.
+- [+] Configurar `vite.config.js`.
+- [+] Configurar `resources/css/app.css`.
+- [+] Revisar `resources/js/app.js`.
+- [+] Ejecutar `npm run build`.
+- [!] Eliminar Bootstrap del layout principal: parcial, se mantiene condicional para vistas legacy.
+- [+] Reemplazar componentes Bootstrap por Tailwind en pantalla piloto.
 - [!] No eliminar Bootstrap globalmente antes de migrar modales/dropdowns dependientes.
 
 ## 5. Checklist de instalacion Tailwind CSS v4
 
-- [ ] Revisar `package.json`.
-- [ ] Instalar Tailwind CSS v4.
-- [ ] Instalar `@tailwindcss/vite`.
-- [ ] Configurar `vite.config.js`.
-- [ ] Actualizar `resources/css/app.css`.
-- [ ] Confirmar `@vite` en layout.
+- [+] Revisar `package.json`.
+- [+] Instalar Tailwind CSS v4.
+- [+] Instalar `@tailwindcss/vite`.
+- [+] Configurar `vite.config.js`.
+- [+] Actualizar `resources/css/app.css`.
+- [+] Confirmar `@vite` en layout.
 - [ ] Ejecutar `npm run dev`.
-- [ ] Ejecutar `npm run build`.
-- [ ] Confirmar `public/build/manifest.json`.
-- [ ] Confirmar que el layout carga CSS.
-- [ ] Confirmar que el layout carga JS.
-- [ ] Retirar Bootstrap CDN.
+- [+] Ejecutar `npm run build`.
+- [+] Confirmar `public/build/manifest.json`.
+- [!] Confirmar que el layout carga CSS: requiere validacion visual en navegador.
+- [!] Confirmar que el layout carga JS: requiere validacion visual en navegador.
+- [!] Retirar Bootstrap CDN: retirado solo para vistas con `tailwind_only`.
 - [ ] Revisar errores en consola.
-- [ ] Migrar primera pantalla piloto.
+- [+] Migrar primera pantalla piloto.
 
 ## 6. Bootstrap -> Tailwind
 
-- [ ] Migrar layout principal.
-- [ ] Migrar sidebar/topbar.
-- [ ] Migrar botones.
-- [ ] Migrar badges.
-- [ ] Migrar formularios simples.
-- [ ] Migrar tablas simples.
-- [ ] Migrar administracion de usuarios.
+- [!] Migrar layout principal: Vite activo y Bootstrap condicional para legacy.
+- [+] Migrar sidebar/topbar base.
+- [+] Migrar botones base.
+- [+] Migrar badges base.
+- [+] Migrar formularios simples base.
+- [+] Migrar tablas simples base.
+- [+] Migrar administracion de usuarios.
 - [ ] Migrar dashboard.
 - [ ] Migrar reportes.
 - [ ] Migrar clientes.
@@ -105,6 +108,12 @@
 
 ## 8. Pruebas funcionales
 
+- [+] `php artisan route:list --except-vendor`.
+- [+] `php artisan view:clear`.
+- [+] `php artisan cache:clear`.
+- [+] `php artisan view:cache`.
+- [+] `php -l` en archivos PHP nuevos/modificados.
+- [!] `php artisan test`: requiere ajustar test base porque `/` responde 302 por autenticacion y el test espera 200.
 - [ ] Login correcto.
 - [ ] Login bloqueado para usuario inactivo.
 - [ ] Busqueda rapida de cliente.
@@ -142,10 +151,10 @@
 ## 9. Assets y build
 
 - [ ] Ejecutar `npm install` si cambiaron dependencias.
-- [ ] Ejecutar `npm run build`.
-- [ ] Confirmar `public/build/manifest.json`.
-- [ ] Confirmar que las vistas cargan CSS.
-- [ ] Confirmar que las vistas cargan JS.
+- [+] Ejecutar `npm run build`.
+- [+] Confirmar `public/build/manifest.json`.
+- [!] Confirmar que las vistas cargan CSS: requiere validacion en navegador.
+- [!] Confirmar que las vistas cargan JS: requiere validacion en navegador.
 - [ ] Confirmar que no hay errores en consola del navegador.
 - [ ] Confirmar que modales funcionan.
 - [ ] Confirmar que filtros AJAX funcionan.

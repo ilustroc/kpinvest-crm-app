@@ -1,246 +1,209 @@
 @extends('layouts.app')
-@section('title','Administración')
-@section('crumb','Administración')
-
-@push('head')
-  <link rel="stylesheet" href="{{ asset('css/admin/admin.css') }}">
-@endpush
+@section('tailwind_only', true)
+@section('title','Administracion')
+@section('crumb','Administracion')
 
 @section('content')
-<div class="admin-compact">
-
-  {{-- ALERTAS --}}
+<div class="space-y-4" data-admin-users-page>
   @if(session('ok'))
-    <div class="alert alert-success d-flex align-items-center" role="alert">
-      <i class="bi bi-check-circle me-2"></i>
-      <div>{{ session('ok') }}</div>
-    </div>
+    <x-ui.alert variant="success">{{ session('ok') }}</x-ui.alert>
   @endif
+
   @if($errors->any())
-    <div class="alert alert-danger d-flex align-items-center" role="alert">
-      <i class="bi bi-exclamation-triangle me-2"></i>
-      <div>{{ $errors->first() }}</div>
-    </div>
+    <x-ui.alert variant="danger">{{ $errors->first() }}</x-ui.alert>
   @endif
 
-  {{-- Barra superior: filtro + búsqueda + crear --}}
-  <div class="card pad mb-2">
-    <div class="filters">
-      <form method="GET" action="{{ route('administracion.index') }}">
-        <div class="form-check form-switch m-0">
-          <input class="form-check-input" type="checkbox" id="swInactivos" name="inactivos" value="1" {{ request('inactivos') ? 'checked' : '' }}>
-          <label class="form-check-label" for="swInactivos">Mostrar inactivos</label>
-        </div>
+  <x-ui.card>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <form method="GET" action="{{ route('administracion.index') }}" class="grid flex-1 gap-3 md:grid-cols-[auto_1fr_auto_auto] md:items-end">
+        <label class="flex items-center gap-3 rounded-md border border-kp-border bg-slate-50 px-3 py-2 text-sm font-semibold text-kp-ink">
+          <input id="swInactivos"
+                 type="checkbox"
+                 name="inactivos"
+                 value="1"
+                 @checked($vm->showInactive())
+                 class="size-4 rounded border-kp-border text-kp-green kp-focus">
+          Mostrar inactivos
+        </label>
 
-        <div class="input-icon" style="min-width:260px; flex:1">
-          <input type="search" class="form-control" name="q" value="{{ request('q') }}" placeholder="Buscar nombre o email…">
-        </div>
+        <x-ui.input
+          type="search"
+          name="q"
+          value="{{ $vm->search() }}"
+          placeholder="Buscar nombre o email..."
+          data-admin-search />
 
-        <button class="btn btn-outline-primary" type="submit">
-          <i class="bi bi-filter-right me-1"></i> Aplicar
-        </button>
-        <a class="btn btn-outline-primary" href="{{ route('administracion.index') }}">
-          Limpiar
-        </a>
+        <x-ui.button type="submit" variant="secondary">Aplicar</x-ui.button>
+        <x-ui.button href="{{ route('administracion.index') }}" variant="ghost">Limpiar</x-ui.button>
       </form>
 
-      <div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateUser">
-          <i class="bi bi-person-plus me-1"></i> Nuevo usuario
-        </button>
-      </div>
+      @if(count($vm->roleOptions()) > 0)
+        <x-ui.button type="button" data-modal-open="#modalCreateUser">
+          Nuevo usuario
+        </x-ui.button>
+      @endif
     </div>
-  </div>
+  </x-ui.card>
 
-  {{-- Tabla de usuarios --}}
-  <div class="card pad struct">
-    <h5 class="mb-3 d-flex align-items-center gap-2">
-      <i class="bi bi-people" style="color:var(--accent)"></i> <span>Usuarios</span>
-    </h5>
-
-    <div class="table-responsive">
-      <table class="table align-middle">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th class="text-center">Rol</th>
-            <th class="text-center">Supervisor</th>
-            <th class="text-center">Estado</th>
-            <th class="col-actions">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-        @forelse($users as $u)
-          @php
-            $me = auth()->user();
-            $canManage = $me->role === 'administrador'
-                      || ($me->role === 'supervisor' && in_array($u->role, ['asesor','soporte']))
-                      || ($me->role === 'soporte'    && in_array($u->role, ['usuario']));
-          @endphp
-          <tr>
-            <td class="fw-semibold">{{ $u->name }}</td>
-            <td class="text-secondary td-email">
-              <div class="text-truncate" title="{{ $u->email }}">{{ $u->email }}</div>
+  <x-ui.card title="Usuarios" subtitle="Gestion de usuarios, roles y estado de acceso.">
+    <x-ui.table>
+      <thead class="bg-slate-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-kp-muted">Nombre</th>
+          <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-kp-muted">Email</th>
+          <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-kp-muted">Rol</th>
+          <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-kp-muted">Supervisor</th>
+          <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-kp-muted">Estado</th>
+          <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-kp-border bg-white">
+        @forelse($vm->users as $u)
+          <tr class="hover:bg-slate-50/70">
+            <td class="px-4 py-3">
+              <div class="font-semibold text-kp-ink">{{ $u->name }}</div>
             </td>
-            <td class="text-center">
-              <span class="badge rounded-pill text-bg-light border">{{ strtoupper($u->role) }}</span>
+            <td class="max-w-[260px] px-4 py-3 text-kp-muted">
+              <div class="truncate" title="{{ $u->email }}">{{ $u->email }}</div>
             </td>
-            <td class="text-center">
-              @if($u->supervisor)
-                <span class="text-secondary">{{ $u->supervisor->name }}</span>
-              @else
-                <span class="text-muted">—</span>
-              @endif
+            <td class="px-4 py-3 text-center">
+              <x-ui.badge>{{ strtoupper($u->role) }}</x-ui.badge>
             </td>
-            <td class="text-center">
+            <td class="px-4 py-3 text-center text-sm text-kp-muted">
+              {{ $u->supervisor?->name ?? '-' }}
+            </td>
+            <td class="px-4 py-3 text-center">
               @if($u->active)
-                <span class="state-chip state-ok">ACTIVO</span>
+                <x-ui.badge variant="success">Activo</x-ui.badge>
               @else
-                <span class="state-chip state-off">INACTIVO</span>
+                <x-ui.badge variant="danger">Inactivo</x-ui.badge>
               @endif
             </td>
-            <td class="col-actions">
-              <div class="actions-wrap">
-                {{-- Cambiar contraseña --}}
-                @if($canManage || $me->role === 'administrador' || $me->id === $u->id)
-                  <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="modal" data-bs-target="#pw-usr-{{ $u->id }}" title="Contraseña">
-                    <i class="bi bi-key"></i>
-                  </button>
+            <td class="px-4 py-3">
+              <div class="flex justify-end gap-2">
+                @if($vm->canUpdatePassword($u))
+                  <x-ui.button type="button" variant="secondary" size="sm" data-modal-open="#pw-usr-{{ $u->id }}">
+                    Password
+                  </x-ui.button>
                 @endif
 
-                {{-- Activar / Desactivar --}}
-                @if($canManage && $me->id !== $u->id)
-                  <form method="POST" action="{{ route('administracion.usuarios.toggle',$u) }}"
-                        onsubmit="return confirm('¿Confirmas {{ $u->active ? 'desactivar' : 'activar' }} esta cuenta?')">
-                    @csrf @method('PATCH')
-                    <button class="btn btn-outline-{{ $u->active ? 'danger' : 'success' }} btn-icon" title="{{ $u->active ? 'Desactivar' : 'Activar' }}">
-                      <i class="bi bi-{{ $u->active ? 'person-x' : 'person-check' }}"></i>
-                    </button>
+                @if($vm->canManage($u) && $vm->currentUser->id !== $u->id)
+                  <form method="POST"
+                        action="{{ route('administracion.usuarios.toggle', $u) }}"
+                        onsubmit="return confirm('Confirmas {{ $u->active ? 'desactivar' : 'activar' }} esta cuenta?')">
+                    @csrf
+                    @method('PATCH')
+                    <x-ui.button type="submit" variant="{{ $u->active ? 'danger' : 'success' }}" size="sm">
+                      {{ $u->active ? 'Desactivar' : 'Activar' }}
+                    </x-ui.button>
                   </form>
                 @endif
               </div>
 
-              {{-- Modal password --}}
-              <div class="modal fade" id="pw-usr-{{ $u->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                  <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}" class="modal-content">
-                    @csrf @method('PATCH')
-                    <div class="modal-header">
-                      <h6 class="modal-title w-100 text-center">
-                        <i class="bi bi-key me-1"></i> Cambiar contraseña — {{ $u->name }}
-                      </h6>
-                      <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body">
-                      <div class="row g-3 align-items-center">
-                        <div class="col-12 col-md-4 text-md-end">
-                          <label class="form-label mb-0">Nueva contraseña</label>
-                        </div>
-                        <div class="col-12 col-md-8">
-                          <div class="input-group">
-                            <input type="password" name="password" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
-                          </div>
+              @if($vm->canUpdatePassword($u))
+                <div id="pw-usr-{{ $u->id }}"
+                     class="fixed inset-0 z-50 hidden bg-slate-950/50 p-4"
+                     data-modal
+                     aria-hidden="true">
+                  <div class="mx-auto mt-20 max-w-md rounded-lg bg-white shadow-xl">
+                    <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}">
+                      @csrf
+                      @method('PATCH')
+
+                      <div class="border-b border-kp-border px-5 py-4">
+                        <h3 class="text-base font-bold text-kp-ink">Cambiar password</h3>
+                        <p class="mt-1 text-sm text-kp-muted">{{ $u->name }}</p>
+                      </div>
+
+                      <div class="space-y-4 p-5">
+                        <div data-password-field>
+                          <x-ui.input label="Nuevo password" name="password" type="password" minlength="6" required />
+                          <button type="button" class="mt-1 text-xs font-semibold text-kp-green" data-password-toggle>Ver</button>
                         </div>
 
-                        <div class="col-12 col-md-4 text-md-end">
-                          <label class="form-label mb-0">Confirmar contraseña</label>
-                        </div>
-                        <div class="col-12 col-md-8">
-                          <div class="input-group">
-                            <input type="password" name="password_confirmation" class="form-control" minlength="6" required>
-                            <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
-                          </div>
+                        <div data-password-field>
+                          <x-ui.input label="Confirmar password" name="password_confirmation" type="password" minlength="6" required />
+                          <button type="button" class="mt-1 text-xs font-semibold text-kp-green" data-password-toggle>Ver</button>
                         </div>
                       </div>
-                    </div>
-                    <div class="modal-footer justify-content-between">
-                      <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-                      <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Guardar</button>
-                    </div>
-                  </form>
+
+                      <div class="flex justify-between gap-2 border-t border-kp-border px-5 py-4">
+                        <x-ui.button type="button" variant="secondary" data-modal-close>Cancelar</x-ui.button>
+                        <x-ui.button type="submit">Guardar</x-ui.button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </div>
+              @endif
             </td>
           </tr>
         @empty
-          <tr><td colspan="6" class="text-center text-muted py-4">Sin usuarios.</td></tr>
+          <tr>
+            <td colspan="6" class="px-4 py-8 text-center text-sm text-kp-muted">Sin usuarios.</td>
+          </tr>
         @endforelse
-        </tbody>
-      </table>
-    </div>
+      </tbody>
+    </x-ui.table>
 
-    <div class="mt-2">
-      {{ $users->withQueryString()->links('pagination::bootstrap-5') }}
+    <div class="mt-4">
+      {{ $vm->users->withQueryString()->links() }}
     </div>
-  </div>
+  </x-ui.card>
 </div>
 
-{{-- Modal: Crear usuario --}}
-@php
-  $me = auth()->user();
-  $roleOptions = match($me->role){
-    'administrador' => ['supervisor'=>'Supervisor','asesor'=>'Asesor','soporte'=>'Soporte','usuario'=>'Usuario'],
-    'supervisor'    => ['asesor'=>'Asesor','soporte'=>'Soporte'],
-    'soporte'       => ['usuario'=>'Usuario'],
-    default         => [],
-  };
-@endphp
-<div class="modal fade" id="modalCreateUser" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" action="{{ route('administracion.usuarios.store') }}" class="modal-content" autocomplete="off">
+<div id="modalCreateUser"
+     class="fixed inset-0 z-50 hidden bg-slate-950/50 p-4"
+     data-modal
+     aria-hidden="true">
+  <div class="mx-auto mt-16 max-w-lg rounded-lg bg-white shadow-xl">
+    <form method="POST"
+          action="{{ route('administracion.usuarios.store') }}"
+          autocomplete="off"
+          data-create-user-form
+          data-current-role="{{ $vm->currentUser->role }}">
       @csrf
-      <div class="modal-header">
-        <h6 class="modal-title w-100 text-center"><i class="bi bi-person-plus me-1"></i> Crear usuario</h6>
-        <button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+
+      <div class="border-b border-kp-border px-5 py-4">
+        <h3 class="text-base font-bold text-kp-ink">Crear usuario</h3>
+        <p class="mt-1 text-sm text-kp-muted">Registra una cuenta nueva para el CRM.</p>
       </div>
-      <div class="modal-body vstack gap-3">
-        <div class="row g-3 align-items-center">
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Nombre</label></div>
-          <div class="col-12 col-md-8"><input name="name" class="form-control" required placeholder="Ej: Carlos López"></div>
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Email</label></div>
-          <div class="col-12 col-md-8"><input name="email" type="email" class="form-control" required placeholder="usuario@empresa.com"></div>
+      <div class="space-y-4 p-5">
+        <x-ui.input label="Nombre" name="name" required placeholder="Ej: Carlos Lopez" />
+        <x-ui.input label="Email" name="email" type="email" required placeholder="usuario@empresa.com" />
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Rol</label></div>
-          <div class="col-12 col-md-8">
-            <select name="role" class="form-select" required>
-              <option value="">Selecciona…</option>
-              @foreach($roleOptions as $val=>$label)
-                <option value="{{ $val }}">{{ $label }}</option>
+        <x-ui.select label="Rol" name="role" required>
+          <option value="">Selecciona...</option>
+          @foreach($vm->roleOptions() as $value => $label)
+            <option value="{{ $value }}">{{ $label }}</option>
+          @endforeach
+        </x-ui.select>
+
+        @if($vm->currentUser->role === 'supervisor')
+          <input type="hidden" name="supervisor_id" value="{{ $vm->currentUser->id }}">
+          <div class="hidden" data-supervisor-row></div>
+        @else
+          <div class="hidden" data-supervisor-row>
+            <x-ui.select label="Supervisor" name="supervisor_id">
+              <option value="">Selecciona...</option>
+              @foreach($vm->supervisorOptions() as $supervisor)
+                <option value="{{ $supervisor['id'] }}">{{ $supervisor['label'] }}</option>
               @endforeach
-            </select>
+            </x-ui.select>
           </div>
+        @endif
 
-          <div class="col-12 col-md-4 text-md-end"><label class="form-label mb-0">Contraseña</label></div>
-          <div class="col-12 col-md-8">
-            <div class="input-group">
-              <input name="password" type="password" class="form-control" required minlength="6" placeholder="Mínimo 6 caracteres">
-              <button class="btn btn-outline-secondary btn-eye" type="button"><i class="bi bi-eye"></i></button>
-            </div>
-          </div>
+        <div data-password-field>
+          <x-ui.input label="Password" name="password" type="password" required minlength="6" placeholder="Minimo 6 caracteres" />
+          <button type="button" class="mt-1 text-xs font-semibold text-kp-green" data-password-toggle>Ver</button>
         </div>
       </div>
-      <div class="modal-footer justify-content-between">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i> Crear</button>
+
+      <div class="flex justify-between gap-2 border-t border-kp-border px-5 py-4">
+        <x-ui.button type="button" variant="secondary" data-modal-close>Cancelar</x-ui.button>
+        <x-ui.button type="submit">Crear usuario</x-ui.button>
       </div>
     </form>
   </div>
 </div>
 @endsection
-
-@push('scripts')
-  <script>
-    window.ADMIN_ME_ROLE = @json(auth()->user()->role ?? 'usuario');
-    window.ADMIN_ME_ID   = @json(auth()->id() ?? null);
-    window.ADMIN_SUPERVISORES = @json(
-      ($supervisores ?? collect())->map(fn($s) => [
-        'id' => $s->id,
-        'label' => $s->name.' — '.$s->email
-      ])
-    );
-  </script>
-  <script src="{{ asset('js/admin/admin.js') }}" defer></script>
-@endpush

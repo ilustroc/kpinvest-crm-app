@@ -46,12 +46,15 @@ v3/analisis-documentacion
 En esta etapa se puede tocar:
 
 - Documentacion.
-- Configuracion local de frontend cuando se inicie la fase Tailwind/Vite.
-- Nuevos archivos de estructura V3, cuando se apruebe iniciar implementacion.
+- Configuracion local de frontend Tailwind/Vite.
+- Nuevos archivos de estructura V3.
+- Pantallas piloto de bajo riesgo.
+- Componentes Blade reutilizables.
+- Servicios y ViewModels piloto.
 - Tests locales.
 - Migraciones nuevas solo sobre base local.
 
-Cuando empiece implementacion, los cambios deben ser pequenos y revisables.
+Los cambios deben seguir siendo pequenos, revisables y reversibles.
 
 ## Que no se debe tocar todavia
 
@@ -96,10 +99,11 @@ Estado:
 - [+] Se usaran ViewModels para vistas complejas.
 - [+] Se usaran componentes Blade.
 - [+] Rutas separadas por modulo manteniendo URLs, nombres y middlewares actuales.
+- [+] Estructura backend por dominios creada.
+- [+] Servicio piloto creado en Admin.
+- [+] ViewModel piloto creado en Admin.
 - [ ] Controladores agrupados fisicamente por dominio.
-- [ ] Servicios organizados por dominio.
-- [ ] Actions creadas para operaciones puntuales.
-- [ ] ViewModels creados para vistas complejas.
+- [ ] Actions reales creadas para operaciones puntuales.
 
 Objetivo:
 
@@ -128,6 +132,9 @@ Resultado actual:
 - `routes/web/cna.php` contiene workflow y descargas CNA.
 - `routes/web/integracion.php` contiene importaciones.
 - `routes/web/admin.php` contiene administracion de usuarios.
+- `app/Services/*`, `app/Actions/*`, `app/ViewModels/*`, `app/DTOs/*` y `app/Support/*` ya tienen estructura base por dominio.
+- `app/Services/Admin/UserStatusService.php` separa una logica de administracion de bajo riesgo.
+- `app/ViewModels/Admin/UserIndexViewModel.php` prepara datos de la pantalla piloto de usuarios.
 
 ### Fase 3 - Tailwind CSS v4 con Vite
 
@@ -140,14 +147,22 @@ Objetivo:
 
 Checklist:
 
-- [ ] Revisar `package.json`.
-- [ ] Instalar `tailwindcss`.
-- [ ] Instalar `@tailwindcss/vite`.
-- [ ] Configurar `vite.config.js`.
-- [ ] Configurar `resources/css/app.css`.
-- [ ] Revisar `resources/js/app.js`.
-- [ ] Ejecutar `npm run dev`.
-- [ ] Ejecutar `npm run build`.
+- [+] Revisar `package.json`.
+- [+] Instalar `tailwindcss`.
+- [+] Instalar `@tailwindcss/vite`.
+- [+] Configurar `vite.config.js`.
+- [+] Configurar `resources/css/app.css`.
+- [+] Revisar `resources/js/app.js`.
+- [+] Ejecutar `npm run dev`.
+- [+] Ejecutar `npm run build`.
+
+Resultado actual:
+
+- `vite.config.js` usa `@tailwindcss/vite`.
+- `resources/css/app.css` importa Tailwind CSS v4.
+- `resources/js/app.js` importa modulos base de layout y administracion.
+- `@vite(['resources/css/app.css', 'resources/js/app.js'])` esta configurado en el layout principal.
+- `npm run build` se ejecuto correctamente.
 
 ### Fase 4 - Migracion progresiva de Bootstrap a Tailwind
 
@@ -159,16 +174,21 @@ Objetivo:
 
 Orden recomendado:
 
-1. Layout principal.
-2. Sidebar/topbar.
-3. Botones y badges.
-4. Formularios simples.
-5. Tablas simples.
-6. Administracion de usuarios.
+1. Layout principal. Estado: en progreso, con Vite activo y Bootstrap condicional para vistas legacy.
+2. Sidebar/topbar. Estado: primera version Tailwind creada como componentes Blade.
+3. Botones y badges. Estado: componentes base creados.
+4. Formularios simples. Estado: componentes base creados.
+5. Tablas simples. Estado: componente base creado.
+6. Administracion de usuarios. Estado: pantalla piloto migrada a Tailwind.
 7. Dashboard.
 8. Reportes.
 9. Clientes.
 10. CNA y Promesas al final.
+
+Regla actual:
+
+- Las vistas migradas pueden declarar `@section('tailwind_only', true)` para no cargar Bootstrap desde el layout.
+- Las vistas legacy siguen cargando Bootstrap de forma temporal para no romper modales, tablas o estilos pendientes.
 
 ### Fase 5 - Refactor backend por modulos
 
@@ -179,6 +199,13 @@ Objetivo:
 - Crear ViewModels.
 - Centralizar permisos.
 
+Avance:
+
+- Estructura de carpetas por dominio creada.
+- Servicio piloto `UserStatusService` creado para administracion.
+- ViewModel piloto `UserIndexViewModel` creado para la pantalla de usuarios.
+- `AdminUsersController` empezo a delegar logica simple sin cambiar rutas ni nombres.
+
 Regla:
 
 - No cambiar comportamiento visible mientras se refactoriza.
@@ -188,6 +215,16 @@ Regla:
 Objetivo:
 
 - Validar localmente todos los flujos criticos.
+
+Verificaciones tecnicas iniciales:
+
+- [+] `php artisan route:list --except-vendor`.
+- [+] `php artisan view:clear`.
+- [+] `php artisan cache:clear`.
+- [+] `php artisan view:cache`.
+- [+] `php -l` en PHP nuevo/modificado.
+- [+] `npm run build`.
+- [!] `php artisan test` requiere correccion: el test base espera HTTP 200 en `/`, pero la aplicacion responde 302 por flujo de autenticacion.
 
 Flujos minimos:
 
