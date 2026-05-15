@@ -1,66 +1,80 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# KP Invest CRM App
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplicacion CRM desarrollada en Laravel 10 para la gestion operativa de KP Invest: consulta de clientes, promesas de pago, solicitudes CNA, carga de data operativa, reportes y administracion de usuarios.
 
-## About Laravel
+Este repositorio contiene un sistema que ya funciona en produccion. La rama de trabajo para el analisis de version 3 es:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+```bash
+v3/analisis-documentacion
+```
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Estado del analisis
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Este documento y la carpeta `docs/` fueron preparados como diagnostico tecnico inicial para planificar una version 3 sin tocar la logica productiva.
 
-## Learning Laravel
+No se ejecutaron migraciones, seeders ni cambios de base de datos durante este analisis.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Punto critico sobre la base de datos
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+El archivo `u480021566_kpinvest_bd.sql` es la referencia principal de la estructura real de produccion. Las migraciones actuales en `database/migrations/` no representan todo el historial ni toda la estructura real del esquema, por lo que no deben ejecutarse sin una estrategia de normalizacion y respaldo.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Documentacion tecnica
 
-## Laravel Sponsors
+- [01 - Descripcion general](docs/01_descripcion_general.md)
+- [02 - Estructura del proyecto](docs/02_estructura_proyecto.md)
+- [03 - Base de datos](docs/03_base_de_datos.md)
+- [04 - Modulos funcionales](docs/04_modulos_funcionales.md)
+- [05 - Rutas y controladores](docs/05_rutas_y_controladores.md)
+- [06 - Diagnostico tecnico](docs/06_diagnostico_tecnico.md)
+- [07 - Recomendaciones V3](docs/07_recomendaciones_v3.md)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Stack principal
 
-### Premium Partners
+- PHP 8.1 o superior, con plataforma Composer fijada a PHP 8.3.0.
+- Laravel Framework 10.x.
+- MySQL/MariaDB.
+- Bootstrap 5 por CDN en las vistas.
+- Vite disponible para assets, aunque gran parte del frontend se sirve desde `public/css` y `public/js`.
+- PhpSpreadsheet para exportaciones Excel.
+- PhpWord y DomPDF/mPDF/iLovePDF para generacion o conversion de documentos.
+- Sanctum instalado, aunque el uso principal del sistema es via sesion web.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+## Modulos principales
 
-## Contributing
+- Autenticacion y control de usuarios activos.
+- Panel/resumen operativo.
+- Dashboard estadistico.
+- Consulta de clientes y cuentas.
+- Promesas de pago y flujo de aprobacion.
+- Solicitudes CNA y generacion de documentos.
+- Reportes de pagos, promesas y CNA.
+- Integraciones CSV para data, asignaciones, CCD y pagos.
+- Administracion de usuarios por rol.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Reglas de seguridad para trabajar en V3
 
-## Code of Conduct
+- No modificar `main` directamente.
+- No ejecutar `php artisan migrate` contra la base real.
+- No asumir que las migraciones actuales reconstruyen produccion.
+- No eliminar columnas, tablas ni relaciones sin comparacion previa contra el SQL real.
+- No cambiar controladores, modelos, rutas ni vistas productivas sin pruebas y respaldo.
+- No exponer valores reales de `.env` en documentacion o commits.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Comandos utiles para inventario local
 
-## Security Vulnerabilities
+Estos comandos son seguros para inspeccion y no alteran la base de datos:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan route:list
+composer install
+npm install
+npm run build
+```
 
-## License
+Evitar por ahora:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan migrate
+php artisan migrate:fresh
+php artisan db:seed
+```
