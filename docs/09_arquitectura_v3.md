@@ -1,342 +1,135 @@
 # 09 - Arquitectura V3
 
-## Arquitectura actual detectada
+## Decision oficial de arquitectura
 
-El proyecto usa una arquitectura Laravel MVC tradicional:
-
-- Rutas en `routes/web.php`.
-- Controladores en `app/Http/Controllers`.
-- Modelos Eloquent en `app/Models`.
-- Vistas Blade en `resources/views`.
-- Servicios para algunas areas especificas.
-- Imports/exports separados en `app/Imports` y `app/Exports`.
-
-El patron actual funciona, pero algunas pantallas crecieron demasiado. La logica de negocio, acceso a datos, formateo para vistas, permisos y generacion de documentos estan mezclados en varios controladores y vistas grandes.
-
-## Problemas de la arquitectura actual
-
-- `routes/web.php` concentra todos los modulos.
-- Controladores grandes mezclan responsabilidades.
-- Algunas vistas tienen demasiado HTML, CSS y JavaScript.
-- Hay logica de permisos repetida.
-- Los servicios existen, pero no siguen una convencion uniforme.
-- El frontend esta mezclado entre CDN, CSS en layout, `public/js`, scripts embebidos y Vite.
-- La estructura de base de datos no esta representada por migraciones completas.
-
-## Opciones evaluadas
-
-### MVC tradicional de Laravel
-
-Consiste en mantener rutas, controladores, modelos y vistas siguiendo la estructura basica de Laravel.
-
-Ventajas:
-
-- Es simple.
-- El equipo Laravel lo entiende facilmente.
-- No requiere crear muchas capas.
-- Encaja con Blade y Eloquent.
-
-Desventajas:
-
-- Si no se controla, los controladores crecen demasiado.
-- Las vistas pueden concentrar mucha logica.
-- Los modulos quedan mezclados.
-
-Uso recomendado:
-
-- Mantenerlo como base, pero ordenarlo por modulos y servicios.
-
-### MVC modular por dominios
-
-Agrupa controladores, vistas, servicios y rutas segun modulos funcionales: clientes, promesas, CNA, reportes, integracion, admin.
-
-Ventajas:
-
-- Encaja muy bien con un CRM interno.
-- Permite avanzar por partes.
-- Reduce mezcla entre modulos.
-- No exige una reescritura total.
-
-Desventajas:
-
-- Requiere convenciones claras.
-- Puede duplicar patrones si no se documenta.
-
-Uso recomendado:
-
-- Es la base mas conveniente para V3.
-
-### Arquitectura por capas
-
-Separa responsabilidades por capas:
-
-- HTTP/controllers.
-- Servicios/casos de uso.
-- Modelos/repositorios.
-- Vistas/ViewModels.
-
-Ventajas:
-
-- Ordena dependencias.
-- Facilita pruebas.
-- Reduce controladores pesados.
-
-Desventajas:
-
-- Puede volverse burocratica si se aplica con rigidez.
-- No todo necesita una clase nueva.
-
-Uso recomendado:
-
-- Aplicarla de forma ligera, especialmente en flujos criticos.
-
-### Clean Architecture ligera
-
-Busca separar dominio, casos de uso, infraestructura y presentacion.
-
-Ventajas:
-
-- Muy testeable.
-- Independiza reglas de negocio.
-- Buena para sistemas grandes y con mucho cambio.
-
-Desventajas:
-
-- Puede ser demasiado compleja para este CRM si se aplica completa.
-- Puede alejarse de las convenciones naturales de Laravel.
-- Aumenta cantidad de archivos y decisiones.
-
-Uso recomendado:
-
-- No aplicar Clean Architecture completa.
-- Tomar ideas utiles: casos de uso, DTOs simples, servicios, dependencias claras.
-
-### Arquitectura basada en servicios
-
-Extrae logica de negocio desde controladores hacia clases en `app/Services`.
-
-Ventajas:
-
-- Encaja con el codigo actual.
-- Permite refactor gradual.
-- Reduce riesgo.
-- Facilita pruebas unitarias.
-
-Desventajas:
-
-- Si todo se llama "Service", puede crecer sin orden.
-- Requiere separar servicios por modulo.
-
-Uso recomendado:
-
-- Usarla como herramienta principal, pero organizada por dominio.
-
-### Arquitectura modular por modulos funcionales
-
-Organiza el sistema por areas reales del negocio:
-
-- Cliente.
-- Promesa.
-- CNA.
-- Reporte.
-- Integracion.
-- Admin.
-- Documento.
-
-Ventajas:
-
-- Es facil de entender para negocio y desarrollo.
-- Permite trabajar modulo por modulo.
-- Evita una reescritura total.
-- Es compatible con Laravel, Blade, Tailwind y Vite.
-
-Desventajas:
-
-- Requiere disciplina para no mezclar modulos.
-- Algunos modelos seguiran siendo compartidos.
-
-Uso recomendado:
-
-- Es la arquitectura recomendada para V3.
-
-## Arquitectura recomendada para V3
-
-Recomendacion:
+La arquitectura oficial para V3 sera:
 
 ```text
-MVC modular por dominios + servicios + acciones puntuales + componentes Blade.
+MVC modular por dominios + Services + Actions + ViewModels + componentes Blade.
 ```
 
-No se recomienda una Clean Architecture completa. El proyecto es un CRM interno ya productivo, por lo que conviene una arquitectura realista, gradual y cercana a Laravel.
+Esta decision queda confirmada para guiar el resto del trabajo.
 
-La idea es:
+## Estado de implementacion de Fase 2
 
-- Mantener Laravel como backend principal.
+Primer avance completado:
+
+- [+] `routes/web.php` quedo como agregador.
+- [+] Se crearon archivos de rutas por dominio en `routes/web/`.
+- [+] Se mantuvieron los mismos controladores actuales.
+- [+] Se mantuvieron las mismas URLs.
+- [+] Se mantuvieron los mismos nombres de rutas.
+- [+] Se mantuvieron los mismos middlewares.
+- [+] `php artisan route:list --except-vendor` lista correctamente las rutas.
+
+Pendiente:
+
+- [ ] Mover controladores a carpetas por dominio.
+- [ ] Crear servicios por dominio donde falten.
+- [ ] Crear actions para operaciones puntuales.
+- [ ] Crear ViewModels para vistas complejas.
+- [ ] Centralizar Policies/Gates.
+
+Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
+
+## Por que esta arquitectura
+
+El proyecto es un CRM interno de cobranzas que ya esta funcionando en produccion. Por eso la arquitectura debe mejorar el orden sin convertir el sistema en una reescritura riesgosa.
+
+La opcion elegida permite:
+
+- Mantener Laravel como base natural del proyecto.
 - Mantener Blade como sistema de vistas.
-- Separar rutas por modulo.
-- Agrupar controladores por dominio.
-- Extraer logica de negocio a servicios.
-- Usar Actions para operaciones concretas.
-- Usar ViewModels para pantallas complejas.
-- Usar Policies/Gates para permisos.
-- Usar componentes Blade para UI repetida.
-- Gestionar CSS/JS con Tailwind y Vite.
+- Ordenar el codigo por dominios funcionales.
+- Reducir controladores grandes.
+- Separar logica de negocio.
+- Preparar pruebas.
+- Migrar frontend por etapas.
+- Evitar complejidad innecesaria.
 
-## Separacion de responsabilidades
+## Por que no se usara Clean Architecture completa
 
-### Controladores
+Clean Architecture completa seria demasiado pesada para este caso porque:
 
-Responsabilidad:
+- Aumentaria mucho la cantidad de clases.
+- Exigiria separar infraestructura, dominio y casos de uso con mucha rigidez.
+- Podria alejar el proyecto de convenciones Laravel.
+- Haria mas lento el refactor inicial.
+- Aumentaria el riesgo de romper flujos productivos.
 
-- Recibir request.
-- Validar o usar Form Requests.
-- Llamar servicios/actions.
-- Retornar vistas, redirects o JSON.
+V3 tomara ideas utiles de Clean Architecture, pero de forma ligera:
 
-No deberian:
+- Casos de uso claros.
+- Servicios testeables.
+- Actions puntuales.
+- Dependencias ordenadas.
+- ViewModels para vistas complejas.
 
-- Generar documentos directamente.
-- Armar consultas complejas extensas.
-- Tener reglas de negocio largas.
-- Formatear toda la data de una vista compleja.
+## Arquitectura actual detectada
 
-### Servicios
+Actualmente el sistema se parece a un MVC tradicional:
 
-Responsabilidad:
+- `routes/web.php` concentra las rutas.
+- `app/Http/Controllers` concentra controladores de todos los modulos.
+- `app/Models` contiene modelos Eloquent.
+- `app/Services` ya existe, pero no esta organizado completamente por dominio.
+- `resources/views` contiene vistas Blade.
+- El frontend mezcla Bootstrap, CSS embebido, JS embebido, archivos en `public/` y Vite.
 
-- Reglas de negocio.
-- Orquestacion de consultas.
-- Calculos.
-- Procesos reutilizables.
+El sistema funciona, pero necesita orden modular.
 
-Ejemplos:
+## Problemas actuales que V3 debe resolver
 
-- `ClienteProfileService`
-- `PromesaWorkflowService`
-- `CnaDocumentService`
-- `PaymentReportService`
+- Controladores grandes con muchas responsabilidades.
+- Vistas muy extensas con HTML, JS y reglas visuales mezcladas.
+- Rutas en un solo archivo.
+- Permisos repartidos en rutas, controladores y vistas.
+- Frontend repartido entre Bootstrap CDN, CSS en layout, `public/js` y Vite.
+- Poca cobertura de pruebas.
+- Migraciones no alineadas con la base real.
 
-### Actions
+## Estructura recomendada
 
-Responsabilidad:
-
-- Ejecutar una accion puntual con nombre claro.
-
-Ejemplos:
-
-- `CreatePromesaAction`
-- `ApproveCnaAction`
-- `RejectPromesaAction`
-- `ImportPagosAction`
-
-### ViewModels
-
-Responsabilidad:
-
-- Preparar datos para vistas complejas sin llenar el controlador.
-
-Ejemplos:
-
-- `ClienteShowViewModel`
-- `AutorizacionIndexViewModel`
-- `DashboardViewModel`
-
-### Models
-
-Responsabilidad:
-
-- Representar tablas.
-- Relaciones Eloquent.
-- Casts.
-- Scopes simples.
-- Accessors realmente propios del modelo.
-
-No deberian:
-
-- Contener logica extensa de workflow.
-- Hacer consultas de reportes complejas.
-
-### Policies/Gates
-
-Responsabilidad:
-
-- Autorizar acciones.
-- Centralizar permisos por rol.
-
-Ejemplos:
-
-- `PromesaPolicy`
-- `CnaPolicy`
-- `ClientePolicy`
-- `UserPolicy`
-
-## Propuesta de carpetas
+### Backend
 
 ```text
 app/
   Http/
     Controllers/
       Cliente/
-        ClienteController.php
-        ClienteLookupController.php
       Promesa/
-        PromesaController.php
-        PromesaDocumentoController.php
       Cna/
-        CnaController.php
-        CnaDocumentoController.php
       Reporte/
-        ReportePagosController.php
-        ReportePromesasController.php
-        ReporteCnaController.php
       Integracion/
-        IntegracionDataController.php
-        IntegracionPagosController.php
-        IntegracionCcdController.php
-        IntegracionAsignacionController.php
       Admin/
-        AdminUsersController.php
       Dashboard/
-        PanelController.php
-        DashboardController.php
+
   Services/
     Cliente/
-      ClienteProfileService.php
-      ClienteLookupService.php
     Promesa/
-      PromesaCreator.php
-      PromesaWorkflowService.php
-      PromesaDocumentService.php
     Cna/
-      CnaCreatorService.php
-      CnaWorkflowService.php
-      CnaNumberingService.php
-      CnaDocumentService.php
     Reporte/
-      PaymentReportService.php
-      PromiseReportService.php
-      CnaReportService.php
-    Importacion/
-      DataImportService.php
-      PagosImportService.php
-      CcdImportService.php
-      AsignacionImportService.php
+    Integracion/
     Documento/
-      DocxTemplateService.php
-      PdfConversionService.php
+
   Actions/
+    Cliente/
     Promesa/
     Cna/
     Importacion/
+
   ViewModels/
     Cliente/
-    Autorizacion/
+    Promesa/
+    Cna/
+    Reporte/
     Dashboard/
+
   Models/
   Policies/
 ```
 
-Rutas:
+### Rutas
 
 ```text
 routes/
@@ -351,7 +144,19 @@ routes/
     dashboard.php
 ```
 
-Vistas:
+`routes/web.php` debe quedar como archivo agregador:
+
+```php
+require __DIR__.'/web/dashboard.php';
+require __DIR__.'/web/clientes.php';
+require __DIR__.'/web/promesas.php';
+require __DIR__.'/web/cna.php';
+require __DIR__.'/web/reportes.php';
+require __DIR__.'/web/integracion.php';
+require __DIR__.'/web/admin.php';
+```
+
+### Vistas y assets
 
 ```text
 resources/
@@ -365,14 +170,7 @@ resources/
     integracion/
     admin/
     dashboard/
-```
 
-Assets:
-
-```text
-resources/
-  css/
-    app.css
   js/
     app.js
     modules/
@@ -382,55 +180,229 @@ resources/
       reportes/
       integracion/
       admin/
+
+  css/
+    app.css
 ```
 
-Documentacion:
+## Flujo recomendado
+
+El flujo general debe ser:
 
 ```text
-docs/
-  arquitectura/
-  base_datos/
-  frontend/
-  backend/
-  despliegue/
+Route -> Controller -> Service/Action -> Model -> ViewModel -> Blade View
 ```
 
-## Ejemplo de flujo recomendado
-
-Pantalla cliente:
+Ejemplo para clientes:
 
 ```text
 Route /clientes/{dni}
   -> ClienteController@show
-    -> ClienteProfileService::build($dni, $user)
-      -> ClienteCuenta, PagoPropia, CcdCliente, PromesaPago, CnaSolicitud
+    -> ClienteProfileService
+      -> Models
     -> ClienteShowViewModel
     -> resources/views/clientes/show.blade.php
-      -> componentes Blade
-      -> JS de resources/js/modules/clientes/show.js
 ```
 
-El controlador queda pequeno:
+Ejemplo resumido:
 
-```php
-public function show(string $dni, ClienteProfileService $service)
-{
-    $profile = $service->build($dni, auth()->user());
-
-    return view('clientes.show', [
-        'vm' => new ClienteShowViewModel($profile),
-    ]);
-}
+```text
+ClienteController -> ClienteProfileService -> ClienteShowViewModel -> clientes/show.blade.php
 ```
 
-## Principio guia
+## Responsabilidades por capa
 
-Cada cambio V3 debe responder:
+### Routes
+
+Responsabilidad:
+
+- Definir URLs.
+- Agrupar middlewares.
+- Apuntar a controladores.
+
+No deben:
+
+- Tener logica de negocio.
+- Tener consultas.
+
+### Controllers
+
+Responsabilidad:
+
+- Recibir request.
+- Validar entrada o usar Form Requests.
+- Llamar Services o Actions.
+- Retornar View, Redirect o JSON.
+
+No deben:
+
+- Armar consultas largas.
+- Generar documentos directamente.
+- Resolver todo el estado de una vista compleja.
+- Contener reglas extensas de negocio.
+
+### Services
+
+Responsabilidad:
+
+- Orquestar logica de negocio.
+- Consultar modelos.
+- Calcular datos.
+- Preparar resultados reutilizables.
+
+Ejemplos:
+
+- `ClienteProfileService`
+- `PromesaWorkflowService`
+- `CnaNumberingService`
+- `PaymentReportService`
+
+### Actions
+
+Responsabilidad:
+
+- Ejecutar operaciones puntuales.
+
+Ejemplos:
+
+- `CreatePromesaAction`
+- `ApproveCnaAction`
+- `RejectPromesaAction`
+- `ImportPagosAction`
+
+### ViewModels
+
+Responsabilidad:
+
+- Preparar datos para Blade.
+- Formatear informacion de pantalla.
+- Evitar que el controlador llene arrays enormes.
+
+Ejemplos:
+
+- `ClienteShowViewModel`
+- `PromesaIndexViewModel`
+- `CnaAuthorizationViewModel`
+- `DashboardViewModel`
+
+### Models
+
+Responsabilidad:
+
+- Representar tablas.
+- Definir relaciones.
+- Definir casts.
+- Definir scopes simples.
+
+No deben:
+
+- Contener flujos completos de workflow.
+- Generar documentos.
+- Enviar correos directamente.
+
+### Policies
+
+Responsabilidad:
+
+- Centralizar permisos.
+- Reducir validaciones de rol repetidas.
+
+Ejemplos:
+
+- `ClientePolicy`
+- `PromesaPolicy`
+- `CnaPolicy`
+- `UserPolicy`
+
+## Modulos funcionales
+
+### Cliente
+
+Incluye:
+
+- Busqueda.
+- Perfil del cliente.
+- Cuentas.
+- Pagos relacionados.
+- Promesas del cliente.
+- CNA del cliente.
+- CCD.
+
+### Promesa
+
+Incluye:
+
+- Creacion.
+- Cronograma.
+- Workflow.
+- Acuerdo/documento.
+
+### CNA
+
+Incluye:
+
+- Creacion.
+- Numeracion.
+- Workflow.
+- Generacion DOCX/PDF.
+- Descargas.
+
+### Reporte
+
+Incluye:
+
+- Pagos.
+- Promesas.
+- CNA.
+- Exports.
+- Facets/filtros.
+
+### Integracion
+
+Incluye:
+
+- Data maestra.
+- Pagos.
+- Asignaciones.
+- CCD.
+
+### Admin
+
+Incluye:
+
+- Usuarios.
+- Roles.
+- Activacion/desactivacion.
+- Cambio de contrasena.
+
+### Dashboard
+
+Incluye:
+
+- Panel resumen.
+- Estadisticas.
+- KPIs.
+
+## Regla de migracion arquitectonica
+
+No mover todo al mismo tiempo.
+
+Orden recomendado:
+
+1. Separar rutas por modulo.
+2. Crear carpetas nuevas.
+3. Mover controladores solo cuando existan pruebas o validacion manual clara.
+4. Extraer servicios sin cambiar comportamiento.
+5. Crear ViewModels para pantallas grandes.
+6. Crear componentes Blade.
+7. Migrar JS por modulo.
+
+## Principio final
+
+Cada cambio debe responder:
 
 - Que modulo toca.
-- Que riesgo productivo tiene.
-- Que prueba lo cubre.
-- Que rollback existe.
-
-Si una nueva capa no reduce riesgo ni mejora claridad, no debe agregarse.
-
+- Que comportamiento mantiene.
+- Que riesgo tiene.
+- Como se prueba.
+- Como se revierte.

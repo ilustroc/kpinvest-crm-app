@@ -1,41 +1,109 @@
 # 12 - Checklist Deploy V3
 
-## Objetivo
+## Formato del checklist
 
-Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. No reemplaza una estrategia de deploy formal, pero reduce el riesgo de romper el CRM productivo.
+- [+] Confirmado.
+- [ ] Pendiente.
+- [!] Riesgo o requiere revision.
 
 ## 1. Rama y codigo
 
-- [+] Confirmar que el trabajo esta en `v3/analisis-documentacion` o rama V3 aprobada.
+- [+] Confirmar que el trabajo esta en rama V3.
 - [+] Confirmar que `main` no fue modificado directamente.
 - [ ] Confirmar que el PR o merge contiene solo cambios esperados.
 - [ ] Revisar que no haya archivos temporales, logs o dumps sensibles versionados.
 - [ ] Revisar que `.env` no este incluido en commits.
 - [ ] Revisar `git diff` completo antes de merge.
 
-## 2. Backup y dump reciente
+## 2. Base de datos local
 
-- [ ] Confirmar backup reciente de produccion.
-- [ ] Confirmar que el backup incluye datos y estructura.
-- [ ] Descargar dump actualizado de produccion.
-- [ ] Guardar el dump en ubicacion segura.
-- [ ] Importar el dump en local o staging.
-- [ ] Confirmar que local/staging apunta a base de prueba, no a produccion.
+- [+] Dump descargado desde produccion.
+- [+] Base de datos importada en local.
+- [+] Proyecto funcionando en localhost.
+- [+] `.env` local apunta a base local.
+- [+] Produccion no sera modificada en esta fase.
+- [ ] Validar flujos actuales contra la base local.
+- [ ] Documentar diferencias detectadas entre SQL, modelos y migraciones.
 
-## 3. Migraciones
+## 3. Arquitectura
+
+- [+] Arquitectura V3 definida como MVC modular por dominios.
+- [+] Se mantendra Laravel.
+- [+] Se mantendra Blade.
+- [+] Se usaran Services.
+- [+] Se usaran Actions donde aplique.
+- [+] Se usaran ViewModels para vistas complejas.
+- [+] Se usaran componentes Blade.
+- [+] Separar rutas por modulo.
+- [ ] Crear estructura de carpetas por dominios.
+- [ ] Definir Policies/Gates por modulo critico.
+- [!] No mover controladores criticos sin pruebas o validacion funcional.
+
+## 4. Frontend V3
+
+- [+] Se define Tailwind CSS v4 como frontend objetivo.
+- [+] Se usara Vite.
+- [+] Bootstrap sera eliminado progresivamente.
+- [ ] Instalar Tailwind CSS v4.
+- [ ] Configurar `vite.config.js`.
+- [ ] Configurar `resources/css/app.css`.
+- [ ] Revisar `resources/js/app.js`.
+- [ ] Ejecutar `npm run build`.
+- [ ] Eliminar Bootstrap del layout principal.
+- [ ] Reemplazar componentes Bootstrap por Tailwind.
+- [!] No eliminar Bootstrap globalmente antes de migrar modales/dropdowns dependientes.
+
+## 5. Checklist de instalacion Tailwind CSS v4
+
+- [ ] Revisar `package.json`.
+- [ ] Instalar Tailwind CSS v4.
+- [ ] Instalar `@tailwindcss/vite`.
+- [ ] Configurar `vite.config.js`.
+- [ ] Actualizar `resources/css/app.css`.
+- [ ] Confirmar `@vite` en layout.
+- [ ] Ejecutar `npm run dev`.
+- [ ] Ejecutar `npm run build`.
+- [ ] Confirmar `public/build/manifest.json`.
+- [ ] Confirmar que el layout carga CSS.
+- [ ] Confirmar que el layout carga JS.
+- [ ] Retirar Bootstrap CDN.
+- [ ] Revisar errores en consola.
+- [ ] Migrar primera pantalla piloto.
+
+## 6. Bootstrap -> Tailwind
+
+- [ ] Migrar layout principal.
+- [ ] Migrar sidebar/topbar.
+- [ ] Migrar botones.
+- [ ] Migrar badges.
+- [ ] Migrar formularios simples.
+- [ ] Migrar tablas simples.
+- [ ] Migrar administracion de usuarios.
+- [ ] Migrar dashboard.
+- [ ] Migrar reportes.
+- [ ] Migrar clientes.
+- [ ] Migrar CNA.
+- [ ] Migrar promesas.
+- [!] CNA y Promesas deben quedar al final por criticidad.
+- [!] Clientes debe migrarse solo cuando exista validacion funcional suficiente.
+
+## 7. Migraciones
 
 - [ ] Revisar migraciones nuevas una por una.
 - [ ] Confirmar que no eliminan datos sin respaldo.
 - [ ] Confirmar que no eliminan columnas usadas por codigo actual.
-- [ ] Ejecutar migraciones sobre copia local reciente.
+- [ ] Ejecutar migraciones solo sobre copia local reciente.
 - [ ] Ejecutar `php artisan migrate:status` en local/staging.
 - [ ] Comparar estructura antes/despues.
 - [ ] Confirmar indices y claves foraneas.
 - [ ] Probar rollback si aplica.
 - [ ] Confirmar si se requieren seeders.
 - [ ] Si se requieren seeders, confirmar que son idempotentes.
+- [!] No correr `php artisan migrate` en produccion todavia.
+- [!] No correr `php artisan migrate:fresh` sobre bases con informacion.
+- [!] No correr seeders en produccion sin revision.
 
-## 4. Pruebas funcionales
+## 8. Pruebas funcionales
 
 - [ ] Login correcto.
 - [ ] Login bloqueado para usuario inactivo.
@@ -71,21 +139,21 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Activar/desactivar usuarios.
 - [ ] Cambiar contrasena.
 
-## 5. Frontend y assets
+## 9. Assets y build
 
 - [ ] Ejecutar `npm install` si cambiaron dependencias.
 - [ ] Ejecutar `npm run build`.
-- [ ] Confirmar que existe `public/build/manifest.json`.
+- [ ] Confirmar `public/build/manifest.json`.
 - [ ] Confirmar que las vistas cargan CSS.
 - [ ] Confirmar que las vistas cargan JS.
 - [ ] Confirmar que no hay errores en consola del navegador.
 - [ ] Confirmar que modales funcionan.
 - [ ] Confirmar que filtros AJAX funcionan.
 - [ ] Confirmar que paginacion AJAX funciona.
-- [ ] Confirmar que layout funciona en desktop.
-- [ ] Confirmar que layout funciona en resolucion movil si aplica.
+- [ ] Confirmar desktop.
+- [ ] Confirmar mobile si aplica.
 
-## 6. Configuracion de produccion
+## 10. Configuracion de produccion
 
 - [ ] Confirmar `APP_ENV=production`.
 - [ ] Confirmar `APP_DEBUG=false`.
@@ -99,7 +167,7 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Confirmar enlace storage si aplica.
 - [ ] Confirmar cache config/rutas si se usa.
 
-## 7. Plantillas y documentos
+## 11. Plantillas y documentos
 
 - [ ] Confirmar existencia de `storage/app/templates/Acuerdo_de_Pago_DNI_{dni}.docx`.
 - [ ] Confirmar existencia de plantilla CNA KP Invest.
@@ -109,7 +177,7 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Probar conversion PDF.
 - [ ] Validar fallback si iLovePDF falla.
 
-## 8. Usuarios, roles y permisos
+## 12. Usuarios, roles y permisos
 
 - [ ] Confirmar roles existentes: administrador, supervisor, asesor, sistemas, soporte, usuario.
 - [ ] Confirmar usuarios administradores activos.
@@ -121,7 +189,7 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Confirmar acceso a reportes.
 - [ ] Confirmar acceso a autorizaciones.
 
-## 9. Logs y monitoreo
+## 13. Logs y monitoreo
 
 - [ ] Revisar `storage/logs` en local/staging despues de pruebas.
 - [ ] Confirmar que no hay errores nuevos.
@@ -130,7 +198,7 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Confirmar que imports reportan errores utiles.
 - [ ] Preparar monitoreo post-deploy.
 
-## 10. Rollback
+## 14. Rollback
 
 - [ ] Definir plan para volver al commit anterior.
 - [ ] Definir plan para restaurar backup de base de datos.
@@ -139,9 +207,10 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Confirmar que migraciones nuevas tienen `down` seguro o plan manual.
 - [ ] Confirmar que assets anteriores pueden restaurarse.
 
-## 11. Antes de ejecutar en produccion
+## 15. Antes de ejecutar en produccion
 
 - [ ] El equipo reviso y aprobo el cambio.
+- [ ] Se descargo dump actualizado de produccion.
 - [ ] Se probo sobre dump reciente.
 - [ ] Se aprobo checklist funcional.
 - [ ] Se aprobo checklist de assets.
@@ -149,8 +218,9 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 - [ ] Existe backup reciente.
 - [ ] Existe rollback.
 - [ ] Se definio ventana de deploy.
+- [!] Si falla una prueba local sobre copia reciente, no desplegar.
 
-## 12. Despues del deploy
+## 16. Despues del deploy
 
 - [ ] Limpiar caches si corresponde.
 - [ ] Verificar login.
@@ -166,4 +236,3 @@ Este checklist debe revisarse antes de pasar cualquier cambio V3 a produccion. N
 ## Regla final
 
 Si una migracion, build o prueba funcional falla sobre una copia reciente de produccion, no se debe ejecutar el cambio en produccion real.
-

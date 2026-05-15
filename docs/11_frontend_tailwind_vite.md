@@ -1,265 +1,341 @@
-# 11 - Frontend con Tailwind CSS y Vite
+# 11 - Frontend con Tailwind CSS v4 y Vite
 
-## Situacion actual del frontend
+## Decision frontend V3
+
+La V3 migrara progresivamente desde Bootstrap hacia Tailwind CSS v4 usando Vite.
+
+El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
+
+- Sin cambiar flujos funcionales.
+- Sin redisenar todo de golpe.
+- Sin romper pantallas criticas.
+- Migrando primero layout y componentes base.
+
+## Situacion actual
 
 El frontend actual usa:
 
-- Blade como sistema de vistas.
-- Bootstrap 5 y Bootstrap Icons via CDN.
+- Blade.
+- Bootstrap 5 via CDN.
+- Bootstrap Icons via CDN.
 - Google Fonts via CDN.
 - Chart.js via CDN en algunas vistas.
 - CSS embebido en `resources/views/layouts/app.blade.php`.
-- CSS separado en `public/css`.
-- JS separado en `public/js`.
-- JS embebido en vistas grandes como `clientes/show.blade.php` y `panel/resumen.blade.php`.
-- Vite instalado, pero no usado como unica fuente de assets.
+- CSS en `public/css`.
+- JS en `public/js`.
+- JS embebido en vistas grandes.
+- Vite instalado, pero no como unico canal de assets.
 
-La interfaz funciona, pero la mezcla de fuentes de CSS/JS dificulta mantener una identidad visual consistente.
+## Problemas actuales
 
-## Problemas detectados
+- Dependencia fuerte de Bootstrap.
+- CSS global dentro del layout.
+- JS embebido dificil de mantener.
+- Vistas demasiado grandes.
+- Componentes visuales repetidos.
+- Assets repartidos entre CDN, `public/` y Vite.
+- Dificultad para redisenar de forma consistente.
 
-- Estilos globales embebidos en el layout.
-- Vistas muy grandes con HTML, JS y reglas visuales mezcladas.
-- JavaScript repetido en reportes.
-- Assets repartidos entre `public/`, CDN y Vite.
-- Dificultad para redisenar sin afectar funcionalidad.
-- Menor control sobre versionado y build de dependencias frontend.
+## Objetivo de Tailwind CSS v4
 
-## Por que usar Tailwind CSS
+Tailwind CSS v4 sera la base visual objetivo.
 
-Tailwind CSS conviene para V3 porque:
+Se usara para:
 
-- Permite construir una interfaz consistente sin escribir grandes archivos CSS manuales.
-- Funciona bien con Blade.
-- Facilita crear componentes reutilizables.
-- Reduce estilos globales impredecibles.
-- Permite migracion gradual pantalla por pantalla.
-- Encaja con un CRM interno donde se necesitan tablas, filtros, paneles y formularios densos.
+- Layout principal.
+- Sidebar/topbar.
+- Botones.
+- Badges.
+- Formularios.
+- Tablas.
+- Cards.
+- Modales.
+- Estados de workflow.
+- Componentes reutilizables.
 
-Tailwind no debe usarse para redisenar todo de golpe. Debe entrar de forma progresiva.
+## Objetivo de Vite
 
-## Por que usar Vite
-
-Vite ya esta disponible en el proyecto y debe convertirse en la herramienta principal para:
+Vite sera el canal principal para:
 
 - Compilar Tailwind.
-- Gestionar `resources/css/app.css`.
-- Gestionar `resources/js/app.js`.
+- Cargar `resources/css/app.css`.
+- Cargar `resources/js/app.js`.
 - Separar JS por modulos.
-- Versionar assets con build.
-- Evitar scripts embebidos innecesarios.
+- Generar assets versionados en `public/build`.
 
-Beneficios:
+## Archivos que se deben revisar
 
-- Builds reproducibles.
-- Mejor cache busting.
-- Menos dependencia de archivos sueltos en `public/js`.
-- Mejor organizacion para V3.
+Antes de instalar o cambiar assets:
 
-## Organizacion propuesta de assets
+- `package.json`
+- `package-lock.json`
+- `vite.config.js`
+- `resources/views/layouts/app.blade.php`
+- `resources/css/app.css`
+- `resources/js/app.js`
+- Vistas que cargan Bootstrap por CDN.
+- Vistas que tienen scripts embebidos.
+- Archivos actuales en `public/css`.
+- Archivos actuales en `public/js`.
 
-```text
-resources/
-  css/
-    app.css
-    modules/
-      clientes.css
-      reportes.css
-  js/
-    app.js
-    bootstrap.js
-    modules/
-      clientes/
-        show.js
-        promesa-form.js
-        cna-form.js
-      promesas/
-        workflow.js
-      cna/
-        workflow.js
-        documentos.js
-      reportes/
-        filters.js
-        pagos.js
-        promesas.js
-        cna.js
-      integracion/
-        imports.js
-      admin/
-        users.js
+## Archivos que se deben modificar primero
+
+En la fase inicial Tailwind/Vite:
+
+- `package.json`, mediante instalacion npm.
+- `package-lock.json`, generado por npm.
+- `vite.config.js`.
+- `resources/css/app.css`.
+- `resources/js/app.js`, solo si hace falta organizar imports base.
+- Layout principal, para usar `@vite`.
+
+No modificar todavia vistas criticas como `clientes/show.blade.php`, `autorizacion/index.blade.php`, CNA o Promesas.
+
+## Instalacion sugerida Tailwind CSS v4
+
+Comando sugerido:
+
+```bash
+npm install tailwindcss @tailwindcss/vite
 ```
 
-Build:
+Luego revisar `package.json` y `package-lock.json`.
+
+## Configuracion esperada de Vite
+
+Archivo a revisar/modificar:
 
 ```text
-public/build/
+vite.config.js
 ```
 
-Los assets generados por Vite deben servirse con `@vite`.
+Ejemplo esperado:
 
-## Componentes Blade reutilizables
+```js
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 
-Crear componentes para UI repetida:
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ],
+            refresh: true,
+        }),
+        tailwindcss(),
+    ],
+});
+```
+
+## Configuracion esperada de CSS
+
+Archivo:
 
 ```text
-resources/views/components/
-  layout/
-    sidebar.blade.php
-    topbar.blade.php
-  ui/
-    card.blade.php
-    button.blade.php
-    badge.blade.php
-    modal.blade.php
-    alert.blade.php
-    table.blade.php
-    pagination.blade.php
-  forms/
-    input.blade.php
-    select.blade.php
-    multiselect.blade.php
-    date-range.blade.php
-  reportes/
-    filters.blade.php
-    export-button.blade.php
+resources/css/app.css
 ```
 
-Ventajas:
+Contenido base:
 
-- Menos HTML repetido.
-- Cambios visuales centralizados.
-- Pantallas mas pequenas.
-- Redisenio mas seguro.
+```css
+@import "tailwindcss";
+```
 
-## Separacion de JavaScript por modulos
+Desde ahi se podran agregar tokens o estilos propios de V3 cuando sean necesarios.
 
-Regla recomendada:
+## Configuracion esperada de JS
 
-- Cada pantalla compleja debe tener su JS en un archivo propio.
-- Cada comportamiento reutilizable debe tener un modulo compartido.
-
-Ejemplo:
+Archivo:
 
 ```text
-resources/js/modules/reportes/filters.js
-resources/js/modules/reportes/pagos.js
-resources/js/modules/clientes/show.js
+resources/js/app.js
 ```
 
-`resources/js/app.js` debe importar solo lo necesario:
+Uso recomendado:
+
+- Importar bootstrap propio del proyecto si aplica.
+- Importar modulos compartidos.
+- Evitar meter logica especifica de pantallas dentro de `app.js`.
+
+Ejemplo conceptual:
 
 ```js
 import './bootstrap';
 import './modules/layout/sidebar';
 ```
 
-Para modulos especificos se puede usar:
+Los scripts especificos deben vivir en:
 
-- Entrypoints por pagina en Vite.
-- Imports condicionales segun elementos presentes en DOM.
-- Data attributes para inicializar componentes.
+```text
+resources/js/modules/
+```
 
-## Propuesta visual para V3
+## Uso de `@vite`
 
-Mantener una interfaz de CRM interno:
+El layout principal debe cargar assets usando:
 
-- Clara.
-- Densa.
-- Rapida de operar.
-- Con buen contraste.
-- Tablas legibles.
-- Filtros visibles.
-- Estados bien diferenciados.
+```blade
+@vite(['resources/css/app.css', 'resources/js/app.js'])
+```
 
-No conviene convertir el CRM en una landing page ni usar componentes demasiado decorativos.
+Esto debe reemplazar progresivamente links manuales a CSS/JS propios.
 
-Elementos recomendados:
+## Retirar Bootstrap de forma controlada
 
-- Sidebar simple.
-- Topbar ligera.
-- Cards compactas para KPIs.
-- Tablas con headers fijos cuando aplique.
-- Badges consistentes para estados.
-- Formularios con validacion visible.
-- Modales ordenados y pequenos.
-- Filtros reutilizables en reportes.
+Bootstrap debe retirarse progresivamente desde:
 
-## Migracion gradual desde Bootstrap/CSS actual
+- Layouts principales.
+- CDN en Blade.
+- Imports JS si existen.
+- Clases Bootstrap en vistas.
+- Modales.
+- Botones.
+- Cards.
+- Tablas.
+- Formularios.
+- Badges.
+- Alertas.
 
-No se recomienda reemplazar todo Bootstrap de inmediato.
+No hacer todo de golpe.
 
-Plan sugerido:
+## Retirar Bootstrap Icons
 
-1. Configurar Tailwind y Vite sin cambiar pantallas.
-2. Crear layout V3 opcional o componentes piloto.
-3. Migrar una pantalla de bajo riesgo.
-4. Migrar reportes o dashboard con componentes reutilizables.
-5. Migrar clientes solo cuando existan pruebas.
-6. Retirar CSS viejo por partes.
-7. Reducir dependencias CDN gradualmente.
+Bootstrap Icons tambien debe revisarse.
 
-## Pantallas candidatas para piloto
+Opciones:
 
-Primera opcion:
+- Mantener temporalmente mientras se migra UI.
+- Reemplazar por iconos SVG propios.
+- Reemplazar por una libreria compatible con Vite.
+- Usar componentes Blade de iconos.
+
+No retirar Bootstrap Icons hasta confirmar todas las pantallas que dependen de ellos.
+
+## Componentes Blade + Tailwind
+
+Los componentes Bootstrap deben reemplazarse por componentes Blade con Tailwind.
+
+Propuesta:
+
+```text
+resources/views/components/
+  ui/
+    button.blade.php
+    badge.blade.php
+    card.blade.php
+    modal.blade.php
+    alert.blade.php
+    table.blade.php
+  forms/
+    input.blade.php
+    select.blade.php
+    textarea.blade.php
+    date.blade.php
+  layout/
+    sidebar.blade.php
+    topbar.blade.php
+```
+
+## Organizacion JS por modulos
+
+```text
+resources/js/
+  app.js
+  modules/
+    clientes/
+      show.js
+      promesa-form.js
+      cna-form.js
+    promesas/
+      workflow.js
+    cna/
+      workflow.js
+      documentos.js
+    reportes/
+      filters.js
+      pagos.js
+      promesas.js
+      cna.js
+    integracion/
+      imports.js
+    admin/
+      users.js
+```
+
+## Orden de migracion Bootstrap -> Tailwind
+
+Orden recomendado:
+
+1. Layout principal.
+2. Sidebar/topbar.
+3. Botones y badges.
+4. Formularios simples.
+5. Tablas simples.
+6. Administracion de usuarios.
+7. Dashboard.
+8. Reportes.
+9. Clientes.
+10. CNA y Promesas al final.
+
+## Pantalla piloto
+
+Pantalla recomendada:
 
 - Administracion de usuarios.
 
-Motivo:
+Por que:
 
-- Es importante, pero menos compleja que clientes/CNA.
-- Permite probar formularios, tabla, modal y permisos.
+- Usa tabla, acciones, formulario y modales.
+- Es buena para probar componentes.
+- Es menos critica que cliente, CNA o promesas.
 
-Segunda opcion:
+## Riesgos
 
-- Reporte de pagos.
+### Riesgos de eliminar Bootstrap
 
-Motivo:
+- Muchas vistas dependen de clases Bootstrap.
+- Modales y dropdowns dependen de JS Bootstrap.
+- Algunos comportamientos pueden dejar de funcionar si se retira el CDN antes de migrarlos.
+- Las tablas pueden perder estilos rapidamente.
 
-- Permite probar filtros, tabla, paginacion y export.
+Mitigacion:
 
-Evitar como primera pantalla:
+- Migrar pantalla por pantalla.
+- Crear componentes Blade antes de reemplazar clases.
+- Mantener Bootstrap temporalmente mientras una pantalla no este migrada.
+- No retirar CDN global hasta que el layout y las pantallas criticas esten listas.
 
-- `clientes/show.blade.php`.
-- `autorizacion/index.blade.php`.
+### Riesgos de Tailwind CSS v4
 
-Son pantallas muy criticas y grandes.
-
-## Riesgos de Tailwind y Vite
-
-### Riesgos de Tailwind
-
-- Mezclar Tailwind con Bootstrap puede generar inconsistencias visuales.
-- Clases largas en Blade pueden volver dificil leer vistas.
-- Si no se crean componentes, se puede duplicar mucho markup.
-- Requiere definir convenciones de diseno.
+- Curva de adaptacion.
+- Clases largas en Blade.
+- Necesidad de convenciones visuales.
+- Posible mezcla visual durante transicion.
 
 Mitigacion:
 
 - Usar componentes Blade.
-- Migrar por pantalla.
-- Definir tokens visuales: colores, espaciado, estados, botones.
-- No mezclar estilos sin criterio.
+- Definir tokens de diseno.
+- Revisar pantalla piloto.
+- Evitar duplicacion.
 
 ### Riesgos de Vite
 
 - Produccion necesita `npm run build`.
-- El servidor debe tener los assets generados.
-- Si se rompe el manifest, las vistas pueden fallar.
-- Hay que ajustar deploy para incluir `public/build`.
+- Debe existir `public/build/manifest.json`.
+- El deploy debe incluir assets compilados.
+- Si `@vite` queda mal configurado, el layout puede cargar sin CSS/JS.
 
 Mitigacion:
 
-- Documentar build.
-- Probar `npm run build` antes de deploy.
-- Confirmar `public/build/manifest.json`.
-- Mantener fallback solo durante transicion.
+- Probar `npm run dev`.
+- Probar `npm run build`.
+- Confirmar manifest.
+- Revisar consola del navegador.
 
-## Recomendaciones finales
+## Regla final
 
-- Blade se mantiene.
-- Tailwind entra gradualmente.
-- Bootstrap puede convivir temporalmente.
-- Vite debe ser el canal principal de nuevos assets.
-- JS embebido debe reducirse progresivamente.
-- No redisenar pantallas criticas sin pruebas.
-
+Tailwind y Vite entran primero como infraestructura. La eliminacion de Bootstrap se hace despues, por partes, con pruebas visuales y funcionales en localhost.
