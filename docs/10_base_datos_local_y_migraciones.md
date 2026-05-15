@@ -11,12 +11,17 @@ La estrategia de base de datos V3 ya parte de un entorno local listo:
 - [+] Produccion no se toca.
 - [+] Base local usada para pruebas de Fase 1 a Fase 4.
 - [+] `php artisan migrate:status` revisado.
-- [!] Diferencias detectadas entre SQL real/base local y migraciones Laravel disponibles.
-- [ ] Baseline final pendiente.
+- [+] Migraciones antiguas revisadas.
+- [+] Migraciones antiguas eliminadas.
+- [+] Baseline V3 creado desde `u480021566_kpinvest_bd.sql`.
+- [+] Migraciones V3 probadas en base local limpia `kpinvest_v3_migrate_test`.
+- [+] Estructura generada exportada en `estructura_generada_v3.sql`.
+- [!] Diferencia intencional detectada: `users.role` ya no incluye `sistemas` ni `usuario`.
+- [!] Produccion no debe ejecutar estas migraciones todavia.
 
 La base local sera el ambiente seguro para pruebas, validaciones y migraciones V3.
 
-## Estado revisado en Fase 4
+## Estado revisado antes del baseline V3
 
 Comando ejecutado:
 
@@ -45,12 +50,95 @@ Migraciones presentes en `database/migrations`:
 2026_01_19_202218_drop_cumplimiento_estado_from_promesas_pago.php
 ```
 
-Hallazgos:
+Hallazgos previos:
 
 - [!] La tabla `migrations` local registra `2019_12_14_000001_create_personal_access_tokens_table`, pero ese archivo no esta presente en `database/migrations`.
 - [!] La base local tiene tablas core que no nacen de migraciones disponibles: `users`, `clientes_cuentas`, `pagos_propia`, `promesas_pago`, `promesa_cuotas`, `cna_solicitudes`, `ccd_clientes`, `pagos_lotes` y `promesa_operaciones`.
 - [+] Las tablas principales necesarias para las pruebas locales existen en la base local.
-- [+] No se requirio crear ni ejecutar migraciones nuevas para Administracion, Dashboard, Tailwind o permisos.
+- [+] Esta inconsistencia justifico eliminar las migraciones historicas incompletas y crear baseline V3.
+
+## Migraciones eliminadas en Fase 5
+
+Se eliminaron los archivos antiguos de `database/migrations`:
+
+```text
+2025_11_02_220020_update_users_drop_team_supervisor_add_active.php
+2025_11_05_172046_add_supervisor_id_to_users.php
+2025_11_13_155533_create_asignar_clientes_table.php
+2026_01_12_221108_create_cliente_bloqueos_table.php
+2026_01_19_202218_drop_cumplimiento_estado_from_promesas_pago.php
+```
+
+Motivo:
+
+- No representaban el esquema real completo de produccion.
+- Dejaban tablas core sin migracion real.
+- Mezclaban parches historicos con una base que ya existia.
+- V3 necesita un baseline claro para reconstruir una base desde cero.
+
+## Migraciones V3 creadas
+
+```text
+2026_05_15_000001_create_users_table.php
+2026_05_15_000002_create_clientes_tables.php
+2026_05_15_000003_create_pagos_tables.php
+2026_05_15_000004_create_promesas_tables.php
+2026_05_15_000005_create_cna_solicitudes_table.php
+2026_05_15_000006_create_integracion_tables.php
+2026_05_15_000007_normalize_user_roles_v3.php
+```
+
+Tabla Laravel estandar incluida por migracion vendor:
+
+```text
+2019_12_14_000001_create_personal_access_tokens_table
+```
+
+Esa migracion viene de Sanctum y crea `personal_access_tokens`, por eso no se duplico en el baseline propio.
+
+## Prueba en base limpia
+
+Base desechable creada:
+
+```text
+kpinvest_v3_migrate_test
+```
+
+Comando ejecutado contra esa base:
+
+```bash
+php artisan migrate
+```
+
+Resultado:
+
+- [+] Migracion completada correctamente.
+- [+] `php artisan migrate:status` muestra todas las migraciones V3 como `Ran`.
+- [+] Indices coinciden con la base real.
+- [+] FKs coinciden con la base real.
+- [+] Tablas coinciden con la base real.
+- [!] Diferencia intencional: `users.role` queda como `enum('administrador','supervisor','asesor','soporte')` con default `soporte`.
+
+## Diferencias SQL real vs baseline V3
+
+Diferencia documentada:
+
+```text
+users.role
+SQL real: enum('administrador','supervisor','asesor','sistemas','soporte','usuario') default 'usuario'
+V3:       enum('administrador','supervisor','asesor','soporte') default 'soporte'
+```
+
+Motivo:
+
+- `sistemas` y `usuario` fueron eliminados como roles validos de V3.
+- La migracion `2026_05_15_000007_normalize_user_roles_v3.php` convierte esos roles a `soporte` antes de cerrar el enum.
+
+Diferencias aceptadas:
+
+- La tabla `migrations` no se define manualmente porque Laravel la administra.
+- `personal_access_tokens` se crea con la migracion vendor de Sanctum, equivalente al SQL real.
+- No se crearon `password_reset_tokens`, `sessions`, `cache` ni `jobs` porque no existen en el SQL real actual.
 
 ## Regla principal
 
@@ -256,11 +344,15 @@ Por ahora:
 - No modificar contrasenas productivas.
 - No se crearon ni ejecutaron seeders en esta fase.
 
-## Decision Fase 4
+## Decision Fase 5
 
-No se creo migracion V3 nueva porque los cambios realizados fueron de frontend, permisos, servicios, ViewModels y tests. No hubo necesidad de alterar estructura para Administracion, Dashboard o Tailwind.
+El baseline V3 ya existe y fue probado en una base limpia. No debe ejecutarse sobre la base local importada ni sobre produccion sin una estrategia de baseline aplicada, porque esas tablas ya existen.
 
-El baseline final sigue pendiente. La recomendacion es cerrarlo antes de cualquier cambio estructural de base de datos.
+Antes de produccion se debe decidir si:
+
+- Se crea una base nueva desde migraciones V3 y se importan datos.
+- O se marca el baseline como aplicado y solo se ejecutan migraciones incrementales.
+- O se usa un plan SQL/manual controlado para transicionar una base existente.
 
 Cuando se necesiten seeders:
 

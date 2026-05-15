@@ -96,7 +96,7 @@
   $role  = $role  ?? strtolower(auth()->user()->role ?? '');
   $isAsesor = $isAsesor ?? ($role==='asesor');
   $isSupervisor = $isSupervisor ?? ($role==='supervisor');
-  $isAdmin = $isAdmin ?? in_array($role,['administrador','sistemas']);
+  $isAdmin = $isAdmin ?? ($role === 'administrador');
 
   $misSup = $misSup ?? collect();
   $misPre = $misPre ?? collect();

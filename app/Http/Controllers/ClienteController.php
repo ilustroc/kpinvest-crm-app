@@ -227,7 +227,7 @@ class ClienteController extends Controller
     public function deletePagos(Request $r, string $dni)
     {
         $role = strtolower((string) optional(Auth::user())->role);
-        if (!in_array($role, ['administrador','sistemas','supervisor','soporte'])) {
+        if (!in_array($role, ['administrador','supervisor','soporte'], true)) {
             abort(403, 'No autorizado');
         }
 

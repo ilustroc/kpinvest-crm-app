@@ -79,7 +79,6 @@ class Roles
     {
         return self::has($user, [
             self::ADMINISTRADOR,
-            self::SISTEMAS,
             self::SUPERVISOR,
             self::SOPORTE,
         ]);

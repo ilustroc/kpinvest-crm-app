@@ -18,7 +18,7 @@ class PanelController extends Controller
         $role  = strtolower($user->role ?? '');
         $isAsesor     = ($role === 'asesor');
         $isSupervisor = ($role === 'supervisor');
-        $isAdmin      = ($role === 'administrador' || $role === 'sistemas');
+        $isAdmin      = ($role === 'administrador');
 
         /* ========================= KPIs ========================= */
         $hoy = Carbon::today()->toDateString();

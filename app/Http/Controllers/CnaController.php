@@ -84,9 +84,9 @@ class CnaController extends Controller
 
             ['serie' => $serie, 'suffix' => $suffix] = $this->seriesConfig($origen);
 
-            // ✅ Detectar si quien crea es administrador/sistemas
+            // Detectar si quien crea es administrador.
             $role = strtolower((string)(Auth::user()->role ?? ''));
-            $isAdminAuto = in_array($role, ['administrador','sistemas'], true);
+            $isAdminAuto = $role === 'administrador';
             $now = now();
 
             // Crear con correlativo (lock para evitar colisiones)
@@ -279,7 +279,7 @@ class CnaController extends Controller
     private function authorizeRole(string $role): void
     {
         $user = Auth::user();
-        if (!$user || !in_array(strtolower($user->role), [$role, 'sistemas'])) {
+        if (!$user || strtolower($user->role) !== $role) {
             abort(403, 'No autorizado.');
         }
     }

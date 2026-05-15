@@ -353,12 +353,12 @@ class AutorizacionController extends Controller
     }
 
     /**
-     * Autorización por rol (admin/sistemas o supervisor).
+     * Autorizacion por rol (administrador o supervisor).
      */
     private function authorizeActionFor(string $role)
     {
         $user = Auth::user();
-        if (!in_array(strtolower($user->role), [$role, 'sistemas'])) {
+        if (strtolower($user->role) !== $role) {
             abort(403, 'No autorizado.');
         }
     }

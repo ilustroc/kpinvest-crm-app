@@ -101,18 +101,25 @@
 
 ## 7. Migraciones
 
-- [ ] Revisar migraciones nuevas una por una.
-- [ ] Confirmar que no eliminan datos sin respaldo.
-- [ ] Confirmar que no eliminan columnas usadas por codigo actual.
-- [ ] Ejecutar migraciones solo sobre copia local reciente.
+- [+] Migraciones antiguas revisadas.
+- [+] Migraciones antiguas eliminadas.
+- [+] Nuevas migraciones generadas desde `u480021566_kpinvest_bd.sql`.
+- [+] Revisar migraciones nuevas una por una.
+- [+] Confirmar que no eliminan datos sin respaldo en base limpia.
+- [+] Confirmar que no eliminan columnas usadas por codigo actual en baseline limpio.
+- [+] Ejecutar migraciones solo sobre base local limpia desechable.
+- [+] `php artisan migrate` ejecutado en base local limpia `kpinvest_v3_migrate_test`.
 - [+] Ejecutar `php artisan migrate:status` en local.
 - [+] Comparar conceptualmente SQL/base local vs migraciones disponibles.
-- [ ] Confirmar indices y claves foraneas.
+- [+] Confirmar indices y claves foraneas.
 - [ ] Probar rollback si aplica.
 - [+] Confirmar si se requieren seeders: no se requirieron en esta fase.
 - [ ] Si se requieren seeders, confirmar que son idempotentes.
-- [!] Baseline final pendiente.
-- [!] Migraciones historicas incompletas frente a la base real.
+- [+] Baseline V3 creado.
+- [+] Migracion de limpieza de roles creada.
+- [!] En la base local principal las migraciones V3 aparecen pendientes porque el baseline no debe correrse sobre tablas existentes.
+- [!] Diferencia SQL vs migraciones documentada: `users.role` elimina `sistemas` y `usuario`.
+- [!] Migraciones historicas incompletas frente a la base real fueron reemplazadas, pero produccion requiere estrategia de baseline antes de ejecutar cualquier cambio.
 - [!] No correr `php artisan migrate` en produccion todavia.
 - [!] No correr `php artisan migrate:fresh` sobre bases con informacion.
 - [!] No correr seeders en produccion sin revision.
@@ -202,7 +209,12 @@
 
 ## 12. Usuarios, roles y permisos
 
-- [+] Confirmar roles existentes: administrador, supervisor, asesor, soporte. `sistemas` esta contemplado en codigo pero no aparecio en usuarios locales.
+- [+] Roles finales definidos: administrador, supervisor, asesor, soporte.
+- [+] Roles `sistemas` y `usuario` eliminados del codigo como roles validos.
+- [+] Selects y validaciones de roles actualizados.
+- [+] Gates/Policies actualizados.
+- [+] Migracion `2026_05_15_000007_normalize_user_roles_v3.php` creada para convertir `sistemas`/`usuario` a `soporte`.
+- [+] Confirmar roles existentes en base local: administrador, supervisor, asesor, soporte.
 - [+] Confirmar usuarios administradores activos.
 - [+] Confirmar que al menos un administrador queda activo en reglas de servicio.
 - [+] Confirmar visibilidad de supervisor sobre su equipo en servicio/policy.

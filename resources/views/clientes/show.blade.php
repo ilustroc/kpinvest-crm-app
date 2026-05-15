@@ -400,7 +400,7 @@
 
   {{-- PAGOS --}}
   @php
-    $canDeletePagos = in_array(strtolower((string)optional(Auth::user())->role), ['administrador','sistemas','supervisor','soporte']);
+    $canDeletePagos = in_array(strtolower((string)optional(Auth::user())->role), ['administrador','supervisor','soporte'], true);
   @endphp
 
   <div class="card pad mb-3">

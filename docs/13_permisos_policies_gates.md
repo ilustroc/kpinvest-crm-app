@@ -8,27 +8,36 @@
 - [+] `UserPolicy` creada.
 - [+] Gates iniciales registrados.
 - [+] Documentacion inicial creada.
+- [+] Roles `sistemas` y `usuario` eliminados como roles validos de V3.
 - [!] Permisos internos de Promesas, CNA y Cliente aun mezclan controladores, rutas y vistas.
 
 ## Roles actuales
 
-Roles detectados en codigo:
+Roles anteriores detectados en codigo/base:
 
 - `administrador`.
-- `sistemas`.
 - `supervisor`.
 - `asesor`.
 - `soporte`.
+- `sistemas`.
 - `usuario`.
 
-Roles detectados en base local:
+Roles eliminados en V3:
+
+- `sistemas`.
+- `usuario`.
+
+Roles finales permitidos:
 
 - `administrador`.
 - `supervisor`.
 - `asesor`.
 - `soporte`.
 
-Nota: `sistemas` y `usuario` estan contemplados por codigo, aunque no aparecieron en el listado local revisado.
+Estado de la base local revisada:
+
+- No habia usuarios con rol `sistemas` ni `usuario`.
+- La migracion V3 convierte esos roles a `soporte` si aparecen en otro dump.
 
 ## Donde se validan permisos hoy
 
@@ -54,6 +63,12 @@ Archivos creados o actualizados:
 - `routes/web/integracion.php`.
 - `routes/web/reportes.php`.
 - `resources/views/components/layout/sidebar.blade.php`.
+- `app/Http/Requests/StoreUserRequest.php`.
+- `app/Services/UserService.php`.
+- `app/Http/Controllers/AutorizacionController.php`.
+- `app/Http/Controllers/CnaController.php`.
+- `app/Http/Controllers/ClienteController.php`.
+- `app/Services/Promesas/PromesaCreator.php`.
 
 ## Gates iniciales
 
@@ -92,7 +107,8 @@ Objetivo:
 ## Riesgos detectados
 
 - [!] Hay reglas de roles repetidas en varias capas.
-- [!] Algunas rutas tenian diferencias con el sidebar. Ejemplo: `sistemas` aparecia en UI pero no siempre en middleware.
+- [+] Se elimino el rol `sistemas` de reglas de admin/aprobacion.
+- [+] Se elimino el rol `usuario` como rol creable/gestionable.
 - [!] Reportes no tenian middleware especifico antes de esta fase.
 - [!] Promesas y CNA aun tienen autorizaciones internas en controladores.
 - [!] Cliente tiene permisos de eliminacion de pagos directamente en controlador/vista.
@@ -128,4 +144,6 @@ Orden recomendado:
 - [+] Admin, Integracion y Reportes ya pasan por Gates.
 - [+] Sidebar ya consulta Gates.
 - [+] Administracion de usuarios usa `UserPolicy`.
-- [!] Promesas, CNA y Cliente quedan para Fase 5 porque son flujos criticos.
+- [+] Roles finales reducidos a `administrador`, `supervisor`, `asesor`, `soporte`.
+- [+] Migracion de limpieza de roles creada.
+- [!] Promesas, CNA y Cliente quedan para una fase posterior de refactor fino porque son flujos criticos.

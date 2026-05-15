@@ -105,7 +105,7 @@ class PromesaCreator
             // Auto workflow simple por rol (igual a tu lógica)
             $meRole = strtolower((string)(optional(Auth::user())->role ?? ''));
             $now = now();
-            if (in_array($meRole,['administrador','sistemas'], true)) {
+            if ($meRole === 'administrador') {
                 $promesa->workflow_estado = 'aprobada';
                 $promesa->pre_aprobado_por = Auth::id(); $promesa->pre_aprobado_at = $now;
                 $promesa->aprobado_por     = Auth::id(); $promesa->aprobado_at     = $now;
@@ -120,13 +120,13 @@ class PromesaCreator
 
             // Mails (best-effort)
             try {
-                if (in_array($meRole,['administrador','sistemas'], true))      WorkflowMailer::promesaResuelta($promesa, true);
+                if ($meRole === 'administrador')                               WorkflowMailer::promesaResuelta($promesa, true);
                 elseif ($meRole === 'supervisor')                               WorkflowMailer::promesaPreaprobada($promesa);
                 else                                                             WorkflowMailer::promesaPendiente($promesa);
             } catch (\Throwable $ignored) {}
 
             $msg = match (true) {
-                in_array($meRole,['administrador','sistemas'], true) => 'Propuesta registrada y APROBADA.',
+                $meRole === 'administrador'                         => 'Propuesta registrada y APROBADA.',
                 $meRole === 'supervisor'                             => 'Propuesta registrada y PRE-APROBADA.',
                 default                                              => 'Propuesta registrada y enviada para autorización.',
             };
