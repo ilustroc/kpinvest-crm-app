@@ -27,6 +27,11 @@ El archivo `u480021566_kpinvest_bd.sql` es la referencia principal de la estruct
 - [05 - Rutas y controladores](docs/05_rutas_y_controladores.md)
 - [06 - Diagnostico tecnico](docs/06_diagnostico_tecnico.md)
 - [07 - Recomendaciones V3](docs/07_recomendaciones_v3.md)
+- [08 - Plan V3](docs/08_plan_v3.md)
+- [09 - Arquitectura V3](docs/09_arquitectura_v3.md)
+- [10 - Base de datos local y migraciones](docs/10_base_datos_local_y_migraciones.md)
+- [11 - Frontend Tailwind y Vite](docs/11_frontend_tailwind_vite.md)
+- [12 - Checklist deploy V3](docs/12_checklist_deploy_v3.md)
 
 ## Stack principal
 
