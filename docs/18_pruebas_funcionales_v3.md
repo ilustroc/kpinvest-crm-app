@@ -116,7 +116,7 @@ Pendiente manual:
 - [!] Interaccion visual de filtros y paginacion.
 - [!] Revision desktop.
 - [!] Revision responsive/mobile.
-- [!] Vistas legacy con Bootstrap condicional.
+- [!] Validacion manual visual de pantallas migradas a Tailwind/Vite.
 
 ## Comandos de verificacion
 

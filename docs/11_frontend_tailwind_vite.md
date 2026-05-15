@@ -2,9 +2,9 @@
 
 ## Decision frontend V3
 
-La V3 migrara progresivamente desde Bootstrap hacia Tailwind CSS v4 usando Vite.
+La V3 migro progresivamente desde Bootstrap hacia Tailwind CSS v4 usando Vite.
 
-El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
+El objetivo final era eliminar Bootstrap del proyecto de forma controlada. En el estado actual V3, Bootstrap ya fue retirado del layout global:
 
 - Sin cambiar flujos funcionales.
 - Sin redisenar todo de golpe.
@@ -27,11 +27,13 @@ El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
 - [+] Se creo `resources/js/core` para utilidades compartidas.
 - [+] Se crearon componentes `forms`, `tables`, `feedback` y `reportes`.
 - [+] `chart.js` se gestiona por npm y Vite para Dashboard.
+- [+] Cliente, Promesas y CNA dentro de Cliente fueron migrados a Tailwind/Vite.
+- [+] Bootstrap CSS, Bootstrap Icons y Bootstrap JS fueron retirados del layout global.
 - [+] `npm run dev` se ejecuto y respondio correctamente.
 - [+] `npm run build` se ejecuto correctamente.
 - [+] `public/build/manifest.json` confirmado.
 - [!] `npm audit` reporta vulnerabilidades moderadas en Vite/esbuild; `npm audit fix --force` implica salto mayor a Vite 8.
-- [!] Bootstrap sigue cargando de forma condicional para pantallas legacy no migradas.
+- [!] Validacion manual visual pendiente en las pantallas criticas migradas.
 
 ## Fase 7 - Arquitectura frontend V3
 
@@ -262,9 +264,9 @@ Esto debe reemplazar progresivamente links manuales a CSS/JS propios.
 Estado actual:
 
 - [+] `@vite` esta configurado en `resources/views/layouts/app.blade.php`.
-- [+] Las vistas migradas pueden usar `@section('tailwind_only', true)` para no cargar Bootstrap.
-- [+] Administracion y Dashboard cargan CSS/JS por Vite.
-- [!] Las vistas legacy siguen usando Bootstrap temporalmente para evitar quiebres.
+- [+] Las vistas migradas conservan `@section('tailwind_only', true)` como marca documental de migracion.
+- [+] Administracion, Dashboard, Reportes, Integraciones, Login, Panel, Autorizacion y Clientes cargan CSS/JS por Vite.
+- [+] Bootstrap ya no se carga desde el layout.
 
 ## Retirar Bootstrap de forma controlada
 
@@ -282,14 +284,14 @@ Bootstrap debe retirarse progresivamente desde:
 - Badges.
 - Alertas.
 
-No hacer todo de golpe.
+Este retiro ya se completo pantalla por pantalla hasta Cliente.
 
 Estado actual:
 
-- [+] Bootstrap fue retirado para la pantalla piloto de administracion mediante `tailwind_only`.
-- [+] Bootstrap fue retirado para Dashboard mediante `tailwind_only`.
-- [!] Bootstrap sigue disponible para vistas legacy.
-- [ ] Retirar Bootstrap globalmente cuando las pantallas dependientes hayan sido migradas.
+- [+] Bootstrap fue retirado para la pantalla piloto de administracion.
+- [+] Bootstrap fue retirado para Dashboard.
+- [+] Bootstrap fue retirado para Reportes, Integraciones, Login, Panel, Autorizacion y Clientes.
+- [+] Bootstrap fue retirado globalmente del layout.
 
 ## Retirar Bootstrap Icons
 
@@ -302,7 +304,7 @@ Opciones:
 - Reemplazar por una libreria compatible con Vite.
 - Usar componentes Blade de iconos.
 
-No retirar Bootstrap Icons hasta confirmar todas las pantallas que dependen de ellos.
+Bootstrap Icons ya fue retirado del layout global. Las pantallas nuevas o migradas no deben depender de esa libreria.
 
 ## Componentes Blade + Tailwind
 
@@ -503,6 +505,52 @@ Pendiente:
 
 - [!] Validacion visual manual del grafico, sugerencias del buscador y responsive.
 
+## Fase 7.5 - Autorizacion
+
+Estado:
+
+- [+] `resources/views/autorizacion/index.blade.php` migrada a Tailwind/Vite.
+- [+] `@section('tailwind_only', true)` agregado.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a `resources/js/modules/autorizacion/index.js`.
+- [+] Modulo importado desde `resources/js/app.js`.
+- [+] Modales Bootstrap reemplazados por modales Tailwind.
+- [+] Tablas migradas a `x-tables.*`.
+- [+] Botones migrados a `x-ui.button`.
+- [+] Alertas migradas a `x-feedback.alert`.
+- [+] Paginacion CNA migrada fuera de `pagination::bootstrap-5`.
+- [+] Autorizacion ya no carga Bootstrap ni Bootstrap Icons.
+
+Pendiente:
+
+- [!] Validacion manual visual de modales, aprobaciones/rechazos y detalle CNA.
+
+## Fase 7.6 - Clientes y cierre Bootstrap
+
+Estado:
+
+- [+] `resources/views/clientes/show.blade.php` migrada a Tailwind/Vite.
+- [+] `@section('tailwind_only', true)` agregado.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a modulos Vite.
+- [+] Modulo `resources/js/modules/clientes/show.js` creado.
+- [+] Modulos `resources/js/modules/promesas/form.js` y `resources/js/modules/promesas/schedule.js` creados.
+- [+] Modulo `resources/js/modules/cna/form.js` creado.
+- [+] Componentes `resources/views/components/clientes/*` creados.
+- [+] Componentes `resources/views/components/promesas/*` creados.
+- [+] Componentes `resources/views/components/cna/*` creados.
+- [+] Modales Bootstrap de Cliente, Promesas y CNA reemplazados por modales Tailwind.
+- [+] Bootstrap CSS, Bootstrap Icons y Bootstrap JS retirados del layout global.
+- [+] `resources/js/app.js` revisado: solo importa modulos reales.
+- [+] `resources/views/layouts/app.blade.php` revisado: solo carga assets por `@vite`.
+- [+] `public/css` y `public/js` sin uso activo.
+- [+] `.gitkeep` innecesarios retirados de modulos/carpetas con archivos reales.
+- [+] Componentes placeholder no usados eliminados.
+
+Pendiente:
+
+- [!] Validacion manual visual de Cliente, seleccion de operaciones, cronograma de promesas y generacion CNA.
+
 ## Riesgos
 
 ### Riesgos de eliminar Bootstrap
@@ -516,8 +564,8 @@ Mitigacion:
 
 - Migrar pantalla por pantalla.
 - Crear componentes Blade antes de reemplazar clases.
-- Mantener Bootstrap temporalmente mientras una pantalla no este migrada.
-- No retirar CDN global hasta que el layout y las pantallas criticas esten listas.
+- Mantener validaciones manuales sobre las pantallas migradas.
+- No reintroducir CDN Bootstrap en vistas nuevas.
 
 ### Riesgos de Tailwind CSS v4
 
@@ -549,4 +597,4 @@ Mitigacion:
 
 ## Regla final
 
-Tailwind y Vite entran primero como infraestructura. La eliminacion de Bootstrap se hace despues, por partes, con pruebas visuales y funcionales en localhost.
+Tailwind y Vite quedan como infraestructura frontend V3. Bootstrap ya fue retirado del layout global y no debe reintroducirse en vistas nuevas o migradas.

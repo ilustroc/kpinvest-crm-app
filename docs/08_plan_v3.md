@@ -204,23 +204,23 @@ Objetivo:
 
 Orden recomendado:
 
-1. Layout principal. Estado: en progreso, con Vite activo y Bootstrap condicional para vistas legacy.
+1. Layout principal. Estado: completado, con Vite activo y sin Bootstrap global.
 2. Sidebar/topbar. Estado: version Tailwind creada como componentes Blade.
 3. Botones y badges. Estado: componentes base creados.
 4. Formularios simples. Estado: componentes base creados.
 5. Tablas simples. Estado: componente base creado.
 6. Administracion de usuarios. Estado: pantalla piloto migrada a Tailwind.
 7. Dashboard. Estado: segunda pantalla piloto migrada a Tailwind.
-8. Reportes.
-9. Clientes.
-10. CNA y Promesas al final.
+8. Reportes. Estado: migrado.
+9. Clientes. Estado: migrado.
+10. CNA y Promesas dentro de Cliente. Estado: migrado a componentes/JS Vite.
 
 Regla actual:
 
-- Las vistas migradas pueden declarar `@section('tailwind_only', true)` para no cargar Bootstrap desde el layout.
-- Las vistas legacy siguen cargando Bootstrap de forma temporal para no romper modales, tablas o estilos pendientes.
-- Administracion y Dashboard ya no cargan Bootstrap desde el layout.
-- Bootstrap no debe eliminarse globalmente hasta migrar vistas legacy con modales, tablas o JS dependiente.
+- Las vistas migradas conservan `@section('tailwind_only', true)` como marca documental de migracion.
+- El layout principal ya no carga Bootstrap CSS, Bootstrap Icons ni Bootstrap JS.
+- Administracion, Dashboard, Reportes, Integraciones, Login, Panel, Autorizacion y Clientes usan Vite/Tailwind.
+- Cualquier nueva pantalla debe usar Tailwind, componentes Blade y JS modular.
 
 ### Fase 5 - Baseline de migraciones y limpieza de roles
 
@@ -334,15 +334,27 @@ Estado:
 - [+] Chart.js del Panel principal movido a Vite.
 - [+] JS del Panel principal movido a `resources/js/modules/panel/resumen.js`.
 - [+] Panel principal ya no carga Bootstrap.
-- [!] Bootstrap sigue condicional para vistas legacy.
-- [!] Clientes, Autorizacion, CNA y Promesas siguen pendientes de migracion.
+- [+] Autorizacion migrada a Tailwind/Vite.
+- [+] JS de Autorizacion movido a `resources/js/modules/autorizacion/index.js`.
+- [+] Modales Bootstrap de Autorizacion reemplazados por modales Tailwind.
+- [+] Autorizacion ya no carga Bootstrap.
+- [+] Clientes migrado a Tailwind/Vite.
+- [+] JS de Cliente movido a `resources/js/modules/clientes/show.js`.
+- [+] Promesas separadas en componentes y JS Vite.
+- [+] CNA separado en componentes y JS Vite.
+- [+] Bootstrap eliminado de `clientes/show.blade.php`.
+- [+] Bootstrap eliminado globalmente de `resources/views/layouts/app.blade.php`.
+- [+] Cierre frontend ejecutado: sin Bootstrap activo, sin assets activos en `public/css` o `public/js`.
+- [+] `.gitkeep` innecesarios eliminados en carpetas con archivos reales.
+- [+] Componentes de dominio no usados eliminados.
+- [!] Validacion manual visual pendiente para Cliente, Promesas y CNA.
 
 Reglas:
 
 - No agregar CSS nuevo en `public/css`.
 - No agregar JS nuevo en `public/js`.
 - No agregar scripts grandes embebidos en Blade.
-- Toda pantalla migrada usa `@section('tailwind_only', true)`.
+- Toda pantalla migrada usa `@section('tailwind_only', true)` como marca documental de migracion.
 - Toda logica JS nueva vive en `resources/js/modules`.
 
 ### Fase 8 - Deploy controlado

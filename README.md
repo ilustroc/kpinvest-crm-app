@@ -38,8 +38,8 @@ El archivo `u480021566_kpinvest_bd.sql` es la referencia principal de la estruct
 - PHP 8.1 o superior, con plataforma Composer fijada a PHP 8.3.0.
 - Laravel Framework 10.x.
 - MySQL/MariaDB.
-- Bootstrap 5 por CDN solo para vistas legacy.
-- Tailwind CSS v4 y Vite como frontend objetivo de V3.
+- Tailwind CSS v4 y Vite como frontend V3.
+- Bootstrap CSS/JS e Icons fueron retirados del layout global durante la migracion frontend V3.
 - `public/css` y `public/js` ya no tienen assets activos; los assets nuevos pasan por Vite.
 - PhpSpreadsheet para exportaciones Excel.
 - PhpWord y DomPDF/mPDF/iLovePDF para generacion o conversion de documentos.

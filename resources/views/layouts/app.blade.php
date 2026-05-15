@@ -11,13 +11,6 @@
   <link rel="icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
   <link rel="shortcut icon" type="image/png" href="{{ asset('assets/img/logo-superior.png?v=2') }}">
 
-  @hasSection('tailwind_only')
-  @else
-    {{-- Legacy temporal: se retira pantalla por pantalla durante la migracion V3. --}}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  @endif
-
   @vite(['resources/css/app.css', 'resources/js/app.js'])
   @stack('head')
 </head>
@@ -41,10 +34,6 @@
     </main>
   </div>
 
-  @hasSection('tailwind_only')
-  @else
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  @endif
   @stack('scripts')
 </body>
 </html>

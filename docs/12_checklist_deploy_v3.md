@@ -66,12 +66,12 @@
 - [+] Configurar `resources/css/app.css`.
 - [+] Revisar `resources/js/app.js`.
 - [+] Ejecutar `npm run build`.
-- [!] Eliminar Bootstrap del layout principal: parcial, se mantiene condicional para vistas legacy.
+- [+] Eliminar Bootstrap del layout principal.
 - [+] Reemplazar componentes Bootstrap por Tailwind en pantalla piloto.
 - [+] Migrar segunda pantalla piloto a Tailwind.
 - [+] Usar JS modular con Vite en pantalla migrada.
 - [!] Vulnerabilidades moderadas de Vite/esbuild pendientes por posible breaking change.
-- [!] No eliminar Bootstrap globalmente antes de migrar modales/dropdowns dependientes.
+- [+] Bootstrap global eliminado despues de migrar modales/dropdowns dependientes.
 
 ## 5. Checklist de instalacion Tailwind CSS v4
 
@@ -86,13 +86,13 @@
 - [+] Confirmar `public/build/manifest.json`.
 - [+] Confirmar que el layout carga CSS por Vite.
 - [+] Confirmar que el layout carga JS por Vite.
-- [!] Retirar Bootstrap CDN: retirado solo para vistas con `tailwind_only`.
+- [+] Retirar Bootstrap CDN del layout global.
 - [!] Revisar errores en consola: pendiente validacion manual de navegador.
 - [+] Migrar primera pantalla piloto.
 
 ## 6. Bootstrap -> Tailwind
 
-- [!] Migrar layout principal: Vite activo y Bootstrap condicional para legacy.
+- [+] Migrar layout principal: Vite activo sin Bootstrap global.
 - [+] Migrar sidebar/topbar base.
 - [+] Migrar botones base.
 - [+] Migrar badges base.
@@ -108,11 +108,11 @@
 - [+] Migrar Login.
 - [+] Eliminar assets legacy confirmados como no usados de Administracion, Dashboard y Reportes.
 - [+] Eliminar assets legacy de Login.
-- [ ] Migrar clientes.
-- [ ] Migrar CNA.
-- [ ] Migrar promesas.
-- [!] CNA y Promesas deben quedar al final por criticidad.
-- [!] Clientes debe migrarse solo cuando exista validacion funcional suficiente.
+- [+] Migrar clientes.
+- [+] Migrar CNA dentro de Cliente.
+- [+] Migrar promesas dentro de Cliente.
+- [+] Bootstrap eliminado globalmente.
+- [!] Validacion manual visual pendiente en Cliente, CNA y Promesas.
 
 ## 6.1 Arquitectura frontend V3
 
@@ -134,7 +134,9 @@
 - [+] Integraciones sin Bootstrap en layout.
 - [+] Login sin Bootstrap ni assets `public`.
 - [+] Panel principal sin Bootstrap en layout.
-- [!] Clientes y Autorizacion siguen como legacy.
+- [+] Autorizacion sin Bootstrap en layout.
+- [+] Clientes sin Bootstrap en layout.
+- [+] Promesas/CNA dentro de Cliente migradas a componentes y JS Vite.
 
 ## 6.2 Limpieza de archivos legacy
 
@@ -159,8 +161,8 @@
 - [+] Confirmar que no quedan referencias activas a `public/css` o `public/js`.
 - [+] Confirmar migraciones sin duplicados obsoletos.
 - [+] Actualizar `.gitignore` para logs, temporales y estructura generada.
-- [!] Bootstrap CDN sigue activo para vistas legacy.
-- [!] Panel, Clientes y Autorizacion siguen pendientes de migracion completa.
+- [+] Bootstrap CDN retirado del layout.
+- [+] Clientes migrado a Tailwind/Vite.
 
 ## 6.3 Fase 7.2 y 7.3 - Integraciones y Login
 
@@ -177,7 +179,7 @@
 - [+] Eliminar Bootstrap Icons directo de Login.
 - [+] Eliminar `public/css/auth/login.css`.
 - [+] Eliminar `public/js/auth/login.js`.
-- [!] Bootstrap sigue condicional para Clientes, Autorizacion, CNA y Promesas.
+- [+] Bootstrap no carga en Integraciones/Login.
 
 ## 6.4 Fase 7.4 - Panel principal
 
@@ -193,7 +195,64 @@
 - [+] Importar modulo de Panel desde `resources/js/app.js`.
 - [+] Quitar Chart.js por CDN.
 - [+] Usar Chart.js desde npm/Vite.
-- [!] Bootstrap sigue condicional para Clientes, Autorizacion, CNA y Promesas.
+- [+] Bootstrap no carga en Panel principal.
+
+## 6.5 Fase 7.5 - Autorizacion
+
+- [+] Migrar `resources/views/autorizacion/index.blade.php` a Tailwind/Vite.
+- [+] Agregar `@section('tailwind_only', true)` a Autorizacion.
+- [+] Reemplazar cards Bootstrap por componentes Blade/Tailwind.
+- [+] Reemplazar botones por `x-ui.button`.
+- [+] Reemplazar tablas por `x-tables.*`.
+- [+] Reemplazar alertas por `x-feedback.alert`.
+- [+] Reemplazar paginacion Bootstrap de CNA.
+- [+] Reemplazar modales Bootstrap por modales Tailwind.
+- [+] Crear componentes `resources/views/components/autorizacion/*`.
+- [+] Crear `resources/js/modules/autorizacion/index.js`.
+- [+] Importar modulo de Autorizacion desde `resources/js/app.js`.
+- [+] Mantener formularios POST, CSRF y rutas actuales.
+- [+] Clientes deja de ser vista legacy Bootstrap.
+- [!] Validacion manual visual pendiente para acciones de workflow.
+
+## 6.6 Fase 7.6 - Clientes y cierre Bootstrap
+
+- [+] Migrar `resources/views/clientes/show.blade.php` a Tailwind/Vite.
+- [+] Agregar `@section('tailwind_only', true)` a Clientes.
+- [+] Reemplazar cards Bootstrap por componentes Blade/Tailwind.
+- [+] Reemplazar botones por `x-ui.button`.
+- [+] Reemplazar tablas por `x-tables.*`.
+- [+] Reemplazar alertas por `x-feedback.alert`.
+- [+] Reemplazar modales Bootstrap por `x-ui.modal`.
+- [+] Crear componentes `resources/views/components/clientes/*`.
+- [+] Crear componentes `resources/views/components/promesas/*`.
+- [+] Crear componentes `resources/views/components/cna/*`.
+- [+] Crear `resources/js/modules/clientes/show.js`.
+- [+] Crear `resources/js/modules/promesas/form.js`.
+- [+] Crear `resources/js/modules/promesas/schedule.js`.
+- [+] Crear `resources/js/modules/cna/form.js`.
+- [+] Importar modulo de Clientes desde `resources/js/app.js`.
+- [+] Mantener formularios POST, CSRF y rutas actuales.
+- [+] Eliminar Bootstrap CSS, Bootstrap Icons y Bootstrap JS del layout global.
+- [!] Validacion manual visual pendiente para Cliente, Promesas y CNA.
+
+## 6.7 Cierre frontend Tailwind/Vite
+
+- [+] Confirmar que `resources/views/promesas_placeholder.txt` no existe.
+- [+] Buscar referencias a `promesas_placeholder` y `placeholder.txt`.
+- [+] Confirmar Bootstrap CSS eliminado.
+- [+] Confirmar Bootstrap JS eliminado.
+- [+] Confirmar Bootstrap Icons eliminado.
+- [+] Confirmar ausencia de `data-bs`, `form-control`, `table-responsive` y `modal fade` en vistas/JS activos.
+- [+] Confirmar que `public/css` no tiene archivos activos.
+- [+] Confirmar que `public/js` no tiene archivos activos.
+- [+] Eliminar `.gitkeep` innecesarios en modulos con archivos reales.
+- [+] Revisar componentes duplicados.
+- [+] Mantener wrappers `x-feedback.*` y componentes `x-ui.*` por compatibilidad con pantallas migradas.
+- [+] Eliminar componentes placeholder no usados.
+- [+] Revisar `resources/js/app.js`.
+- [+] Revisar `resources/views/layouts/app.blade.php`.
+- [!] Referencias restantes a Bootstrap son historicas/documentales o propias del framework (`bootstrap/app.php`, `bootstrap/cache`, PHPUnit).
+- [!] Validacion manual de navegador pendiente.
 
 ## 7. Migraciones
 

@@ -20,8 +20,11 @@ Pantallas ya migradas a Tailwind/Vite:
 - [+] Integracion de asignaciones.
 - [+] Integracion de CCD.
 - [+] Login.
+- [+] Panel principal `/`.
+- [+] Autorizacion.
+- [+] Clientes.
 
-Bootstrap sigue activo de forma condicional para vistas legacy que no declaran:
+Bootstrap ya no se carga desde el layout. Las pantallas migradas conservan esta marca documental:
 
 ```blade
 @section('tailwind_only', true)
@@ -67,16 +70,15 @@ Carpetas eliminadas al quedar vacias:
 
 ## CDN usados todavia
 
-Desde `resources/views/layouts/app.blade.php`, solo para vistas legacy:
+Desde `resources/views/layouts/app.blade.php`:
 
-- Bootstrap CSS.
-- Bootstrap Icons.
-- Bootstrap JS bundle.
 - Google Fonts.
+- Vite para `resources/css/app.css` y `resources/js/app.js`.
 
 Desde vistas legacy:
 
-- No quedan CDN adicionales fuera del layout legacy.
+- No quedan CDN adicionales fuera del layout.
+- No quedan vistas legacy Bootstrap detectadas.
 
 Login ya no carga Bootstrap, Bootstrap Icons ni assets desde `public`.
 
@@ -110,7 +112,7 @@ Estado:
 - [+] Tablas parciales migradas a componentes `x-tables.*`.
 - [+] Filtros multiselect migrados a `x-reportes.multiselect`.
 - [+] JS migrado a `resources/js/modules/reportes`.
-- [+] Sin Bootstrap CDN al declarar `tailwind_only`.
+- [+] Sin Bootstrap CDN global.
 - [+] Archivos antiguos de reportes en `public/css/reportes` y `public/js/reportes` eliminados.
 
 ## Integraciones
@@ -161,20 +163,19 @@ Vista:
 
 - `resources/views/clientes/show.blade.php`.
 
-Legacy detectado:
+Estado:
 
-- CSS embebido extenso.
-- JS embebido extenso.
-- Bootstrap modals.
-- Bootstrap dropdowns/collapse/tooltips.
-- Bootstrap Icons.
-- Formularios y tablas con clases Bootstrap.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a `resources/js/modules/clientes/show.js`.
+- [+] Modales Bootstrap reemplazados por modales Tailwind.
+- [+] Dropdown/collapse/tooltips Bootstrap reemplazados por `details`, `title` y JS modular.
+- [+] Bootstrap Icons retirado.
+- [+] Formularios y tablas migrados a componentes Tailwind.
+- [+] Bootstrap ya no carga en Cliente.
 
 Pendiente:
 
-- Dividir vista en partials/componentes.
-- Mover JS a `resources/js/modules/clientes`.
-- Migrar modales de Promesa y CNA con componentes V3.
+- [!] Validacion manual visual y funcional sobre navegador real.
 
 ## Autorizacion
 
@@ -182,38 +183,36 @@ Vista:
 
 - `resources/views/autorizacion/index.blade.php`.
 
-Legacy detectado:
+Estado:
 
-- CSS embebido.
-- JS embebido.
-- Bootstrap modals.
-- Bootstrap pagination.
-- Bootstrap Icons.
-- Tablas con clases Bootstrap.
+- [+] Migrada a Tailwind/Vite.
+- [+] Usa `@section('tailwind_only', true)`.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a `resources/js/modules/autorizacion/index.js`.
+- [+] Modales Bootstrap reemplazados por modales Tailwind.
+- [+] Paginacion Bootstrap reemplazada.
+- [+] Sin Bootstrap classes ni Bootstrap Icons.
 
 Pendiente:
 
-- Crear componentes de workflow.
-- Mover JS a `resources/js/modules/autorizacion`.
-- Migrar tablas y modales.
+- [!] Validacion manual visual de modales, aprobaciones/rechazos y ficha CNA.
 
 ## CNA
 
 Modulo visual:
 
 - Parte de CNA vive en `clientes/show.blade.php`.
-- Parte de CNA vive en `autorizacion/index.blade.php`.
+- El workflow CNA en `autorizacion/index.blade.php` ya fue migrado a Tailwind/Vite.
 - Descargas DOCX/PDF no tienen vista propia principal.
 
-Legacy detectado:
+Estado:
 
-- Formularios CNA dentro de modales Bootstrap.
-- Workflow CNA dentro de autorizacion legacy.
+- [+] Formulario CNA migrado a `resources/views/components/cna/create-modal.blade.php`.
+- [+] Logica CNA movida a `resources/js/modules/cna/form.js`.
 
 Pendiente:
 
-- Crear componentes `components/cna`.
-- Crear JS `resources/js/modules/cna`.
+- [!] Validar creacion CNA con datos locales controlados.
 
 ## Promesas
 
@@ -222,18 +221,16 @@ Modulo visual:
 - Creacion de promesas en `clientes/show.blade.php`.
 - Workflow de promesas en `autorizacion/index.blade.php`.
 
-Legacy detectado:
+Estado:
 
-- Formulario grande embebido.
-- Cronograma con JS embebido.
-- Modales Bootstrap.
-- Bootstrap Icons.
+- [+] Formulario grande separado en componentes `components/promesas`.
+- [+] Cronograma movido a JS modular en `resources/js/modules/promesas`.
+- [+] Modales Bootstrap reemplazados por `x-ui.modal`.
+- [+] Bootstrap Icons retirado.
 
 Pendiente:
 
-- Crear componentes `components/promesas`.
-- Crear JS `resources/js/modules/promesas`.
-- Revisar comportamiento de cuota balon.
+- [!] Validar creacion de cancelacion, convenio y cuota balon en navegador real.
 
 ## Otros
 
@@ -275,12 +272,29 @@ Regla:
 - No agregar nuevos archivos a `public/css` ni `public/js`.
 - Todo asset nuevo debe vivir en `resources/css`, `resources/js` y cargarse por Vite.
 
+## Cierre frontend Tailwind/Vite
+
+Estado:
+
+- [+] `resources/views/promesas_placeholder.txt` no existe.
+- [+] No hay referencias a `promesas_placeholder` ni `placeholder.txt`.
+- [+] `.gitkeep` innecesarios eliminados en carpetas con archivos reales.
+- [+] Componentes placeholder no usados eliminados: `clientes/account-card`, `cna/cna-history`, `cna/cna-summary`.
+- [+] No quedan archivos activos en `public/css` ni `public/js`.
+- [+] Bootstrap CSS, JS e Icons no cargan desde el layout.
+- [+] No quedan `data-bs`, `form-control`, `table-responsive` ni `modal fade` en vistas/JS activos.
+
+Falsos positivos esperados al buscar Bootstrap:
+
+- `bootstrap/app.php`, `bootstrap/cache` y referencias de PHPUnit/Composer.
+- Menciones historicas o de cierre en documentacion V3.
+
 ## Orden recomendado pendiente
 
-1. Migrar Autorizacion.
-2. Migrar Clientes.
-3. Migrar CNA/Promesas finos.
-4. Retirar Bootstrap CDN del layout.
+1. Validar manualmente Cliente, Promesas y CNA.
+2. Ejecutar pruebas funcionales completas.
+3. Revisar responsive/mobile.
+4. Mantener regla de no agregar assets en `public/css` o `public/js`.
 
 ## Regla
 

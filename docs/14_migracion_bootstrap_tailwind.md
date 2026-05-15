@@ -18,12 +18,12 @@ Eliminar Bootstrap progresivamente y reemplazarlo por Tailwind CSS v4, component
 - [+] Modal reutilizable creado.
 - [+] JS modular creado para Administracion y Dashboard.
 - [+] JS modular creado para Reportes.
-- [!] Bootstrap legacy se mantiene condicional para vistas no migradas.
-- [ ] Bootstrap eliminado globalmente.
+- [+] Bootstrap legacy eliminado de vistas operativas.
+- [+] Bootstrap eliminado globalmente.
 
 ## Estrategia actual
 
-El layout principal conserva Bootstrap solo para vistas legacy.
+El layout principal ya no carga Bootstrap. Vite es el unico canal de CSS/JS de la aplicacion.
 
 Las vistas migradas declaran:
 
@@ -162,6 +162,7 @@ import './modules/reportes/cna';
 import './modules/integracion/imports';
 import './modules/auth/login';
 import './modules/panel/resumen';
+import './modules/autorizacion/index';
 ```
 
 Regla:
@@ -178,18 +179,18 @@ Regla:
 4. Integraciones. Estado: migrado.
 5. Login. Estado: migrado.
 6. Panel principal `/`. Estado: migrado.
-7. Autorizacion.
-8. Clientes.
-9. CNA.
-10. Promesas.
+7. Autorizacion. Estado: migrado.
+8. Clientes. Estado: migrado.
+9. CNA dentro de Cliente. Estado: migrado.
+10. Promesas dentro de Cliente. Estado: migrado.
 
-Clientes, Autorizacion, CNA y Promesas deben quedar al final porque concentran flujo operativo critico.
+Clientes, Autorizacion, CNA y Promesas se migraron al final porque concentran flujo operativo critico.
 
 ## Riesgos
 
-- [!] Algunas vistas legacy dependen de Bootstrap JS para modales, dropdowns o spinners.
-- [!] Bootstrap Icons sigue siendo usado en vistas legacy.
-- [!] Clientes y Autorizacion conservan Bootstrap JS por flujos de modales/workflow.
+- [+] No quedan vistas operativas con Bootstrap JS detectado.
+- [+] Bootstrap Icons fue retirado del layout global.
+- [+] Clientes ya no conserva Bootstrap JS para modales/workflow.
 - [!] El salto de dependencias por `npm audit fix --force` podria romper Vite.
 
 ## Limpieza ejecutada
@@ -266,6 +267,60 @@ Estado:
 - [+] Chart.js por CDN retirado.
 - [+] Chart.js usado desde npm/Vite.
 
+## Fase 7.5 - Autorizacion
+
+Archivos migrados:
+
+- `resources/views/autorizacion/index.blade.php`.
+- `resources/js/modules/autorizacion/index.js`.
+- `resources/views/components/autorizacion/decision-modal.blade.php`.
+- `resources/views/components/autorizacion/detail-field.blade.php`.
+
+Estado:
+
+- [+] Autorizacion sin Bootstrap en layout.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a Vite.
+- [+] Modales Bootstrap reemplazados por modales Tailwind.
+- [+] Tabla de promesas y tabla CNA migradas a componentes Tailwind.
+- [+] Paginacion CNA migrada fuera de Bootstrap.
+
+## Fase 7.6 - Clientes
+
+Archivos migrados:
+
+- `resources/views/clientes/show.blade.php`.
+- `resources/js/modules/clientes/show.js`.
+- `resources/js/modules/promesas/form.js`.
+- `resources/js/modules/promesas/schedule.js`.
+- `resources/js/modules/cna/form.js`.
+- `resources/views/components/clientes/*`.
+- `resources/views/components/promesas/*`.
+- `resources/views/components/cna/*`.
+
+Estado:
+
+- [+] Clientes sin Bootstrap en layout.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a Vite.
+- [+] Modales Bootstrap reemplazados por `x-ui.modal`.
+- [+] Dropdown/collapse/tooltips Bootstrap reemplazados por `details`, `title` y JS modular.
+- [+] Formulario de Promesas separado en componentes y JS Vite.
+- [+] Formulario CNA separado en componentes y JS Vite.
+- [+] Bootstrap global retirado de `resources/views/layouts/app.blade.php`.
+
+## Cierre frontend
+
+Estado:
+
+- [+] Bootstrap CSS/JS/Icon CDN eliminado del layout global.
+- [+] No quedan assets activos en `public/css` ni `public/js`.
+- [+] No quedan clases/atributos Bootstrap en vistas o JS activos.
+- [+] `resources/js/app.js` solo importa modulos reales.
+- [+] `.gitkeep` innecesarios retirados.
+- [+] Componentes placeholder no usados eliminados.
+- [!] Quedan menciones a Bootstrap en documentacion historica y archivos propios del framework, no como dependencia frontend activa.
+
 ## Validaciones realizadas
 
 - [+] `npm run dev`.
@@ -277,4 +332,4 @@ Estado:
 
 ## Regla final
 
-No eliminar Bootstrap globalmente hasta que las vistas legacy criticas hayan sido migradas o verificadas con reemplazos Tailwind/JS equivalentes.
+Bootstrap ya fue eliminado globalmente. Cualquier nueva pantalla debe usar Tailwind, Blade Components y assets por Vite.

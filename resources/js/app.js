@@ -1,6 +1,8 @@
 import './modules/layout/sidebar';
 import './modules/admin/users';
 import './modules/auth/login';
+import './modules/autorizacion/index';
+import './modules/clientes/show';
 import './modules/dashboard/stats';
 import './modules/integracion/imports';
 import './modules/panel/resumen';

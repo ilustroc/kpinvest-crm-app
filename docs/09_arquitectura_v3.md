@@ -78,14 +78,14 @@ V3 tomara ideas utiles de Clean Architecture, pero de forma ligera:
 
 ## Arquitectura actual detectada
 
-Actualmente el sistema se parece a un MVC tradicional:
+Al inicio de la V3 el sistema se parecia a un MVC tradicional:
 
 - `routes/web.php` concentra las rutas.
 - `app/Http/Controllers` concentra controladores de todos los modulos.
 - `app/Models` contiene modelos Eloquent.
 - `app/Services` ya existe, pero no esta organizado completamente por dominio.
 - `resources/views` contiene vistas Blade.
-- El frontend mezcla Bootstrap, CSS embebido, JS embebido, archivos en `public/` y Vite.
+- El frontend mezclaba Bootstrap, CSS embebido, JS embebido, archivos en `public/` y Vite.
 
 El sistema funciona, pero necesita orden modular.
 
@@ -95,7 +95,7 @@ El sistema funciona, pero necesita orden modular.
 - Vistas muy extensas con HTML, JS y reglas visuales mezcladas.
 - Rutas en un solo archivo.
 - Permisos repartidos en rutas, controladores y vistas.
-- Frontend repartido entre Bootstrap CDN, CSS en layout, `public/js` y Vite.
+- Frontend repartido historicamente entre Bootstrap CDN, CSS en layout, `public/js` y Vite; en Fase 7 se retiro Bootstrap globalmente y se consolido Vite.
 - Poca cobertura de pruebas.
 - Migraciones no alineadas con la base real.
 

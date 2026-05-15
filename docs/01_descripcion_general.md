@@ -9,9 +9,7 @@ El sistema esta orientado a roles operativos:
 - `asesor`: consulta clientes, registra promesas y solicitudes CNA.
 - `supervisor`: revisa y preaprueba solicitudes de su equipo.
 - `administrador`: aprueba o rechaza solicitudes preaprobadas y gestiona usuarios.
-- `sistemas`: rol con permisos elevados similares a administracion en varias zonas.
 - `soporte`: rol operativo con acceso a integraciones, reportes o gestion limitada segun el modulo.
-- `usuario`: rol existente en base de datos, con uso funcional menos claro en el codigo actual.
 
 ## Flujo funcional principal
 
@@ -31,7 +29,7 @@ El sistema esta orientado a roles operativos:
 - MySQL/MariaDB como motor de base de datos.
 - Sesiones web para autenticacion.
 - Blade para vistas.
-- Bootstrap 5 y Bootstrap Icons via CDN.
+- Tailwind CSS v4 y Vite para frontend.
 - JavaScript vanilla para interacciones, filtros y tablas AJAX.
 - PhpSpreadsheet para generar XLSX.
 - PhpWord e iLovePDF para generar DOCX/PDF.
@@ -40,11 +38,11 @@ El sistema esta orientado a roles operativos:
 
 - SMTP configurado por variables `MAIL_*`.
 - iLovePDF configurado por `ILOVEPDF_PUBLIC_KEY` e `ILOVEPDF_SECRET_KEY`.
-- CDNs externos en vistas para Bootstrap, Bootstrap Icons, Google Fonts y Chart.js.
+- Google Fonts desde CDN.
+- Chart.js gestionado por npm/Vite en las pantallas migradas.
 
 ## Estado actual del proyecto
 
 El sistema esta en produccion y tiene una base de datos real documentada en `u480021566_kpinvest_bd.sql`. Las migraciones actuales son parciales y no reconstruyen todo el esquema productivo.
 
 La version 3 debe partir de este diagnostico, no de ejecutar migraciones existentes.
-

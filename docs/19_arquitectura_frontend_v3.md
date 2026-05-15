@@ -161,6 +161,7 @@ if (root) {
 - `resources/js/modules/integracion/imports.js`.
 - `resources/js/modules/auth/login.js`.
 - `resources/js/modules/panel/resumen.js`.
+- `resources/js/modules/autorizacion/index.js`.
 
 ## CSS
 
@@ -189,16 +190,28 @@ Regla:
 - Integracion de CCD.
 - Login.
 - Panel principal `/`.
+- Autorizacion.
+- Clientes.
+- Promesas dentro de Cliente.
+- CNA dentro de Cliente.
 
 ## Legacy temporal
 
-Bootstrap se mantiene condicionalmente desde `resources/views/layouts/app.blade.php` para vistas sin `tailwind_only`.
+Bootstrap ya no se carga desde `resources/views/layouts/app.blade.php`.
 
 Vistas legacy principales:
 
-- Clientes.
-- Autorizacion.
-- CNA/Promesas dentro de Clientes y Autorizacion.
+- No quedan vistas operativas con dependencia Bootstrap detectada.
+
+Layout final:
+
+- `resources/views/layouts/app.blade.php` carga solamente `@vite(['resources/css/app.css', 'resources/js/app.js'])` para assets de aplicacion.
+- No existe condicion `tailwind_only` para cargar o retirar Bootstrap.
+
+Entrada JS final:
+
+- `resources/js/app.js` importa solo modulos reales.
+- Cada modulo se inicializa por selector/data-module propio o por eventos seguros.
 
 Archivos legacy activos en `public`:
 
@@ -212,8 +225,16 @@ Archivos legacy eliminados:
 - Assets antiguos de Login.
 - Assets genericos no referenciados en `public/css` y `public/js`.
 
+Componentes de dominio creados:
+
+- `resources/views/components/autorizacion/decision-modal.blade.php`.
+- `resources/views/components/autorizacion/detail-field.blade.php`.
+- `resources/views/components/clientes/*`.
+- `resources/views/components/promesas/*`.
+- `resources/views/components/cna/*`.
+
 ## Decision
 
 Fase 7 establece la arquitectura frontend V3 y migra Reportes como primer modulo completo bajo esa arquitectura.
 
-Bootstrap se elimina al final, no antes.
+Bootstrap fue eliminado al final de la migracion de Clientes. Vite queda como canal unico de assets frontend.
