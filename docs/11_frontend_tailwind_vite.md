@@ -92,10 +92,10 @@ El frontend actual esta en transicion. Todavia existen partes legacy que usan:
 - Bootstrap 5 via CDN.
 - Bootstrap Icons via CDN.
 - Google Fonts via CDN.
-- Chart.js via CDN en algunas vistas.
+- Chart.js instalado por npm y usado desde Vite en Dashboard y Panel.
 - CSS embebido en `resources/views/layouts/app.blade.php`.
-- CSS legacy activo solo en `public/css/auth/login.css`.
-- JS legacy activo solo en `public/js/auth/login.js`.
+- No quedan CSS activos en `public/css`.
+- No quedan JS activos en `public/js`.
 - JS embebido en vistas grandes.
 - Vite instalado, pero no como unico canal de assets.
 
@@ -446,11 +446,62 @@ Estado:
 - [+] Eliminados assets antiguos de Dashboard: `public/css/dashboard-stats.css` y `public/js/dashboard-stats.js`.
 - [+] Eliminados assets antiguos de Administracion: `public/css/admin/admin.css` y `public/js/admin/admin.js`.
 - [+] Eliminados assets genericos no referenciados: `public/css/app.css`, `public/js/app.js`, `public/js/bootstrap.js`, `public/css/layout/app.css` y `public/js/layout/app.js`.
-- [!] Se mantiene Login como legacy temporal con `public/css/auth/login.css` y `public/js/auth/login.js`.
+- [+] Login migrado a Tailwind/Vite.
+- [+] Eliminados assets antiguos de Login: `public/css/auth/login.css` y `public/js/auth/login.js`.
+- [+] `public/css` y `public/js` quedan sin archivos activos.
 
 Regla:
 
 - No volver a crear archivos nuevos en `public/css` o `public/js` salvo excepcion temporal documentada.
+
+## Fase 7.2 - Integraciones
+
+Estado:
+
+- [+] `resources/views/placeholders/integracion-pagos.blade.php` migrada a Tailwind/Vite.
+- [+] `resources/views/placeholders/integracion-data.blade.php` migrada a Tailwind/Vite.
+- [+] `resources/views/placeholders/integracion-asignacion.blade.php` migrada a Tailwind/Vite.
+- [+] `resources/views/placeholders/integracion-ccd.blade.php` migrada a Tailwind/Vite.
+- [+] Precheck CSV de pagos movido a `resources/js/modules/integracion/imports.js`.
+- [+] Modulo importado desde `resources/js/app.js`.
+- [+] Sin Bootstrap classes, Bootstrap Icons, CSS embebido ni scripts embebidos.
+
+Pendiente:
+
+- [!] Validacion manual en navegador con CSV reales grandes.
+
+## Fase 7.3 - Login
+
+Estado:
+
+- [+] `resources/views/auth/login.blade.php` migrada a Tailwind/Vite.
+- [+] Bootstrap CSS/JS directo retirado.
+- [+] Bootstrap Icons retirado.
+- [+] JS movido a `resources/js/modules/auth/login.js`.
+- [+] Modulo importado desde `resources/js/app.js`.
+- [+] `public/css/auth/login.css` eliminado.
+- [+] `public/js/auth/login.js` eliminado.
+
+Pendiente:
+
+- [!] Validacion manual responsive y comportamiento de Caps Lock/password.
+
+## Fase 7.4 - Panel principal
+
+Estado:
+
+- [+] `resources/views/panel/resumen.blade.php` migrada a Tailwind/Vite.
+- [+] `@section('tailwind_only', true)` agregado.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a `resources/js/modules/panel/resumen.js`.
+- [+] Chart.js por CDN retirado.
+- [+] Chart.js importado desde npm en el modulo Vite.
+- [+] Buscador rapido y sugerencias movidos al modulo JS del Panel.
+- [+] Panel principal ya no carga Bootstrap ni Bootstrap Icons.
+
+Pendiente:
+
+- [!] Validacion visual manual del grafico, sugerencias del buscador y responsive.
 
 ## Riesgos
 

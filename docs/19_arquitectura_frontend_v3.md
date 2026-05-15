@@ -16,7 +16,7 @@ El frontend historico esta mezclado entre varias capas:
 - CSS historico en `public/css`.
 - JS historico en `public/js`.
 - Scripts grandes embebidos en Blade.
-- Chart.js por CDN en vistas legacy.
+- Chart.js historicamente cargado por CDN en vistas legacy; Dashboard y Panel ya lo usan desde Vite.
 - Vite configurado, pero usado solo en pantallas migradas.
 - Componentes visuales repetidos.
 - Reportes, Clientes, Autorizacion e Integraciones con estructuras diferentes.
@@ -101,9 +101,11 @@ resources/css/app.css
 - [+] `resources/views/pages/*` creado como estructura futura.
 - [+] `resources/js/core/` creado.
 - [+] `resources/js/modules/reportes/` creado.
-- [+] Carpetas JS futuras creadas para integracion, clientes, autorizacion, CNA y promesas.
+- [+] `resources/js/modules/integracion/` creado y usado.
+- [+] `resources/js/modules/auth/` creado y usado.
+- [+] Carpetas JS futuras creadas para clientes, autorizacion, CNA y promesas.
 - [+] Assets legacy no referenciados eliminados de `public/css` y `public/js`.
-- [+] `public/css` y `public/js` quedan reducidos a Login como legacy temporal.
+- [+] Login migrado a Vite; no quedan assets activos en `public/css` ni `public/js`.
 
 ## Convenciones de componentes
 
@@ -156,6 +158,9 @@ if (root) {
 - `resources/js/modules/reportes/pagos.js`.
 - `resources/js/modules/reportes/promesas.js`.
 - `resources/js/modules/reportes/cna.js`.
+- `resources/js/modules/integracion/imports.js`.
+- `resources/js/modules/auth/login.js`.
+- `resources/js/modules/panel/resumen.js`.
 
 ## CSS
 
@@ -178,6 +183,12 @@ Regla:
 - Reporte de pagos.
 - Reporte de promesas.
 - Reporte CNA.
+- Integracion de pagos.
+- Integracion de data maestra.
+- Integracion de asignaciones.
+- Integracion de CCD.
+- Login.
+- Panel principal `/`.
 
 ## Legacy temporal
 
@@ -185,22 +196,20 @@ Bootstrap se mantiene condicionalmente desde `resources/views/layouts/app.blade.
 
 Vistas legacy principales:
 
-- Panel principal `/`.
-- Integraciones.
 - Clientes.
 - Autorizacion.
-- Login.
+- CNA/Promesas dentro de Clientes y Autorizacion.
 
 Archivos legacy activos en `public`:
 
-- `public/css/auth/login.css`.
-- `public/js/auth/login.js`.
+- Ninguno.
 
 Archivos legacy eliminados:
 
 - Assets antiguos de Reportes.
 - Assets antiguos de Dashboard.
 - Assets antiguos de Administracion.
+- Assets antiguos de Login.
 - Assets genericos no referenciados en `public/css` y `public/js`.
 
 ## Decision

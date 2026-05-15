@@ -159,6 +159,9 @@ import './modules/dashboard/stats';
 import './modules/reportes/pagos';
 import './modules/reportes/promesas';
 import './modules/reportes/cna';
+import './modules/integracion/imports';
+import './modules/auth/login';
+import './modules/panel/resumen';
 ```
 
 Regla:
@@ -172,12 +175,13 @@ Regla:
 1. Reporte de pagos. Estado: migrado.
 2. Reporte de promesas. Estado: migrado.
 3. Reporte CNA. Estado: migrado.
-4. Integraciones.
-5. Panel principal `/`.
-6. Clientes.
+4. Integraciones. Estado: migrado.
+5. Login. Estado: migrado.
+6. Panel principal `/`. Estado: migrado.
 7. Autorizacion.
-8. CNA.
-9. Promesas.
+8. Clientes.
+9. CNA.
+10. Promesas.
 
 Clientes, Autorizacion, CNA y Promesas deben quedar al final porque concentran flujo operativo critico.
 
@@ -185,8 +189,7 @@ Clientes, Autorizacion, CNA y Promesas deben quedar al final porque concentran f
 
 - [!] Algunas vistas legacy dependen de Bootstrap JS para modales, dropdowns o spinners.
 - [!] Bootstrap Icons sigue siendo usado en vistas legacy.
-- [!] Login conserva CSS antiguo en `public/css/auth/login.css`.
-- [!] Login conserva JS antiguo en `public/js/auth/login.js`.
+- [!] Clientes y Autorizacion conservan Bootstrap JS por flujos de modales/workflow.
 - [!] El salto de dependencias por `npm audit fix --force` podria romper Vite.
 
 ## Limpieza ejecutada
@@ -208,15 +211,60 @@ Archivos eliminados:
 - `public/js/bootstrap.js`.
 - `public/css/layout/app.css`.
 - `public/js/layout/app.js`.
-
-Se mantienen:
-
 - `public/css/auth/login.css`.
 - `public/js/auth/login.js`.
 
-Motivo:
+Estado actual:
 
-- Login todavia no fue migrado a Tailwind/Vite.
+- [+] No quedan archivos activos en `public/css`.
+- [+] No quedan archivos activos en `public/js`.
+
+## Fase 7.2 - Integraciones
+
+Archivos migrados:
+
+- `resources/views/placeholders/integracion-pagos.blade.php`.
+- `resources/views/placeholders/integracion-data.blade.php`.
+- `resources/views/placeholders/integracion-asignacion.blade.php`.
+- `resources/views/placeholders/integracion-ccd.blade.php`.
+- `resources/js/modules/integracion/imports.js`.
+
+Estado:
+
+- [+] Vistas sin Bootstrap en layout.
+- [+] Formularios con Tailwind y componentes Blade.
+- [+] Alertas con `x-feedback.alert`.
+- [+] Precheck CSV movido desde Blade a Vite.
+
+## Fase 7.3 - Login
+
+Archivos migrados:
+
+- `resources/views/auth/login.blade.php`.
+- `resources/js/modules/auth/login.js`.
+
+Estado:
+
+- [+] Login sin Bootstrap CSS/JS.
+- [+] Login sin Bootstrap Icons.
+- [+] Login cargado por Vite.
+- [+] Assets antiguos de Login eliminados desde `public`.
+
+## Fase 7.4 - Panel principal
+
+Archivos migrados:
+
+- `resources/views/panel/resumen.blade.php`.
+- `resources/js/modules/panel/resumen.js`.
+
+Estado:
+
+- [+] Panel principal sin Bootstrap en layout.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a Vite.
+- [+] Buscador rapido y sugerencias movidos a modulo JS.
+- [+] Chart.js por CDN retirado.
+- [+] Chart.js usado desde npm/Vite.
 
 ## Validaciones realizadas
 

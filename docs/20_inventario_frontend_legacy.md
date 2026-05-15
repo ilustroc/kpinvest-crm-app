@@ -15,6 +15,11 @@ Pantallas ya migradas a Tailwind/Vite:
 - [+] Reporte de pagos.
 - [+] Reporte de promesas.
 - [+] Reporte CNA.
+- [+] Integracion de pagos.
+- [+] Integracion de data maestra.
+- [+] Integracion de asignaciones.
+- [+] Integracion de CCD.
+- [+] Login.
 
 Bootstrap sigue activo de forma condicional para vistas legacy que no declaran:
 
@@ -33,6 +38,7 @@ Archivos eliminados por no tener referencias activas desde Blade, Vite, PHP, rut
 - `public/css/reportes/pagos.css`.
 - `public/css/reportes/promesas.css`.
 - `public/css/reportes/cna.css`.
+- `public/css/auth/login.css`.
 - `public/js/app.js`.
 - `public/js/bootstrap.js`.
 - `public/js/layout/app.js`.
@@ -41,6 +47,7 @@ Archivos eliminados por no tener referencias activas desde Blade, Vite, PHP, rut
 - `public/js/reportes/pagos.js`.
 - `public/js/reportes/promesas.js`.
 - `public/js/reportes/cna.js`.
+- `public/js/auth/login.js`.
 - `resources/views/welcome.blade.php`.
 - `error_log`.
 - `estructura_generada_v3.sql`.
@@ -50,9 +57,13 @@ Carpetas eliminadas al quedar vacias:
 - `public/css/admin`.
 - `public/css/layout`.
 - `public/css/reportes`.
+- `public/css/auth`.
+- `public/css`.
 - `public/js/admin`.
 - `public/js/layout`.
 - `public/js/reportes`.
+- `public/js/auth`.
+- `public/js`.
 
 ## CDN usados todavia
 
@@ -65,28 +76,29 @@ Desde `resources/views/layouts/app.blade.php`, solo para vistas legacy:
 
 Desde vistas legacy:
 
-- `resources/views/panel/resumen.blade.php`: Chart.js por CDN.
-- `resources/views/auth/login.blade.php`: Bootstrap CSS/JS y Bootstrap Icons por CDN.
+- No quedan CDN adicionales fuera del layout legacy.
+
+Login ya no carga Bootstrap, Bootstrap Icons ni assets desde `public`.
 
 ## Archivos activos en public/css
 
-Activos por referencia directa desde Blade:
+Estado:
 
-- `public/css/auth/login.css`.
+- [+] No quedan archivos activos en `public/css`.
 
-Motivo:
+Regla:
 
-- `resources/views/auth/login.blade.php` todavia no fue migrada a Tailwind/Vite.
+- No agregar CSS nuevo en `public/css`.
 
 ## Archivos activos en public/js
 
-Activos por referencia directa desde Blade:
+Estado:
 
-- `public/js/auth/login.js`.
+- [+] No quedan archivos activos en `public/js`.
 
-Motivo:
+Regla:
 
-- `resources/views/auth/login.blade.php` todavia no fue migrada a Tailwind/Vite.
+- No agregar JS nuevo en `public/js`.
 
 ## Reportes
 
@@ -110,17 +122,38 @@ Vistas:
 - `resources/views/placeholders/integracion-asignacion.blade.php`.
 - `resources/views/placeholders/integracion-ccd.blade.php`.
 
-Legacy detectado:
+Estado:
 
-- Bootstrap classes: `card`, `btn`, `form-control`, `table-responsive`.
-- Bootstrap Icons.
-- CSS embebido en integracion de pagos.
-- JS embebido en integracion de pagos.
+- [+] Vistas migradas a Tailwind.
+- [+] Usan `@section('tailwind_only', true)`.
+- [+] Formularios migrados a `x-forms.*` y `x-ui.button`.
+- [+] Avisos migrados a `x-feedback.alert`.
+- [+] Tabla de ultimo lote de pagos migrada a `x-tables.*`.
+- [+] Precheck CSV de pagos movido a `resources/js/modules/integracion/imports.js`.
+- [+] Sin Bootstrap classes, Bootstrap Icons, CSS embebido ni scripts embebidos.
 
 Pendiente:
 
-- Migrar a `x-forms.*`, `x-tables.*`, `x-feedback.*`.
-- Mover prevalidacion CSV a `resources/js/modules/integracion`.
+- [!] Validar en navegador real los imports con CSV de negocio grandes.
+
+## Login
+
+Vista:
+
+- `resources/views/auth/login.blade.php`.
+
+Estado:
+
+- [+] Migrada a Tailwind/Vite.
+- [+] Bootstrap CSS/JS eliminado.
+- [+] Bootstrap Icons eliminado.
+- [+] CSS `public/css/auth/login.css` eliminado.
+- [+] JS `public/js/auth/login.js` movido a `resources/js/modules/auth/login.js`.
+- [+] `public/css/auth` y `public/js/auth` eliminadas al quedar vacias.
+
+Pendiente:
+
+- [!] Validar visualmente responsive y comportamiento de Caps Lock/password en navegador real.
 
 ## Clientes
 
@@ -204,40 +237,25 @@ Pendiente:
 
 ## Otros
 
-### Login
-
-Vista:
-
-- `resources/views/auth/login.blade.php`.
-
-Legacy activo:
-
-- Bootstrap CSS/JS por CDN.
-- Bootstrap Icons.
-- `public/css/auth/login.css`.
-- `public/js/auth/login.js`.
-
-Pendiente:
-
-- Migrar login a Tailwind/Vite en fase separada.
-
 ### Panel principal `/`
 
 Vista:
 
 - `resources/views/panel/resumen.blade.php`.
 
-Legacy:
+Estado:
 
-- CSS embebido.
-- JS embebido.
-- Chart.js por CDN.
-- Bootstrap classes.
-- Bootstrap Icons.
+- [+] Migrado a Tailwind/Vite.
+- [+] Usa `@section('tailwind_only', true)`.
+- [+] CSS embebido retirado.
+- [+] JS embebido movido a `resources/js/modules/panel/resumen.js`.
+- [+] Chart.js por CDN eliminado.
+- [+] Chart.js usado desde npm/Vite.
+- [+] Sin Bootstrap classes ni Bootstrap Icons.
 
 Pendiente:
 
-- Migrar o consolidar con Dashboard.
+- [!] Validacion visual manual del grafico, sugerencias del buscador y responsive.
 
 ### Welcome
 
@@ -247,26 +265,22 @@ Estado:
 
 ## Estado actual de public
 
-Despues de la limpieza, solo deben quedar activos:
+Despues de la limpieza de Fase 7.2 y 7.3:
 
-- `public/css/auth/login.css`.
-- `public/js/auth/login.js`.
+- [+] No quedan archivos activos en `public/css`.
+- [+] No quedan archivos activos en `public/js`.
 
 Regla:
 
-- No agregar nuevos archivos a `public/css` ni `public/js` salvo excepcion temporal documentada.
+- No agregar nuevos archivos a `public/css` ni `public/js`.
 - Todo asset nuevo debe vivir en `resources/css`, `resources/js` y cargarse por Vite.
 
 ## Orden recomendado pendiente
 
-1. Migrar Integraciones.
-2. Migrar Login.
-3. Migrar Panel principal.
-4. Migrar Autorizacion.
-5. Migrar Clientes.
-6. Migrar CNA/Promesas finos.
-7. Retirar Bootstrap CDN del layout.
-8. Eliminar `public/css/auth/login.css` y `public/js/auth/login.js` cuando Login migre a Vite.
+1. Migrar Autorizacion.
+2. Migrar Clientes.
+3. Migrar CNA/Promesas finos.
+4. Retirar Bootstrap CDN del layout.
 
 ## Regla
 

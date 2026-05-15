@@ -323,8 +323,19 @@ Estado:
 - [+] Reporte CNA migrado a Tailwind/Vite.
 - [+] Assets legacy sin referencias eliminados de `public/css` y `public/js`.
 - [+] `welcome.blade.php`, `error_log` y `estructura_generada_v3.sql` eliminados del repositorio.
+- [+] Integraciones migradas a Tailwind/Vite.
+- [+] JS de Integraciones movido a `resources/js/modules/integracion/imports.js`.
+- [+] Login migrado a Tailwind/Vite.
+- [+] JS de Login movido a `resources/js/modules/auth/login.js`.
+- [+] `public/css/auth/login.css` eliminado.
+- [+] `public/js/auth/login.js` eliminado.
+- [+] No quedan assets activos en `public/css` ni `public/js`.
+- [+] Panel principal `/` migrado a Tailwind/Vite.
+- [+] Chart.js del Panel principal movido a Vite.
+- [+] JS del Panel principal movido a `resources/js/modules/panel/resumen.js`.
+- [+] Panel principal ya no carga Bootstrap.
 - [!] Bootstrap sigue condicional para vistas legacy.
-- [!] Login conserva temporalmente `public/css/auth/login.css` y `public/js/auth/login.js` hasta migrarlo a Vite.
+- [!] Clientes, Autorizacion, CNA y Promesas siguen pendientes de migracion.
 
 Reglas:
 

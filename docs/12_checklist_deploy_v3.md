@@ -104,7 +104,10 @@
 - [+] Migrar dashboard.
 - [+] JS modular usado en Dashboard.
 - [+] Migrar reportes.
+- [+] Migrar integraciones.
+- [+] Migrar Login.
 - [+] Eliminar assets legacy confirmados como no usados de Administracion, Dashboard y Reportes.
+- [+] Eliminar assets legacy de Login.
 - [ ] Migrar clientes.
 - [ ] Migrar CNA.
 - [ ] Migrar promesas.
@@ -128,7 +131,10 @@
 - [+] Reporte de promesas sin Bootstrap en layout.
 - [+] Reporte CNA sin Bootstrap en layout.
 - [+] Archivos legacy de reportes en `public/` eliminados.
-- [!] Integraciones, Clientes y Autorizacion siguen como legacy.
+- [+] Integraciones sin Bootstrap en layout.
+- [+] Login sin Bootstrap ni assets `public`.
+- [+] Panel principal sin Bootstrap en layout.
+- [!] Clientes y Autorizacion siguen como legacy.
 
 ## 6.2 Limpieza de archivos legacy
 
@@ -147,12 +153,47 @@
 - [+] Eliminar `resources/views/welcome.blade.php` por no tener ruta activa.
 - [+] Eliminar `error_log`.
 - [+] Eliminar `estructura_generada_v3.sql`.
-- [+] Mantener `public/css/auth/login.css` porque Login todavia lo usa.
-- [+] Mantener `public/js/auth/login.js` porque Login todavia lo usa.
+- [+] Eliminar `public/css/auth/login.css` despues de migrar Login.
+- [+] Eliminar `public/js/auth/login.js` despues de migrar Login.
+- [+] Eliminar carpetas vacias `public/css`, `public/js`, `public/css/auth` y `public/js/auth`.
+- [+] Confirmar que no quedan referencias activas a `public/css` o `public/js`.
 - [+] Confirmar migraciones sin duplicados obsoletos.
 - [+] Actualizar `.gitignore` para logs, temporales y estructura generada.
 - [!] Bootstrap CDN sigue activo para vistas legacy.
-- [!] Login, Integraciones, Panel, Clientes y Autorizacion siguen pendientes de migracion completa.
+- [!] Panel, Clientes y Autorizacion siguen pendientes de migracion completa.
+
+## 6.3 Fase 7.2 y 7.3 - Integraciones y Login
+
+- [+] Migrar `integracion-pagos` a Tailwind/Vite.
+- [+] Migrar `integracion-data` a Tailwind/Vite.
+- [+] Migrar `integracion-asignacion` a Tailwind/Vite.
+- [+] Migrar `integracion-ccd` a Tailwind/Vite.
+- [+] Mover precheck CSV de pagos a `resources/js/modules/integracion/imports.js`.
+- [+] Importar modulo de Integraciones desde `resources/js/app.js`.
+- [+] Migrar `resources/views/auth/login.blade.php` a Tailwind/Vite.
+- [+] Mover JS de Login a `resources/js/modules/auth/login.js`.
+- [+] Importar modulo de Login desde `resources/js/app.js`.
+- [+] Eliminar Bootstrap directo de Login.
+- [+] Eliminar Bootstrap Icons directo de Login.
+- [+] Eliminar `public/css/auth/login.css`.
+- [+] Eliminar `public/js/auth/login.js`.
+- [!] Bootstrap sigue condicional para Clientes, Autorizacion, CNA y Promesas.
+
+## 6.4 Fase 7.4 - Panel principal
+
+- [+] Migrar `resources/views/panel/resumen.blade.php` a Tailwind/Vite.
+- [+] Agregar `@section('tailwind_only', true)` al Panel principal.
+- [+] Reemplazar cards Bootstrap por componentes Blade/Tailwind.
+- [+] Reemplazar tabla de coincidencias por `x-tables.*`.
+- [+] Reemplazar botones por `x-ui.button`.
+- [+] Quitar Bootstrap Icons del Panel principal.
+- [+] Quitar CSS embebido del Panel principal.
+- [+] Quitar JS embebido del Panel principal.
+- [+] Crear `resources/js/modules/panel/resumen.js`.
+- [+] Importar modulo de Panel desde `resources/js/app.js`.
+- [+] Quitar Chart.js por CDN.
+- [+] Usar Chart.js desde npm/Vite.
+- [!] Bootstrap sigue condicional para Clientes, Autorizacion, CNA y Promesas.
 
 ## 7. Migraciones
 

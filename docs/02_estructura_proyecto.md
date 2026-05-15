@@ -16,7 +16,7 @@ La aplicacion conserva la estructura clasica de Laravel:
 - `config`: configuracion Laravel y servicios externos.
 - `database/migrations`: baseline V3 basado en el SQL real.
 - `resources/css` y `resources/js`: assets V3 compilados por Vite.
-- `public/css` y `public/js`: legacy temporal, actualmente solo Login.
+- `public/css` y `public/js`: sin assets activos tras la migracion de Login.
 
 ## Directorios de aplicacion
 
@@ -107,14 +107,11 @@ V3 usa Tailwind CSS v4 y Vite como canal principal:
 - `resources/js/core/*`
 - `resources/js/modules/*`
 
-Assets directos que se mantienen temporalmente:
+No quedan assets directos activos en `public/css` ni `public/js`.
 
-- `public/css/auth/login.css`
-- `public/js/auth/login.js`
+Los assets antiguos de Administracion, Dashboard, Reportes, Login y entradas genericas en `public/css` y `public/js` fueron eliminados al quedar sin referencias activas.
 
-Los assets antiguos de Administracion, Dashboard, Reportes y entradas genericas en `public/css` y `public/js` fueron eliminados al quedar sin referencias activas.
-
-Todavia hay CSS y JavaScript embebido en vistas grandes como `clientes/show.blade.php`, `autorizacion/index.blade.php` y `panel/resumen.blade.php`.
+Todavia hay CSS y JavaScript embebido en vistas grandes como `clientes/show.blade.php` y `autorizacion/index.blade.php`.
 
 ## Automatizaciones
 
