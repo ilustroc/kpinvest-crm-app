@@ -25,6 +25,12 @@ Primer avance completado:
 - [+] Se creo un servicio piloto: `app/Services/Admin/UserStatusService.php`.
 - [+] Se creo un ViewModel piloto: `app/ViewModels/Admin/UserIndexViewModel.php`.
 - [+] La pantalla piloto de administracion usa el flujo Controller -> Service/ViewModel -> Blade.
+- [+] Se creo `app/Support/Authorization/Roles.php`.
+- [+] Se creo `app/Policies/UserPolicy.php`.
+- [+] Se definieron Gates iniciales por modulo critico.
+- [+] Reportes, Integracion y Administracion usan Gates en rutas.
+- [+] Sidebar/topbar usan Gates para mostrar accesos.
+- [+] Dashboard fue migrado como segunda pantalla piloto Tailwind/Vite.
 
 Pendiente:
 
@@ -32,7 +38,7 @@ Pendiente:
 - [ ] Crear servicios reales por dominio donde falten.
 - [ ] Crear actions reales para operaciones puntuales.
 - [ ] Crear ViewModels para vistas complejas restantes.
-- [ ] Centralizar Policies/Gates.
+- [!] Migrar permisos internos restantes de Promesas, CNA y Cliente hacia Policies/Gates sin romper workflow.
 
 Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
 La excepcion controlada es `AdminUsersController`, que comenzo a delegar logica simple en un servicio y un ViewModel sin cambiar rutas ni comportamiento esperado.
@@ -142,6 +148,7 @@ app/
     Integracion/
 
   Support/
+    Authorization/
     Formatters/
     Helpers/
 
@@ -177,6 +184,8 @@ Estado actual de carpetas:
 - [+] `app/DTOs/Integracion`.
 - [+] `app/Support/Formatters`.
 - [+] `app/Support/Helpers`.
+- [+] `app/Support/Authorization`.
+- [+] `app/Policies/UserPolicy.php`.
 
 ### Rutas
 
@@ -229,6 +238,7 @@ resources/
       reportes/
       integracion/
       admin/
+      dashboard/
       layout/
 
   css/
@@ -241,6 +251,7 @@ Estado actual de frontend V3:
 - [+] `resources/js/app.js` existe y carga modulos base.
 - [+] `resources/js/modules/layout/sidebar.js` maneja el menu lateral sin Bootstrap.
 - [+] `resources/js/modules/admin/users.js` maneja la pantalla piloto de administracion.
+- [+] `resources/js/modules/dashboard/stats.js` maneja el grafico de Dashboard con Vite.
 - [+] `resources/views/components/ui/*` contiene componentes base Tailwind.
 - [+] `resources/views/components/layout/*` contiene sidebar y topbar Tailwind.
 
@@ -292,6 +303,44 @@ routes/web/admin.php
 ```
 
 Este piloto mantiene rutas, nombres y controladores actuales, pero empieza a separar responsabilidad.
+
+La segunda pantalla piloto usa este flujo:
+
+```text
+routes/web/dashboard.php
+  -> DashboardController@index
+    -> DashboardStatsService
+    -> resources/views/dashboard/index.blade.php
+    -> resources/js/modules/dashboard/stats.js
+```
+
+Dashboard mantiene el controlador y servicio actual, pero reemplaza Bootstrap por Tailwind y mueve el grafico a Vite.
+
+## Permisos V3
+
+Base implementada:
+
+- `Roles` centraliza listas de roles y reglas reutilizables.
+- `UserPolicy` centraliza permisos de usuarios.
+- `AuthServiceProvider` registra Gates de acceso por modulo.
+- Rutas de `admin`, `integracion` y `reportes` ya usan middleware `can:*`.
+- El sidebar usa Gates para decidir visibilidad.
+
+Gates iniciales:
+
+- `access-dashboard`.
+- `access-admin-users`.
+- `access-reportes`.
+- `access-integracion`.
+- `review-promesas`.
+- `review-cna`.
+- `delete-client-payments`.
+
+Pendiente:
+
+- Convertir validaciones internas de `AutorizacionController`, `CnaController` y `ClienteController` a Policies/Gates especificos.
+- Crear `PromesaPolicy`, `CnaPolicy` y `ClientePolicy` cuando se refactoricen esos modulos.
+- Evitar cambios grandes de permisos sin pruebas funcionales completas.
 
 ## Responsabilidades por capa
 

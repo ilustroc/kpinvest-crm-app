@@ -3,7 +3,7 @@
 use App\Http\Controllers\AdminUsersController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('role:administrador,supervisor,soporte')
+Route::middleware('can:access-admin-users')
     ->prefix('administracion')
     ->name('administracion.')
     ->group(function () {

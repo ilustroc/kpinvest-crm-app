@@ -22,7 +22,12 @@ El objetivo final es eliminar Bootstrap del proyecto, pero de forma controlada:
 - [+] Sidebar y topbar base existen como componentes Blade con Tailwind.
 - [+] Componentes UI base existen con Tailwind.
 - [+] Administracion de usuarios fue seleccionada y migrada como pantalla piloto.
+- [+] Dashboard fue migrado como segunda pantalla piloto.
+- [+] `chart.js` se gestiona por npm y Vite para Dashboard.
+- [+] `npm run dev` se ejecuto y respondio correctamente.
 - [+] `npm run build` se ejecuto correctamente.
+- [+] `public/build/manifest.json` confirmado.
+- [!] `npm audit` reporta vulnerabilidades moderadas en Vite/esbuild; `npm audit fix --force` implica salto mayor a Vite 8.
 - [!] Bootstrap sigue cargando de forma condicional para pantallas legacy no migradas.
 
 ## Situacion actual
@@ -40,7 +45,7 @@ El frontend actual esta en transicion. Todavia existen partes legacy que usan:
 - JS embebido en vistas grandes.
 - Vite instalado, pero no como unico canal de assets.
 
-La pantalla piloto de administracion ya usa Tailwind y no carga Bootstrap desde el layout.
+Administracion y Dashboard ya usan Tailwind y no cargan Bootstrap desde el layout.
 
 ## Problemas actuales
 
@@ -181,6 +186,7 @@ Estado actual:
 ```js
 import './modules/layout/sidebar';
 import './modules/admin/users';
+import './modules/dashboard/stats';
 ```
 
 Los scripts especificos deben vivir en:
@@ -203,6 +209,7 @@ Estado actual:
 
 - [+] `@vite` esta configurado en `resources/views/layouts/app.blade.php`.
 - [+] Las vistas migradas pueden usar `@section('tailwind_only', true)` para no cargar Bootstrap.
+- [+] Administracion y Dashboard cargan CSS/JS por Vite.
 - [!] Las vistas legacy siguen usando Bootstrap temporalmente para evitar quiebres.
 
 ## Retirar Bootstrap de forma controlada
@@ -226,6 +233,7 @@ No hacer todo de golpe.
 Estado actual:
 
 - [+] Bootstrap fue retirado para la pantalla piloto de administracion mediante `tailwind_only`.
+- [+] Bootstrap fue retirado para Dashboard mediante `tailwind_only`.
 - [!] Bootstrap sigue disponible para vistas legacy.
 - [ ] Retirar Bootstrap globalmente cuando las pantallas dependientes hayan sido migradas.
 
@@ -254,10 +262,16 @@ resources/views/components/
     button.blade.php
     badge.blade.php
     card.blade.php
+    confirm-dialog.blade.php
+    date.blade.php
+    dropdown.blade.php
+    empty-state.blade.php
     alert.blade.php
     input.blade.php
+    modal.blade.php
     select.blade.php
     table.blade.php
+    textarea.blade.php
   layout/
     sidebar.blade.php
     topbar.blade.php
@@ -272,10 +286,15 @@ Estado actual:
 - [+] `resources/views/components/ui/input.blade.php`.
 - [+] `resources/views/components/ui/select.blade.php`.
 - [+] `resources/views/components/ui/table.blade.php`.
+- [+] `resources/views/components/ui/textarea.blade.php`.
+- [+] `resources/views/components/ui/date.blade.php`.
+- [+] `resources/views/components/ui/modal.blade.php`.
+- [+] `resources/views/components/ui/dropdown.blade.php`.
+- [+] `resources/views/components/ui/empty-state.blade.php`.
+- [+] `resources/views/components/ui/confirm-dialog.blade.php`.
 - [+] `resources/views/components/layout/sidebar.blade.php`.
 - [+] `resources/views/components/layout/topbar.blade.php`.
-- [ ] Crear componente modal reutilizable si mas pantallas lo necesitan.
-- [ ] Crear componentes textarea/date cuando se migren formularios mas grandes.
+- [+] Administracion usa el componente modal reutilizable.
 
 ## Organizacion JS por modulos
 
@@ -301,6 +320,8 @@ resources/js/
       imports.js
     admin/
       users.js
+    dashboard/
+      stats.js
 ```
 
 ## Orden de migracion Bootstrap -> Tailwind
@@ -334,9 +355,27 @@ Estado:
 
 - [+] Vista migrada a Tailwind.
 - [+] Tabla, filtros, botones, badges y formularios usan componentes Tailwind.
-- [+] Modales Bootstrap fueron reemplazados por modales simples con Blade y JS del modulo `resources/js/modules/admin/users.js`.
+- [+] Modales Bootstrap fueron reemplazados por `x-ui.modal` y JS del modulo `resources/js/modules/admin/users.js`.
 - [+] Funcionalidad de crear usuario, cambiar contrasena y activar/desactivar se mantiene por las mismas rutas.
-- [!] Requiere validacion manual en navegador con usuarios reales de prueba.
+- [+] Smoke test renderiza la pantalla contra base local.
+- [!] Requiere validacion manual completa de acciones POST con usuarios reales de prueba.
+
+## Segunda pantalla piloto
+
+Pantalla seleccionada:
+
+- Dashboard.
+
+Estado:
+
+- [+] Vista migrada a Tailwind.
+- [+] Filtros, KPIs, tablas y estados vacios usan componentes Blade.
+- [+] Bootstrap y Bootstrap Icons no cargan en esta vista.
+- [+] CSS legacy `public/css/dashboard-stats.css` ya no se carga en esta vista.
+- [+] JS legacy `public/js/dashboard-stats.js` ya no se carga en esta vista.
+- [+] Grafico de pagos usa `resources/js/modules/dashboard/stats.js` con `chart.js` importado desde npm.
+- [+] Smoke test renderiza la pantalla contra base local.
+- [!] Falta validacion visual manual de grafico y responsive en navegador.
 
 ## Riesgos
 

@@ -3,6 +3,7 @@
 namespace App\ViewModels\Admin;
 
 use App\Models\User;
+use App\Support\Authorization\Roles;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -27,22 +28,16 @@ class UserIndexViewModel
 
     public function roleOptions(): array
     {
-        return match ($this->currentUser->role) {
-            'administrador', 'sistemas' => [
-                'supervisor' => 'Supervisor',
-                'asesor' => 'Asesor',
-                'soporte' => 'Soporte',
-                'usuario' => 'Usuario',
-            ],
-            'supervisor' => [
-                'asesor' => 'Asesor',
-                'soporte' => 'Soporte',
-            ],
-            'soporte' => [
-                'usuario' => 'Usuario',
-            ],
-            default => [],
-        };
+        $labels = [
+            Roles::ADMINISTRADOR => 'Administrador',
+            Roles::SUPERVISOR => 'Supervisor',
+            Roles::ASESOR => 'Asesor',
+            Roles::SOPORTE => 'Soporte',
+        ];
+
+        return collect(Roles::creatableUserRoles($this->currentUser))
+            ->mapWithKeys(fn (string $role) => [$role => $labels[$role] ?? ucfirst($role)])
+            ->all();
     }
 
     public function supervisorOptions(): array
@@ -58,24 +53,11 @@ class UserIndexViewModel
 
     public function canManage(User $target): bool
     {
-        if (in_array($this->currentUser->role, ['administrador', 'sistemas'], true)) {
-            return true;
-        }
-
-        if ($this->currentUser->role === 'supervisor') {
-            return in_array($target->role, ['asesor', 'soporte'], true)
-                && $target->supervisor_id === $this->currentUser->id;
-        }
-
-        if ($this->currentUser->role === 'soporte') {
-            return $target->role === 'usuario';
-        }
-
-        return false;
+        return $this->currentUser->can('manage', $target);
     }
 
     public function canUpdatePassword(User $target): bool
     {
-        return $this->currentUser->id === $target->id || $this->canManage($target);
+        return $this->currentUser->can('updatePassword', $target);
     }
 }

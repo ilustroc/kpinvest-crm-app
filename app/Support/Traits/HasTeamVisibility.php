@@ -15,7 +15,7 @@ trait HasTeamVisibility
 
         $role = strtolower((string) $me->role);
 
-        if (in_array($role, ['administrador','sistemas'])) {
+        if ($role === 'administrador') {
             return []; // ver todo
         }
         if ($role === 'supervisor') {

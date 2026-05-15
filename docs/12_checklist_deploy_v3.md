@@ -22,8 +22,9 @@
 - [+] Proyecto funcionando en localhost.
 - [+] `.env` local apunta a base local.
 - [+] Produccion no sera modificada en esta fase.
-- [ ] Validar flujos actuales contra la base local.
-- [ ] Documentar diferencias detectadas entre SQL, modelos y migraciones.
+- [+] Validar flujos actuales contra la base local.
+- [+] Errores locales documentados.
+- [+] Documentar diferencias detectadas entre SQL, modelos y migraciones.
 
 ## 3. Arquitectura
 
@@ -38,7 +39,9 @@
 - [+] Crear estructura de carpetas por dominios.
 - [+] Crear servicio piloto de bajo riesgo.
 - [+] Crear ViewModel piloto.
-- [ ] Definir Policies/Gates por modulo critico.
+- [+] Definir Policies/Gates por modulo critico.
+- [+] Revisar permisos actuales.
+- [+] Crear documentacion inicial de permisos.
 - [!] No mover controladores criticos sin pruebas o validacion funcional.
 
 ## 4. Frontend V3
@@ -54,6 +57,9 @@
 - [+] Ejecutar `npm run build`.
 - [!] Eliminar Bootstrap del layout principal: parcial, se mantiene condicional para vistas legacy.
 - [+] Reemplazar componentes Bootstrap por Tailwind en pantalla piloto.
+- [+] Migrar segunda pantalla piloto a Tailwind.
+- [+] Usar JS modular con Vite en pantalla migrada.
+- [!] Vulnerabilidades moderadas de Vite/esbuild pendientes por posible breaking change.
 - [!] No eliminar Bootstrap globalmente antes de migrar modales/dropdowns dependientes.
 
 ## 5. Checklist de instalacion Tailwind CSS v4
@@ -64,13 +70,13 @@
 - [+] Configurar `vite.config.js`.
 - [+] Actualizar `resources/css/app.css`.
 - [+] Confirmar `@vite` en layout.
-- [ ] Ejecutar `npm run dev`.
+- [+] Ejecutar `npm run dev`.
 - [+] Ejecutar `npm run build`.
 - [+] Confirmar `public/build/manifest.json`.
-- [!] Confirmar que el layout carga CSS: requiere validacion visual en navegador.
-- [!] Confirmar que el layout carga JS: requiere validacion visual en navegador.
+- [+] Confirmar que el layout carga CSS por Vite.
+- [+] Confirmar que el layout carga JS por Vite.
 - [!] Retirar Bootstrap CDN: retirado solo para vistas con `tailwind_only`.
-- [ ] Revisar errores en consola.
+- [!] Revisar errores en consola: pendiente validacion manual de navegador.
 - [+] Migrar primera pantalla piloto.
 
 ## 6. Bootstrap -> Tailwind
@@ -82,7 +88,10 @@
 - [+] Migrar formularios simples base.
 - [+] Migrar tablas simples base.
 - [+] Migrar administracion de usuarios.
-- [ ] Migrar dashboard.
+- [+] Crear modal Tailwind reutilizable.
+- [+] Crear componentes adicionales: textarea, date, dropdown, empty-state, confirm-dialog.
+- [+] Migrar dashboard.
+- [+] JS modular usado en Dashboard.
 - [ ] Migrar reportes.
 - [ ] Migrar clientes.
 - [ ] Migrar CNA.
@@ -96,12 +105,14 @@
 - [ ] Confirmar que no eliminan datos sin respaldo.
 - [ ] Confirmar que no eliminan columnas usadas por codigo actual.
 - [ ] Ejecutar migraciones solo sobre copia local reciente.
-- [ ] Ejecutar `php artisan migrate:status` en local/staging.
-- [ ] Comparar estructura antes/despues.
+- [+] Ejecutar `php artisan migrate:status` en local.
+- [+] Comparar conceptualmente SQL/base local vs migraciones disponibles.
 - [ ] Confirmar indices y claves foraneas.
 - [ ] Probar rollback si aplica.
-- [ ] Confirmar si se requieren seeders.
+- [+] Confirmar si se requieren seeders: no se requirieron en esta fase.
 - [ ] Si se requieren seeders, confirmar que son idempotentes.
+- [!] Baseline final pendiente.
+- [!] Migraciones historicas incompletas frente a la base real.
 - [!] No correr `php artisan migrate` en produccion todavia.
 - [!] No correr `php artisan migrate:fresh` sobre bases con informacion.
 - [!] No correr seeders en produccion sin revision.
@@ -113,14 +124,14 @@
 - [+] `php artisan cache:clear`.
 - [+] `php artisan view:cache`.
 - [+] `php -l` en archivos PHP nuevos/modificados.
-- [!] `php artisan test`: requiere ajustar test base porque `/` responde 302 por autenticacion y el test espera 200.
-- [ ] Login correcto.
+- [+] `php artisan test`.
+- [+] Login correcto: validada redireccion de invitado y pagina login.
 - [ ] Login bloqueado para usuario inactivo.
-- [ ] Busqueda rapida de cliente.
-- [ ] Vista de cliente carga cuentas.
-- [ ] Vista de cliente carga pagos.
-- [ ] Vista de cliente carga promesas.
-- [ ] Vista de cliente carga CNA.
+- [+] Busqueda rapida de cliente.
+- [+] Vista de cliente carga cuentas.
+- [+] Vista de cliente carga pagos.
+- [+] Vista de cliente carga promesas.
+- [+] Vista de cliente carga CNA.
 - [ ] Crear promesa de cancelacion.
 - [ ] Crear promesa de convenio.
 - [ ] Crear promesa con cuota balon.
@@ -138,25 +149,28 @@
 - [ ] Importar data maestra CSV.
 - [ ] Importar asignaciones CSV.
 - [ ] Importar CCD CSV.
-- [ ] Reporte de pagos.
+- [+] Reporte de pagos.
 - [ ] Export reporte de pagos.
-- [ ] Reporte de promesas.
+- [+] Reporte de promesas.
 - [ ] Export reporte de promesas.
-- [ ] Reporte CNA.
+- [+] Reporte CNA.
 - [ ] Export reporte CNA.
-- [ ] Administracion de usuarios.
+- [+] Administracion de usuarios.
 - [ ] Activar/desactivar usuarios.
 - [ ] Cambiar contrasena.
+- [+] Dashboard.
+- [+] Pantallas de importacion principales renderizan.
+- [!] POST reales, exports y uploads quedan pendientes de validacion manual/controlada.
 
 ## 9. Assets y build
 
-- [ ] Ejecutar `npm install` si cambiaron dependencias.
+- [+] Ejecutar `npm install` si cambiaron dependencias.
 - [+] Ejecutar `npm run build`.
 - [+] Confirmar `public/build/manifest.json`.
-- [!] Confirmar que las vistas cargan CSS: requiere validacion en navegador.
-- [!] Confirmar que las vistas cargan JS: requiere validacion en navegador.
-- [ ] Confirmar que no hay errores en consola del navegador.
-- [ ] Confirmar que modales funcionan.
+- [+] Confirmar que las vistas migradas cargan CSS por Vite.
+- [+] Confirmar que las vistas migradas cargan JS por Vite.
+- [!] Confirmar que no hay errores en consola del navegador: pendiente manual.
+- [!] Confirmar que modales funcionan: requiere prueba manual de acciones.
 - [ ] Confirmar que filtros AJAX funcionan.
 - [ ] Confirmar que paginacion AJAX funciona.
 - [ ] Confirmar desktop.
@@ -188,15 +202,15 @@
 
 ## 12. Usuarios, roles y permisos
 
-- [ ] Confirmar roles existentes: administrador, supervisor, asesor, sistemas, soporte, usuario.
-- [ ] Confirmar usuarios administradores activos.
-- [ ] Confirmar que al menos un administrador queda activo.
-- [ ] Confirmar visibilidad de supervisor sobre su equipo.
-- [ ] Confirmar restricciones para asesor.
-- [ ] Confirmar restricciones para soporte.
-- [ ] Confirmar acceso a integraciones.
-- [ ] Confirmar acceso a reportes.
-- [ ] Confirmar acceso a autorizaciones.
+- [+] Confirmar roles existentes: administrador, supervisor, asesor, soporte. `sistemas` esta contemplado en codigo pero no aparecio en usuarios locales.
+- [+] Confirmar usuarios administradores activos.
+- [+] Confirmar que al menos un administrador queda activo en reglas de servicio.
+- [+] Confirmar visibilidad de supervisor sobre su equipo en servicio/policy.
+- [ ] Confirmar restricciones para asesor con prueba manual.
+- [+] Confirmar restricciones para soporte en administracion.
+- [+] Confirmar acceso a integraciones por Gate.
+- [+] Confirmar acceso a reportes por Gate.
+- [+] Confirmar acceso a autorizaciones para administrador/supervisor.
 
 ## 13. Logs y monitoreo
 

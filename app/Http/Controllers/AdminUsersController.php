@@ -72,7 +72,7 @@ class AdminUsersController extends Controller
 
     public function updatePassword(Request $r, User $user)
     {
-        if ($r->user()->id !== $user->id && !$this->userService->canManage($r->user(), $user)) {
+        if (!$r->user()->can('updatePassword', $user)) {
             return back()->withErrors('No tienes permisos para esta accion.');
         }
 

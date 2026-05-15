@@ -101,19 +101,10 @@
               </div>
 
               @if($vm->canUpdatePassword($u))
-                <div id="pw-usr-{{ $u->id }}"
-                     class="fixed inset-0 z-50 hidden bg-slate-950/50 p-4"
-                     data-modal
-                     aria-hidden="true">
-                  <div class="mx-auto mt-20 max-w-md rounded-lg bg-white shadow-xl">
+                <x-ui.modal id="pw-usr-{{ $u->id }}" title="Cambiar password" subtitle="{{ $u->name }}">
                     <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}">
                       @csrf
                       @method('PATCH')
-
-                      <div class="border-b border-kp-border px-5 py-4">
-                        <h3 class="text-base font-bold text-kp-ink">Cambiar password</h3>
-                        <p class="mt-1 text-sm text-kp-muted">{{ $u->name }}</p>
-                      </div>
 
                       <div class="space-y-4 p-5">
                         <div data-password-field>
@@ -132,8 +123,7 @@
                         <x-ui.button type="submit">Guardar</x-ui.button>
                       </div>
                     </form>
-                  </div>
-                </div>
+                </x-ui.modal>
               @endif
             </td>
           </tr>
@@ -151,22 +141,13 @@
   </x-ui.card>
 </div>
 
-<div id="modalCreateUser"
-     class="fixed inset-0 z-50 hidden bg-slate-950/50 p-4"
-     data-modal
-     aria-hidden="true">
-  <div class="mx-auto mt-16 max-w-lg rounded-lg bg-white shadow-xl">
+<x-ui.modal id="modalCreateUser" title="Crear usuario" subtitle="Registra una cuenta nueva para el CRM." max-width="lg">
     <form method="POST"
           action="{{ route('administracion.usuarios.store') }}"
           autocomplete="off"
           data-create-user-form
           data-current-role="{{ $vm->currentUser->role }}">
       @csrf
-
-      <div class="border-b border-kp-border px-5 py-4">
-        <h3 class="text-base font-bold text-kp-ink">Crear usuario</h3>
-        <p class="mt-1 text-sm text-kp-muted">Registra una cuenta nueva para el CRM.</p>
-      </div>
 
       <div class="space-y-4 p-5">
         <x-ui.input label="Nombre" name="name" required placeholder="Ej: Carlos Lopez" />
@@ -204,6 +185,5 @@
         <x-ui.button type="submit">Crear usuario</x-ui.button>
       </div>
     </form>
-  </div>
-</div>
+</x-ui.modal>
 @endsection

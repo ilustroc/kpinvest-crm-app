@@ -16,7 +16,7 @@ class BlockClienteAccess
         $dni  = (string) $request->route('dni');
 
         // Admin/Sistemas pueden saltarse (si quieres)
-        if ($user && in_array($user->role, ['administrador','sistemas'], true)) {
+        if ($user && $user->role === 'administrador') {
             return $next($request);
         }
 
@@ -36,4 +36,3 @@ class BlockClienteAccess
         return $next($request);
     }
 }
-

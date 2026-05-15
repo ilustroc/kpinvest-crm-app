@@ -9,8 +9,48 @@ La estrategia de base de datos V3 ya parte de un entorno local listo:
 - [+] Proyecto apuntando a localhost.
 - [+] `.env` local apunta a la base local.
 - [+] Produccion no se toca.
+- [+] Base local usada para pruebas de Fase 1 a Fase 4.
+- [+] `php artisan migrate:status` revisado.
+- [!] Diferencias detectadas entre SQL real/base local y migraciones Laravel disponibles.
+- [ ] Baseline final pendiente.
 
 La base local sera el ambiente seguro para pruebas, validaciones y migraciones V3.
+
+## Estado revisado en Fase 4
+
+Comando ejecutado:
+
+```bash
+php artisan migrate:status
+```
+
+Resultado:
+
+```text
+2019_12_14_000001_create_personal_access_tokens_table ........ Ran
+2025_11_02_220020_update_users_drop_team_supervisor_add_active  Ran
+2025_11_05_172046_add_supervisor_id_to_users .................. Ran
+2025_11_13_155533_create_asignar_clientes_table ............... Ran
+2026_01_12_221108_create_cliente_bloqueos_table ............... Ran
+2026_01_19_202218_drop_cumplimiento_estado_from_promesas_pago . Ran
+```
+
+Migraciones presentes en `database/migrations`:
+
+```text
+2025_11_02_220020_update_users_drop_team_supervisor_add_active.php
+2025_11_05_172046_add_supervisor_id_to_users.php
+2025_11_13_155533_create_asignar_clientes_table.php
+2026_01_12_221108_create_cliente_bloqueos_table.php
+2026_01_19_202218_drop_cumplimiento_estado_from_promesas_pago.php
+```
+
+Hallazgos:
+
+- [!] La tabla `migrations` local registra `2019_12_14_000001_create_personal_access_tokens_table`, pero ese archivo no esta presente en `database/migrations`.
+- [!] La base local tiene tablas core que no nacen de migraciones disponibles: `users`, `clientes_cuentas`, `pagos_propia`, `promesas_pago`, `promesa_cuotas`, `cna_solicitudes`, `ccd_clientes`, `pagos_lotes` y `promesa_operaciones`.
+- [+] Las tablas principales necesarias para las pruebas locales existen en la base local.
+- [+] No se requirio crear ni ejecutar migraciones nuevas para Administracion, Dashboard, Tailwind o permisos.
 
 ## Regla principal
 
@@ -38,6 +78,12 @@ La base local permite:
 - Probar imports y exports en ambiente controlado.
 
 Antes de cualquier cambio funcional, se debe confirmar que el flujo actual funciona en local.
+
+Estado Fase 4:
+
+- [+] Smoke tests locales ejecutados contra la base importada.
+- [+] Login/redireccion, Dashboard, Administracion, busqueda/vista de cliente, autorizacion, reportes e importaciones renderizan.
+- [!] No se ejecutaron cambios destructivos ni POST reales de aprobacion/importacion durante esta validacion.
 
 ## Configuracion local
 
@@ -144,8 +190,8 @@ Recomendacion:
 
 Cuando se creen migraciones V3:
 
-- [ ] Ejecutarlas solo en local.
-- [ ] Revisar `php artisan migrate:status`.
+- [+] Revisar `php artisan migrate:status`.
+- [ ] Ejecutarlas solo en local cuando existan migraciones nuevas.
 - [ ] Revisar estructura de tablas afectadas.
 - [ ] Confirmar indices.
 - [ ] Confirmar FKs.
@@ -208,6 +254,13 @@ Por ahora:
 - No correr seeders en produccion.
 - No crear seeders que pisen usuarios reales.
 - No modificar contrasenas productivas.
+- No se crearon ni ejecutaron seeders en esta fase.
+
+## Decision Fase 4
+
+No se creo migracion V3 nueva porque los cambios realizados fueron de frontend, permisos, servicios, ViewModels y tests. No hubo necesidad de alterar estructura para Administracion, Dashboard o Tailwind.
+
+El baseline final sigue pendiente. La recomendacion es cerrarlo antes de cualquier cambio estructural de base de datos.
 
 Cuando se necesiten seeders:
 
@@ -219,4 +272,3 @@ Cuando se necesiten seeders:
 ## Regla final
 
 La base local es el laboratorio. Produccion no se toca hasta que el cambio haya sido probado contra una copia reciente y exista rollback.
-

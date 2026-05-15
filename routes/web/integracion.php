@@ -6,7 +6,7 @@ use App\Http\Controllers\IntegracionDataController;
 use App\Http\Controllers\IntegracionPagosController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('role:administrador,supervisor,soporte')
+Route::middleware('can:access-integracion')
     ->prefix('integracion')
     ->name('integracion.')
     ->group(function () {

@@ -3,15 +3,10 @@
 namespace App\Services\Admin;
 
 use App\Models\User;
-use App\Services\UserService;
 use RuntimeException;
 
 class UserStatusService
 {
-    public function __construct(
-        private UserService $userService
-    ) {}
-
     public function toggle(User $actor, User $target): string
     {
         if ($target->id === $actor->id) {
@@ -28,7 +23,7 @@ class UserStatusService
             }
         }
 
-        if (!$this->userService->canManage($actor, $target)) {
+        if (!$actor->can('toggleStatus', $target)) {
             throw new RuntimeException('No tienes permisos para gestionar este usuario.');
         }
 

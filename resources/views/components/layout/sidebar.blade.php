@@ -37,7 +37,7 @@
                 </a>
             </div>
 
-            @if(in_array($role, ['supervisor','administrador','sistemas','soporte'], true))
+            @can('access-reportes')
                 <div>
                     <div class="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-kp-muted">Reportes</div>
                     <details class="group" {{ $isReportes ? 'open' : '' }}>
@@ -52,36 +52,40 @@
                         </div>
                     </details>
                 </div>
-            @endif
+            @endcan
 
-            @if(in_array($role, ['supervisor','administrador'], true))
+            @can('review-promesas')
                 <div>
                     <div class="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-kp-muted">Aprobaciones</div>
                     <a href="{{ route('autorizacion') }}" class="{{ $navLink(request()->is('autorizacion*')) }}">
                         <span>Autorizacion</span>
                     </a>
                 </div>
-            @endif
+            @endcan
 
-            @if(in_array($role, ['administrador','supervisor','soporte','sistemas'], true))
+            @if(auth()->user()?->can('access-integracion') || auth()->user()?->can('access-admin-users'))
                 <div>
                     <div class="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-kp-muted">Admin / Supervision</div>
-                    <details class="group" {{ $isIntegracion ? 'open' : '' }}>
-                        <summary class="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-sm font-bold text-kp-ink hover:bg-slate-100">
-                            <span>Integracion</span>
-                            <span class="text-kp-muted transition group-open:rotate-180">v</span>
-                        </summary>
-                        <div class="mt-1 space-y-1 pl-3">
-                            <a href="{{ route('integracion.pagos.index') }}" class="{{ $navLink(request()->is('integracion/pagos*')) }}">Subir Pagos</a>
-                            <a href="{{ route('integracion.asignacion.index') }}" class="{{ $navLink(request()->is('integracion/asignacion*')) }}">Subir Asignacion</a>
-                            <a href="{{ route('integracion.ccd.index') }}" class="{{ $navLink(request()->is('integracion/ccd*')) }}">Subir CCD</a>
-                            <a href="{{ route('integracion.data.index') }}" class="{{ $navLink(request()->is('integracion/data*')) }}">Subir Data</a>
-                        </div>
-                    </details>
+                    @can('access-integracion')
+                        <details class="group" {{ $isIntegracion ? 'open' : '' }}>
+                            <summary class="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-sm font-bold text-kp-ink hover:bg-slate-100">
+                                <span>Integracion</span>
+                                <span class="text-kp-muted transition group-open:rotate-180">v</span>
+                            </summary>
+                            <div class="mt-1 space-y-1 pl-3">
+                                <a href="{{ route('integracion.pagos.index') }}" class="{{ $navLink(request()->is('integracion/pagos*')) }}">Subir Pagos</a>
+                                <a href="{{ route('integracion.asignacion.index') }}" class="{{ $navLink(request()->is('integracion/asignacion*')) }}">Subir Asignacion</a>
+                                <a href="{{ route('integracion.ccd.index') }}" class="{{ $navLink(request()->is('integracion/ccd*')) }}">Subir CCD</a>
+                                <a href="{{ route('integracion.data.index') }}" class="{{ $navLink(request()->is('integracion/data*')) }}">Subir Data</a>
+                            </div>
+                        </details>
+                    @endcan
 
-                    <a href="{{ route('administracion.index') }}" class="{{ $navLink(request()->routeIs('administracion.*')) }}">
-                        <span>Administracion</span>
-                    </a>
+                    @can('access-admin-users')
+                        <a href="{{ route('administracion.index') }}" class="{{ $navLink(request()->routeIs('administracion.*')) }}">
+                            <span>Administracion</span>
+                        </a>
+                    @endcan
                 </div>
             @endif
         </nav>

@@ -1,196 +1,157 @@
 @extends('layouts.app')
+@section('tailwind_only', true)
 @section('title', 'Dashboard')
-@section('crumb', 'Estadísticas')
-
-@push('head')
-    <link rel="stylesheet" href="{{ asset('css/dashboard-stats.css') }}?v={{ time() }}">
-@endpush
+@section('crumb', 'Dashboard')
 
 @section('content')
 @php
     $dashboardJson = [
-        'meses'    => $meses ?? [],
+        'meses' => $meses ?? [],
         'serieMto' => $serie_pagos_monto ?? [],
     ];
+
+    $money = fn ($value) => 'S/ ' . number_format((float) $value, 2);
 @endphp
 
-<form id="filtrosDash" class="dash-card dash-filters" method="GET" action="{{ route('dashboard') }}">
-    <div class="row g-3">
-        <div class="col-12 col-md-3">
-            <label class="form-label">Mes</label>
-            <input type="month" name="mes" class="form-control" value="{{ $mes ?? now()->format('Y-m') }}">
-        </div>
+<div class="space-y-4" data-dashboard-page>
+    <script id="dashboard-json" type="application/json">{!! json_encode($dashboardJson, JSON_UNESCAPED_SLASHES) !!}</script>
 
-        <div class="col-12 col-md-2">
-            <label class="form-label">Día hábil</label>
-            <input type="number" min="0" step="1" name="dia_habil" class="form-control" value="{{ $dia_habil ?? 0 }}">
-        </div>
+    <x-ui.card>
+        <form id="filtrosDash" class="grid gap-3 lg:grid-cols-12 lg:items-end" method="GET" action="{{ route('dashboard') }}">
+            <div class="lg:col-span-2">
+                <x-ui.date label="Mes" type="month" name="mes" value="{{ $mes ?? now()->format('Y-m') }}" />
+            </div>
 
-        <div class="col-12 col-md-2">
-            <label class="form-label">Cosecha</label>
-            <select name="cosecha" class="form-select">
-                <option value="">Todas</option>
-                @foreach($cosechas as $c)
-                    <option value="{{ $c }}" {{ ($fCosecha ?? '') === $c ? 'selected' : '' }}>{{ $c }}</option>
-                @endforeach
-            </select>
-        </div>
+            <div class="lg:col-span-2">
+                <x-ui.input label="Dia habil" type="number" min="0" step="1" name="dia_habil" value="{{ $dia_habil ?? 0 }}" />
+            </div>
 
-        <div class="col-12 col-md-2">
-            <label class="form-label">Entidad financiera</label>
-            <select name="entidad" class="form-select">
-                <option value="">Todas</option>
-                @foreach($entidades as $e)
-                    <option value="{{ $e }}" {{ ($fEntidad ?? '') === $e ? 'selected' : '' }}>{{ $e }}</option>
-                @endforeach
-            </select>
-        </div>
+            <div class="lg:col-span-2">
+                <x-ui.select label="Cosecha" name="cosecha">
+                    <option value="">Todas</option>
+                    @foreach($cosechas as $c)
+                        <option value="{{ $c }}" @selected(($fCosecha ?? '') === $c)>{{ $c }}</option>
+                    @endforeach
+                </x-ui.select>
+            </div>
 
-        @unless($isAsesor ?? false)
-        <div class="col-12 col-md-3">
-            <label class="form-label">Asesor</label>
-            <select name="asesor" class="form-select">
-                <option value="">Todos</option>
-                @foreach($asesores as $a)
-                    <option value="{{ $a }}" {{ ($fAsesor ?? '') === $a ? 'selected' : '' }}>{{ $a }}</option>
-                @endforeach
-            </select>
-        </div>
-        @endunless
+            <div class="lg:col-span-2">
+                <x-ui.select label="Entidad financiera" name="entidad">
+                    <option value="">Todas</option>
+                    @foreach($entidades as $e)
+                        <option value="{{ $e }}" @selected(($fEntidad ?? '') === $e)>{{ $e }}</option>
+                    @endforeach
+                </x-ui.select>
+            </div>
 
-        <div class="col-12 d-flex gap-2">
-            <button class="btn btn-success">
-                <i class="bi bi-funnel me-1"></i> Filtrar
-            </button>
-            <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Limpiar</a>
-        </div>
-    </div>
-</form>
-
-<div class="row g-3 mt-1">
-    @foreach([
-        ['# Promesas generadas', $k['pdp_gen'] ?? 0, false],
-        ['Monto negociado', $k['pdp_monto'] ?? 0, true],
-        ['# Pagos', $k['pagos_num'] ?? 0, false],
-        ['Monto pagado', $k['pagos_monto'] ?? 0, true],
-    ] as [$label, $value, $isMoney])
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="kpi">
-                <div class="label">{{ $label }}</div>
-                <div class="value">
-                    {{ $isMoney ? 'S/ ' . number_format((float) $value, 2) : number_format((float) $value, 0) }}
+            @unless($isAsesor ?? false)
+                <div class="lg:col-span-2">
+                    <x-ui.select label="Asesor" name="asesor">
+                        <option value="">Todos</option>
+                        @foreach($asesores as $a)
+                            <option value="{{ $a }}" @selected(($fAsesor ?? '') === $a)>{{ $a }}</option>
+                        @endforeach
+                    </x-ui.select>
                 </div>
-            </div>
-        </div>
-    @endforeach
-</div>
+            @endunless
 
-<div class="row g-3 mt-1">
-    <div class="col-12">
-        <div class="dash-card">
-            <div class="dash-card__head">
-                <div>
-                    <h5 class="dash-card__title">Evolución de Pagos</h5>
-                    <p class="dash-card__subtitle">
-                        Últimos 12 meses · Día hábil {{ $dia_habil ?? 0 }} · Corte {{ $fecha_corte_texto ?? '-' }}
-                    </p>
+            <div class="flex gap-2 lg:col-span-2">
+                <x-ui.button type="submit" class="flex-1">Filtrar</x-ui.button>
+                <x-ui.button href="{{ route('dashboard') }}" variant="secondary">Limpiar</x-ui.button>
+            </div>
+        </form>
+    </x-ui.card>
+
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        @foreach([
+            ['Promesas generadas', $k['pdp_gen'] ?? 0, false],
+            ['Monto negociado', $k['pdp_monto'] ?? 0, true],
+            ['Pagos registrados', $k['pagos_num'] ?? 0, false],
+            ['Monto pagado', $k['pagos_monto'] ?? 0, true],
+        ] as [$label, $value, $isMoney])
+            <x-ui.card>
+                <div class="text-sm font-semibold text-kp-muted">{{ $label }}</div>
+                <div class="mt-2 text-2xl font-black text-kp-ink">
+                    {{ $isMoney ? $money($value) : number_format((float) $value, 0) }}
                 </div>
-
-                <div class="dash-chip">12 meses</div>
-            </div>
-
-            <div class="chart-wrap">
-                <canvas id="linePagos12"></canvas>
-            </div>
-        </div>
+            </x-ui.card>
+        @endforeach
     </div>
 
-    <div class="col-12">
-        <div class="dash-card">
-            <div class="dash-card__head">
-                <div>
-                    <h5 class="dash-card__title">Top Entidades</h5>
-                    <p class="dash-card__subtitle">Comparativo últimos 3 meses</p>
-                </div>
+    <x-ui.card title="Evolucion de pagos" subtitle="Ultimos 12 meses segun filtros aplicados.">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="text-sm text-kp-muted">
+                Dia habil {{ $dia_habil ?? 0 }}. Corte {{ $fecha_corte_texto ?? '-' }}.
             </div>
-
-            <div class="table-wrap">
-                <table class="table table-compare mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th>Entidad</th>
-                            <th class="text-end">{{ $periodosComp['m2']['label'] ?? '-' }}</th>
-                            <th class="text-end">{{ $periodosComp['m1']['label'] ?? '-' }}</th>
-                            <th class="text-end">{{ $periodosComp['m0']['label'] ?? '-' }}</th>
-                            <th class="text-end">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($comparativoEntidades ?? [] as $fila)
-                            <tr>
-                                <td class="fw-semibold">{{ $fila['nombre'] }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m2'], 2) }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m1'], 2) }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m0'], 2) }}</td>
-                                <td class="text-end fw-bold">S/ {{ number_format($fila['total'], 2) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">Sin datos</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+            <x-ui.badge variant="success">12 meses</x-ui.badge>
         </div>
-    </div>
+        <div class="h-80">
+            <canvas id="linePagos12"></canvas>
+        </div>
+    </x-ui.card>
+
+    <x-ui.card title="Top entidades" subtitle="Comparativo de los ultimos 3 meses.">
+        <x-ui.table>
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-kp-muted">Entidad</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m2']['label'] ?? '-' }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m1']['label'] ?? '-' }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m0']['label'] ?? '-' }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">Total</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-kp-border bg-white">
+                @forelse($comparativoEntidades ?? [] as $fila)
+                    <tr class="hover:bg-slate-50/70">
+                        <td class="px-4 py-3 font-semibold text-kp-ink">{{ $fila['nombre'] }}</td>
+                        <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m2']) }}</td>
+                        <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m1']) }}</td>
+                        <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m0']) }}</td>
+                        <td class="px-4 py-3 text-right font-bold text-kp-ink">{{ $money($fila['total']) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-4 py-6">
+                            <x-ui.empty-state title="Sin datos" message="No hay pagos para mostrar con los filtros actuales." />
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </x-ui.table>
+    </x-ui.card>
 
     @unless($isAsesor ?? false)
-    <div class="col-12">
-        <div class="dash-card">
-            <div class="dash-card__head">
-                <div>
-                    <h5 class="dash-card__title">Top Asesores</h5>
-                    <p class="dash-card__subtitle">Comparativo últimos 3 meses</p>
-                </div>
-            </div>
-
-            <div class="table-wrap">
-                <table class="table table-compare mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th>Asesor</th>
-                            <th class="text-end">{{ $periodosComp['m2']['label'] ?? '-' }}</th>
-                            <th class="text-end">{{ $periodosComp['m1']['label'] ?? '-' }}</th>
-                            <th class="text-end">{{ $periodosComp['m0']['label'] ?? '-' }}</th>
-                            <th class="text-end">Total</th>
+        <x-ui.card title="Top asesores" subtitle="Comparativo de los ultimos 3 meses.">
+            <x-ui.table>
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-kp-muted">Asesor</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m2']['label'] ?? '-' }}</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m1']['label'] ?? '-' }}</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">{{ $periodosComp['m0']['label'] ?? '-' }}</th>
+                        <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-kp-muted">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-kp-border bg-white">
+                    @forelse($comparativoAsesores ?? [] as $fila)
+                        <tr class="hover:bg-slate-50/70">
+                            <td class="px-4 py-3 font-semibold text-kp-ink">{{ $fila['nombre'] }}</td>
+                            <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m2']) }}</td>
+                            <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m1']) }}</td>
+                            <td class="px-4 py-3 text-right text-kp-muted">{{ $money($fila['m0']) }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-kp-ink">{{ $money($fila['total']) }}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($comparativoAsesores ?? [] as $fila)
-                            <tr>
-                                <td class="fw-semibold">{{ $fila['nombre'] }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m2'], 2) }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m1'], 2) }}</td>
-                                <td class="text-end">S/ {{ number_format($fila['m0'], 2) }}</td>
-                                <td class="text-end fw-bold">S/ {{ number_format($fila['total'], 2) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">Sin datos</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-4 py-6">
+                                <x-ui.empty-state title="Sin datos" message="No hay asesores para mostrar con los filtros actuales." />
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </x-ui.table>
+        </x-ui.card>
     @endunless
 </div>
 @endsection
-
-@push('scripts')
-    <script id="dashboard-json" type="application/json">{!! json_encode($dashboardJson, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}</script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-    <script src="{{ asset('js/dashboard-stats.js') }}?v={{ time() }}"></script>
-@endpush

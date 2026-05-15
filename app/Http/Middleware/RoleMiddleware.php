@@ -14,7 +14,7 @@ class RoleMiddleware
             return redirect()->route('login');
         }
 
-        // admite "administrador,sistemas" o "administrador|sistemas"
+        // Admite roles separados por coma o pipe: "administrador,supervisor".
         $allowed = [];
         foreach ($roles as $chunk) {
             foreach (preg_split('/[,\|]/', $chunk) as $r) {

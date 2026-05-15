@@ -5,7 +5,7 @@ use App\Http\Controllers\ReportePagosController;
 use App\Http\Controllers\ReportePromesasController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('reportes')->name('reportes.')->group(function () {
+Route::middleware('can:access-reportes')->prefix('reportes')->name('reportes.')->group(function () {
     Route::controller(ReporteCnaController::class)->prefix('cna')->group(function () {
         Route::get('/', 'index')->name('cna');
         Route::get('/facets', 'facets')->name('cna.facets');

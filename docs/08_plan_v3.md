@@ -81,11 +81,29 @@ Estado:
 - [+] Base de datos local importada.
 - [+] `.env` apuntando a localhost.
 - [+] Produccion no sera modificada.
+- [+] Flujos actuales validados contra base local mediante smoke tests.
+- [+] Errores locales documentados.
 
 Objetivo:
 
 - Usar la copia local como ambiente seguro de validacion.
 - Confirmar que los flujos actuales funcionan localmente antes de cambios.
+
+Flujos validados:
+
+- Login/redireccion de invitado a `/login`.
+- Dashboard.
+- Administracion de usuarios.
+- Busqueda de cliente.
+- Vista de cliente.
+- Autorizacion de promesas/CNA.
+- Reportes de pagos, promesas y CNA.
+- Importaciones principales: pagos, data, asignacion y CCD.
+
+Alcance de la validacion:
+
+- Se validaron rutas GET y renderizado contra datos locales.
+- No se ejecutaron POST destructivos, cargas CSV reales, aprobaciones ni cambios masivos de datos.
 
 ### Fase 2 - Arquitectura MVC modular por dominios
 
@@ -102,8 +120,12 @@ Estado:
 - [+] Estructura backend por dominios creada.
 - [+] Servicio piloto creado en Admin.
 - [+] ViewModel piloto creado en Admin.
+- [+] Policies/Gates definidos para modulos criticos.
+- [+] Permisos actuales revisados.
+- [+] Centralizacion basica de permisos creada.
 - [ ] Controladores agrupados fisicamente por dominio.
 - [ ] Actions reales creadas para operaciones puntuales.
+- [!] Controladores criticos pendientes de mover.
 
 Objetivo:
 
@@ -135,6 +157,10 @@ Resultado actual:
 - `app/Services/*`, `app/Actions/*`, `app/ViewModels/*`, `app/DTOs/*` y `app/Support/*` ya tienen estructura base por dominio.
 - `app/Services/Admin/UserStatusService.php` separa una logica de administracion de bajo riesgo.
 - `app/ViewModels/Admin/UserIndexViewModel.php` prepara datos de la pantalla piloto de usuarios.
+- `app/Support/Authorization/Roles.php` centraliza reglas basicas de roles.
+- `app/Policies/UserPolicy.php` centraliza permisos de usuarios.
+- `AuthServiceProvider` define Gates iniciales para dashboard, administracion, reportes, integracion, promesas, CNA y pagos de cliente.
+- `routes/web/admin.php`, `routes/web/integracion.php` y `routes/web/reportes.php` ya usan Gates.
 
 ### Fase 3 - Tailwind CSS v4 con Vite
 
@@ -155,14 +181,18 @@ Checklist:
 - [+] Revisar `resources/js/app.js`.
 - [+] Ejecutar `npm run dev`.
 - [+] Ejecutar `npm run build`.
+- [+] Confirmar `public/build/manifest.json`.
+- [!] Vulnerabilidades moderadas de Vite/esbuild pendientes porque `npm audit fix --force` implica cambio mayor.
 
 Resultado actual:
 
 - `vite.config.js` usa `@tailwindcss/vite`.
 - `resources/css/app.css` importa Tailwind CSS v4.
-- `resources/js/app.js` importa modulos base de layout y administracion.
+- `resources/js/app.js` importa modulos base de layout, administracion y dashboard.
 - `@vite(['resources/css/app.css', 'resources/js/app.js'])` esta configurado en el layout principal.
+- `npm run dev` levanto correctamente en `http://127.0.0.1:5178`.
 - `npm run build` se ejecuto correctamente.
+- `public/build/manifest.json` contiene entradas para CSS y JS.
 
 ### Fase 4 - Migracion progresiva de Bootstrap a Tailwind
 
@@ -175,12 +205,12 @@ Objetivo:
 Orden recomendado:
 
 1. Layout principal. Estado: en progreso, con Vite activo y Bootstrap condicional para vistas legacy.
-2. Sidebar/topbar. Estado: primera version Tailwind creada como componentes Blade.
+2. Sidebar/topbar. Estado: version Tailwind creada como componentes Blade.
 3. Botones y badges. Estado: componentes base creados.
 4. Formularios simples. Estado: componentes base creados.
 5. Tablas simples. Estado: componente base creado.
 6. Administracion de usuarios. Estado: pantalla piloto migrada a Tailwind.
-7. Dashboard.
+7. Dashboard. Estado: segunda pantalla piloto migrada a Tailwind.
 8. Reportes.
 9. Clientes.
 10. CNA y Promesas al final.
@@ -189,6 +219,8 @@ Regla actual:
 
 - Las vistas migradas pueden declarar `@section('tailwind_only', true)` para no cargar Bootstrap desde el layout.
 - Las vistas legacy siguen cargando Bootstrap de forma temporal para no romper modales, tablas o estilos pendientes.
+- Administracion y Dashboard ya no cargan Bootstrap desde el layout.
+- Bootstrap no debe eliminarse globalmente hasta migrar vistas legacy con modales, tablas o JS dependiente.
 
 ### Fase 5 - Refactor backend por modulos
 
@@ -205,6 +237,8 @@ Avance:
 - Servicio piloto `UserStatusService` creado para administracion.
 - ViewModel piloto `UserIndexViewModel` creado para la pantalla de usuarios.
 - `AdminUsersController` empezo a delegar logica simple sin cambiar rutas ni nombres.
+- `DashboardController` ya usa `DashboardStatsService`.
+- Permisos iniciales se centralizaron en `Roles`, `UserPolicy` y Gates.
 
 Regla:
 
@@ -224,18 +258,20 @@ Verificaciones tecnicas iniciales:
 - [+] `php artisan view:cache`.
 - [+] `php -l` en PHP nuevo/modificado.
 - [+] `npm run build`.
-- [!] `php artisan test` requiere correccion: el test base espera HTTP 200 en `/`, pero la aplicacion responde 302 por flujo de autenticacion.
+- [+] `php artisan test`.
+- [+] Smoke tests locales contra base importada.
 
 Flujos minimos:
 
-- Login.
-- Clientes.
-- Promesas.
-- CNA.
-- Pagos.
-- Reportes.
-- Importaciones.
-- Administracion.
+- [+] Login/redireccion.
+- [+] Clientes: busqueda y vista.
+- [+] Promesas: bandeja de autorizacion renderiza.
+- [+] CNA: bandeja de autorizacion renderiza.
+- [+] Pagos: reporte renderiza.
+- [+] Reportes: pagos, promesas y CNA renderizan.
+- [+] Importaciones: pantallas principales renderizan.
+- [+] Administracion.
+- [!] Pendiente prueba manual de POST reales: aprobaciones, creacion de promesas/CNA, imports CSV y cambios de usuarios.
 
 ### Fase 7 - Deploy controlado
 
