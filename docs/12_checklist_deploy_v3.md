@@ -61,6 +61,19 @@
 - [+] Crear `ClientePolicy`.
 - [+] Delegar `ClienteController` a Services/Action sin cambiar rutas.
 - [+] Delegar `ClienteLookupController` a `ClienteLookupService`.
+- [+] Refactor backend de Promesas iniciado.
+- [+] Crear servicios reales del modulo Promesas.
+- [+] Crear Actions de Promesas.
+- [+] Crear `PromesaPolicy`.
+- [+] Delegar `PromesaController` a `CreatePromesaAction`.
+- [+] Delegar workflow de Promesas a Actions/Service.
+- [+] Delegar acuerdo de Promesa a `PromesaDocumentService`.
+- [+] Refactor backend de CNA iniciado.
+- [+] Crear servicios reales del modulo CNA.
+- [+] Crear Actions de CNA.
+- [+] Crear `CnaPolicy`.
+- [+] Delegar `CnaController` a Actions/Services.
+- [+] Delegar consulta CNA de Autorizacion a `CnaQueryService`.
 - [!] No mover controladores criticos sin pruebas o validacion funcional.
 
 ## 3.1 Fase 8.1 - Refactor backend Clientes
@@ -82,7 +95,62 @@
 - [+] Crear `tests/Feature/V3ClienteModuleTest.php`.
 - [+] Documentar refactor en `docs/22_refactor_backend_clientes_v3.md`.
 - [!] Busqueda por telefono queda pendiente hasta definir fuente estable sin cambiar comportamiento.
-- [!] Promesas y CNA quedan pendientes para siguientes refactors backend.
+- [+] CNA refactorizado en Fase 8.3.
+
+## 3.2 Fase 8.2 - Refactor backend Promesas
+
+- [+] Analizar `PromesaController`.
+- [+] Analizar `AutorizacionController` para workflow de promesas.
+- [+] Analizar `PromesaPdfController`.
+- [+] Analizar `PromesaCreator`.
+- [+] Crear `app/Services/Promesa/PromesaCreationService.php`.
+- [+] Crear `app/Services/Promesa/PromesaScheduleService.php`.
+- [+] Crear `app/Services/Promesa/PromesaWorkflowService.php`.
+- [+] Crear `app/Services/Promesa/PromesaDocumentService.php`.
+- [+] Crear `app/Services/Promesa/PromesaQueryService.php`.
+- [+] Crear `app/Actions/Promesa/CreatePromesaAction.php`.
+- [+] Crear `app/Actions/Promesa/PreapprovePromesaAction.php`.
+- [+] Crear `app/Actions/Promesa/ApprovePromesaAction.php`.
+- [+] Crear `app/Actions/Promesa/RejectPromesaAction.php`.
+- [+] Crear `app/Actions/Promesa/GeneratePromesaAgreementAction.php`.
+- [+] Crear `app/Policies/PromesaPolicy.php`.
+- [+] Registrar Gates de Promesas en `AuthServiceProvider`.
+- [+] Refactorizar `PromesaController`.
+- [+] Refactorizar workflow de Promesas en `AutorizacionController`.
+- [+] Refactorizar `PromesaPdfController`.
+- [+] Mantener `PromesaCreator` como wrapper de compatibilidad.
+- [+] Eliminar servicio legacy duplicado `app/Services/PromesaWorkflowService.php`.
+- [+] Crear `tests/Feature/V3PromesaModuleTest.php`.
+- [+] Documentar refactor en `docs/23_refactor_backend_promesas_v3.md`.
+- [+] Documentar cuota balon como variante de flujo persistida por `promesa_cuotas.es_balon`.
+- [+] CNA dentro de `AutorizacionController@index` refactorizado a `CnaQueryService` en Fase 8.3.
+- [!] No cambiar persistencia de `convenio_balon` sin migracion y validacion productiva.
+
+## 3.3 Fase 8.3 - Refactor backend CNA
+
+- [+] Analizar `CnaController`.
+- [+] Analizar `AutorizacionController` para bandeja CNA.
+- [+] Analizar `CnaSolicitud`.
+- [+] Crear `app/Services/Cna/CnaCreationService.php`.
+- [+] Crear `app/Services/Cna/CnaNumberingService.php`.
+- [+] Crear `app/Services/Cna/CnaWorkflowService.php`.
+- [+] Crear `app/Services/Cna/CnaDocumentService.php`.
+- [+] Crear `app/Services/Cna/CnaQueryService.php`.
+- [+] Crear `app/Actions/Cna/CreateCnaAction.php`.
+- [+] Crear `app/Actions/Cna/PreapproveCnaAction.php`.
+- [+] Crear `app/Actions/Cna/ApproveCnaAction.php`.
+- [+] Crear `app/Actions/Cna/RejectCnaAction.php`.
+- [+] Crear `app/Actions/Cna/DownloadCnaDocumentAction.php`.
+- [+] Crear `app/Policies/CnaPolicy.php`.
+- [+] Registrar Gates de CNA en `AuthServiceProvider`.
+- [+] Refactorizar `CnaController`.
+- [+] Refactorizar consulta CNA en `AutorizacionController`.
+- [+] Mantener rutas y nombres de rutas actuales.
+- [+] Mantener estados, redirects, mensajes y fallback documental.
+- [+] Crear `tests/Feature/V3CnaModuleTest.php`.
+- [+] Documentar refactor en `docs/24_refactor_backend_cna_v3.md`.
+- [!] Validacion manual visual de workflow CNA en navegador queda pendiente.
+- [!] Separar Autorizacion en ViewModel/modulo propio queda como mejora posterior.
 
 ## 4. Frontend V3
 

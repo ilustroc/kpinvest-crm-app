@@ -1,21 +1,21 @@
 <?php
 
-namespace App\Services\Promesas;
+namespace App\Actions\Promesa;
 
 use App\Http\Requests\StorePromesaRequest;
 use App\Services\Promesa\PromesaCreationService;
+use Illuminate\Support\Facades\Gate;
 
-class PromesaCreator
+class CreatePromesaAction
 {
     public function __construct(private readonly PromesaCreationService $promesas)
     {
     }
 
-    /**
-     * Compatibilidad legacy: crea la promesa y retorna [PromesaPago $promesa, string $mensaje].
-     */
-    public function createFromRequest(string $dni, StorePromesaRequest $request): array
+    public function execute(string $dni, StorePromesaRequest $request): array
     {
+        Gate::authorize('create-promesa');
+
         return $this->promesas->createFromRequest($dni, $request);
     }
 }

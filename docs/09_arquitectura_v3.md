@@ -28,6 +28,7 @@ Primer avance completado:
 - [+] Se creo `app/Support/Authorization/Roles.php`.
 - [+] Se creo `app/Policies/UserPolicy.php`.
 - [+] Se creo `app/Policies/ClientePolicy.php`.
+- [+] Se creo `app/Policies/PromesaPolicy.php`.
 - [+] Se definieron Gates iniciales por modulo critico.
 - [+] Reportes, Integracion y Administracion usan Gates en rutas.
 - [+] Sidebar/topbar usan Gates para mostrar accesos.
@@ -39,7 +40,13 @@ Pendiente:
 - [+] Crear servicios reales para el modulo Cliente.
 - [+] Crear action puntual para eliminacion de pagos de Cliente.
 - [+] Crear ViewModel para la vista compleja de Cliente.
-- [!] Migrar permisos internos restantes de Promesas y CNA hacia Policies/Gates sin romper workflow.
+- [+] Crear servicios reales para el modulo Promesas.
+- [+] Crear actions puntuales para creacion, workflow y acuerdo de Promesas.
+- [+] Migrar permisos internos de Promesas hacia Policy/Gates.
+- [+] Crear servicios reales para el modulo CNA.
+- [+] Crear actions puntuales para creacion, workflow y descargas de CNA.
+- [+] Migrar permisos internos de CNA hacia Policy/Gates.
+- [!] Separar Autorizacion en ViewModel/modulo propio queda como mejora posterior.
 
 Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
 La excepcion controlada es `AdminUsersController`, que comenzo a delegar logica simple en un servicio y un ViewModel sin cambiar rutas ni comportamiento esperado.
@@ -188,6 +195,8 @@ Estado actual de carpetas:
 - [+] `app/Support/Authorization`.
 - [+] `app/Policies/UserPolicy.php`.
 - [+] `app/Policies/ClientePolicy.php`.
+- [+] `app/Policies/PromesaPolicy.php`.
+- [+] `app/Policies/CnaPolicy.php`.
 
 ### Rutas
 
@@ -343,6 +352,56 @@ routes/web/clientes.php
 
 Este refactor mantiene rutas, nombres de rutas, variables de vista y permisos funcionales.
 
+El segundo refactor backend critico usa este flujo:
+
+```text
+routes/web/clientes.php
+  -> PromesaController@store
+    -> CreatePromesaAction
+      -> PromesaCreationService
+        -> PromesaScheduleService
+      -> redirect con mensaje
+
+routes/web/promesas.php
+  -> AutorizacionController@preaprobar/aprobar/rechazar*
+    -> Promesa Actions
+      -> PromesaWorkflowService
+      -> redirect con mensaje
+
+routes/web/promesas.php
+  -> PromesaPdfController@acuerdo
+    -> GeneratePromesaAgreementAction
+      -> PromesaDocumentService
+      -> PDF o DOCX fallback
+```
+
+La bandeja de promesas de Autorizacion usa `PromesaQueryService`. La bandeja CNA usa `CnaQueryService`.
+
+El tercer refactor backend critico usa este flujo:
+
+```text
+routes/web/clientes.php
+  -> CnaController@store
+    -> CreateCnaAction
+      -> CnaCreationService
+        -> CnaNumberingService
+        -> CnaDocumentService cuando crea administrador
+      -> redirect con mensaje
+
+routes/web/cna.php
+  -> CnaController@preaprobar/aprobar/rechazar*
+    -> CNA Actions
+      -> CnaWorkflowService
+        -> CnaDocumentService al aprobar
+      -> redirect con mensaje
+
+routes/web/cna.php
+  -> CnaController@docx/pdf
+    -> DownloadCnaDocumentAction
+      -> CnaDocumentService
+      -> descarga DOCX/PDF o fallback
+```
+
 ## Permisos V3
 
 Base implementada:
@@ -350,6 +409,8 @@ Base implementada:
 - `Roles` centraliza listas de roles y reglas reutilizables.
 - `UserPolicy` centraliza permisos de usuarios.
 - `ClientePolicy` centraliza permisos base del modulo Cliente.
+- `PromesaPolicy` centraliza permisos de creacion, workflow y acuerdo de Promesas.
+- `CnaPolicy` centraliza permisos de creacion, workflow y descargas de CNA.
 - `AuthServiceProvider` registra Gates de acceso por modulo.
 - Rutas de `admin`, `integracion` y `reportes` ya usan middleware `can:*`.
 - El sidebar usa Gates para decidir visibilidad.
@@ -367,11 +428,23 @@ Gates iniciales:
 - `search-clientes`.
 - `create-cliente-promesa`.
 - `create-cliente-cna`.
+- `create-promesa`.
+- `preapprove-promesa`.
+- `approve-promesa`.
+- `reject-promesa-supervisor`.
+- `reject-promesa-admin`.
+- `generate-promesa-agreement`.
+- `create-cna`.
+- `preapprove-cna`.
+- `approve-cna`.
+- `reject-cna-supervisor`.
+- `reject-cna-admin`.
+- `generate-cna-document`.
+- `download-cna-document`.
 
 Pendiente:
 
-- Convertir validaciones internas de `AutorizacionController` y `CnaController` a Policies/Gates especificos.
-- Crear `PromesaPolicy` y `CnaPolicy` cuando se refactoricen esos modulos.
+- Separar `AutorizacionController` en ViewModel/modulo propio si se quiere reducir todavia mas la bandeja.
 - Evitar cambios grandes de permisos sin pruebas funcionales completas.
 
 ## Responsabilidades por capa

@@ -381,11 +381,23 @@ Estado:
 - [+] Action creada: `DeleteClientePaymentAction`.
 - [+] Policy creada: `ClientePolicy`.
 - [+] Tests creados: `V3ClienteModuleTest`.
-- [!] Promesas y CNA quedan pendientes como siguientes modulos criticos.
+- [+] Fase 8.2 iniciada con modulo Promesas.
+- [+] Servicios creados: `PromesaCreationService`, `PromesaScheduleService`, `PromesaWorkflowService`, `PromesaDocumentService`, `PromesaQueryService`.
+- [+] Actions creadas: `CreatePromesaAction`, `PreapprovePromesaAction`, `ApprovePromesaAction`, `RejectPromesaAction`, `GeneratePromesaAgreementAction`.
+- [+] Policy creada: `PromesaPolicy`.
+- [+] Tests creados: `V3PromesaModuleTest`.
+- [+] Fase 8.3 iniciada con modulo CNA.
+- [+] Servicios creados: `CnaCreationService`, `CnaNumberingService`, `CnaWorkflowService`, `CnaDocumentService`, `CnaQueryService`.
+- [+] Actions creadas: `CreateCnaAction`, `PreapproveCnaAction`, `ApproveCnaAction`, `RejectCnaAction`, `DownloadCnaDocumentAction`.
+- [+] Policy creada: `CnaPolicy`.
+- [+] Tests creados: `V3CnaModuleTest`.
+- [!] Autorizacion puede separarse despues en ViewModel/modulo propio si se quiere reducir mas la pantalla de bandeja.
 
 Documento:
 
 - `docs/22_refactor_backend_clientes_v3.md`.
+- `docs/23_refactor_backend_promesas_v3.md`.
+- `docs/24_refactor_backend_cna_v3.md`.
 
 ### Fase 9 - Deploy controlado
 
@@ -420,8 +432,9 @@ Antes de produccion:
 13. Migrar Integraciones.
 14. Revisar frontend post-diseno manual y normalizar scripts/componentes.
 15. Refactor backend de Clientes con Services/Actions/ViewModel/Policy.
-16. Extraer servicios/actions de Promesas y CNA con cobertura.
-17. Preparar deploy controlado.
+16. Extraer servicios/actions de Promesas con cobertura.
+17. Extraer servicios/actions de CNA con cobertura.
+18. Preparar deploy controlado.
 
 ## Pantalla piloto recomendada
 

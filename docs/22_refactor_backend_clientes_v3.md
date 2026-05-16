@@ -223,7 +223,7 @@ Cobertura:
 
 ## Pendientes
 
-- Refactor backend de Promesas.
+- Refactor backend de Promesas. Estado: completado en `docs/23_refactor_backend_promesas_v3.md`.
 - Refactor backend de CNA.
 - Extraer permisos internos de Promesas/CNA hacia Policies.
 - Evaluar busqueda por telefono solo si se define una fuente de datos estable.
