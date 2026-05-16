@@ -347,6 +347,11 @@ Estado:
 - [+] Cierre frontend ejecutado: sin Bootstrap activo, sin assets activos en `public/css` o `public/js`.
 - [+] `.gitkeep` innecesarios eliminados en carpetas con archivos reales.
 - [+] Componentes de dominio no usados eliminados.
+- [+] Revision frontend post-diseno manual documentada en `docs/21_revision_frontend_post_diseno_manual.md`.
+- [+] Logica de toast retirada de Blade y centralizada en `resources/js/core/toast.js`.
+- [+] `window.alert` de Promesas reemplazado por `notify()` modular.
+- [+] Global `window.toggleRail` retirado del sidebar.
+- [+] Plantillas Bootstrap de paginacion no usadas eliminadas.
 - [!] Validacion manual visual pendiente para Cliente, Promesas y CNA.
 
 Reglas:
@@ -357,7 +362,32 @@ Reglas:
 - Toda pantalla migrada usa `@section('tailwind_only', true)` como marca documental de migracion.
 - Toda logica JS nueva vive en `resources/js/modules`.
 
-### Fase 8 - Deploy controlado
+### Fase 8 - Refactor backend por modulos criticos
+
+Objetivo:
+
+- Reducir controladores grandes sin cambiar comportamiento funcional.
+- Extraer Services, Actions, ViewModels y Policies por modulo.
+- Mantener rutas, nombres de rutas, vistas, formularios y permisos funcionales.
+- Ampliar tests por modulo antes de tocar flujos mas sensibles.
+
+Estado:
+
+- [+] Fase 8.1 iniciada con modulo Clientes.
+- [+] `ClienteController` delegado a `ClienteProfileService` y `DeleteClientePaymentAction`.
+- [+] `ClienteLookupController` delegado a `ClienteLookupService`.
+- [+] Servicios creados: `ClienteProfileService`, `ClienteAccountService`, `ClientePaymentService`, `ClienteLookupService`.
+- [+] ViewModel creado: `ClienteShowViewModel`.
+- [+] Action creada: `DeleteClientePaymentAction`.
+- [+] Policy creada: `ClientePolicy`.
+- [+] Tests creados: `V3ClienteModuleTest`.
+- [!] Promesas y CNA quedan pendientes como siguientes modulos criticos.
+
+Documento:
+
+- `docs/22_refactor_backend_clientes_v3.md`.
+
+### Fase 9 - Deploy controlado
 
 Objetivo:
 
@@ -388,8 +418,10 @@ Antes de produccion:
 11. Ordenar arquitectura frontend V3.
 12. Migrar Reportes.
 13. Migrar Integraciones.
-14. Extraer servicios/actions de modulos criticos con cobertura.
-15. Preparar deploy controlado.
+14. Revisar frontend post-diseno manual y normalizar scripts/componentes.
+15. Refactor backend de Clientes con Services/Actions/ViewModel/Policy.
+16. Extraer servicios/actions de Promesas y CNA con cobertura.
+17. Preparar deploy controlado.
 
 ## Pantalla piloto recomendada
 

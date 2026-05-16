@@ -16,6 +16,8 @@
 
 <div id="{{ $id }}"
      role="alert"
+     data-toast
+     data-toast-timeout="{{ (int) $timeout }}"
      class="fixed right-4 top-4 z-[100] flex w-full max-w-sm items-center gap-3.5 border border-kp-border border-l-4 bg-white p-4 transition-all duration-300 {{ $variants[$variant] ?? $variants['info'] }}">
     
     <img src="{{ asset('assets/img/logo-superior.png') }}" alt="KP Invest" class="h-7 w-auto shrink-0">
@@ -27,7 +29,7 @@
     </div>
 
     <button type="button" 
-            onclick="closeToast('{{ $id }}')"
+            data-toast-close
             class="shrink-0 rounded-md p-1 text-kp-muted transition-colors hover:bg-slate-100 hover:text-kp-ink focus:outline-none">
         <span class="sr-only">Cerrar</span>
         <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
@@ -35,20 +37,3 @@
         </svg>
     </button>
 </div>
-
-<script>
-    if (typeof window.closeToast !== 'function') {
-        window.closeToast = function(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(-10px)';
-                setTimeout(() => el.remove(), 300);
-            }
-        }
-    }
-    
-    setTimeout(() => {
-        closeToast('{{ $id }}');
-    }, {{ $timeout }});
-</script>

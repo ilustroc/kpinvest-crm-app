@@ -1,3 +1,4 @@
+import './core/toast';
 import './modules/layout/sidebar';
 import './modules/admin/users';
 import './modules/auth/login';

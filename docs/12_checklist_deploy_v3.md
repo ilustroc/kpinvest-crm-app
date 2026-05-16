@@ -14,8 +14,9 @@
 - [+] Fase 4 - Migracion inicial Bootstrap -> Tailwind.
 - [+] Fase 5 - Baseline de migraciones + limpieza de roles.
 - [+] Fase 6 - Pruebas funcionales reales con cobertura inicial completada.
-- [+] Fase 7 - Arquitectura frontend V3 + migracion Tailwind iniciada.
-- [ ] Fase 8 - Deploy controlado.
+- [+] Fase 7 - Arquitectura frontend V3 + migracion Tailwind completada a nivel tecnico.
+- [+] Fase 8 - Refactor backend por modulos criticos iniciado.
+- [ ] Fase 9 - Deploy controlado.
 
 ## 1. Rama y codigo
 
@@ -53,7 +54,35 @@
 - [+] Definir Policies/Gates por modulo critico.
 - [+] Revisar permisos actuales.
 - [+] Crear documentacion inicial de permisos.
+- [+] Refactor backend de Clientes iniciado.
+- [+] Crear servicios reales del modulo Cliente.
+- [+] Crear `ClienteShowViewModel`.
+- [+] Crear `DeleteClientePaymentAction`.
+- [+] Crear `ClientePolicy`.
+- [+] Delegar `ClienteController` a Services/Action sin cambiar rutas.
+- [+] Delegar `ClienteLookupController` a `ClienteLookupService`.
 - [!] No mover controladores criticos sin pruebas o validacion funcional.
+
+## 3.1 Fase 8.1 - Refactor backend Clientes
+
+- [+] Analizar responsabilidades actuales de `ClienteController`.
+- [+] Crear `app/Services/Cliente/ClienteLookupService.php`.
+- [+] Crear `app/Services/Cliente/ClienteProfileService.php`.
+- [+] Crear `app/Services/Cliente/ClienteAccountService.php`.
+- [+] Crear `app/Services/Cliente/ClientePaymentService.php`.
+- [+] Crear `app/ViewModels/Cliente/ClienteShowViewModel.php`.
+- [+] Crear `app/Actions/Cliente/DeleteClientePaymentAction.php`.
+- [+] Crear `app/Policies/ClientePolicy.php`.
+- [+] Registrar Gates de Cliente en `AuthServiceProvider`.
+- [+] Refactorizar `ClienteController` para orquestar Services/Action.
+- [+] Refactorizar `ClienteLookupController` para usar `ClienteLookupService`.
+- [+] Mantener rutas y nombres de rutas actuales.
+- [+] Mantener variables esperadas por `clientes/show.blade.php`.
+- [+] Mantener regla de eliminacion de pagos: administrador, supervisor y soporte.
+- [+] Crear `tests/Feature/V3ClienteModuleTest.php`.
+- [+] Documentar refactor en `docs/22_refactor_backend_clientes_v3.md`.
+- [!] Busqueda por telefono queda pendiente hasta definir fuente estable sin cambiar comportamiento.
+- [!] Promesas y CNA quedan pendientes para siguientes refactors backend.
 
 ## 4. Frontend V3
 
@@ -252,6 +281,23 @@
 - [+] Revisar `resources/js/app.js`.
 - [+] Revisar `resources/views/layouts/app.blade.php`.
 - [!] Referencias restantes a Bootstrap son historicas/documentales o propias del framework (`bootstrap/app.php`, `bootstrap/cache`, PHPUnit).
+- [!] Validacion manual de navegador pendiente.
+
+## 6.8 Revision frontend post-diseno manual
+
+- [+] Revisar cambios recientes con `git status`, `git log`, `git diff` y `git diff HEAD~1..HEAD`.
+- [+] Crear `docs/21_revision_frontend_post_diseno_manual.md`.
+- [+] Revisar layouts, componentes, vistas grandes, JS modular, CSS global, Vite y `package.json`.
+- [+] Mantener cambios manuales de diseno que respetan la arquitectura V3.
+- [+] Retirar `<script>` y `onclick` de `resources/views/components/ui/alert.blade.php`.
+- [+] Centralizar toast/alertas en `resources/js/core/toast.js`.
+- [+] Importar `resources/js/core/toast.js` desde `resources/js/app.js`.
+- [+] Reemplazar `window.alert` de Promesas por `notify()`.
+- [+] Retirar `window.toggleRail` de Sidebar.
+- [+] Eliminar plantillas Bootstrap de paginacion no usadas.
+- [+] Confirmar que no quedan scripts grandes embebidos en Blade/componentes.
+- [+] Confirmar que `resources/js/app.js` importa solo modulos reales.
+- [+] Confirmar que `resources/css/app.css` no recibio CSS especifico de pantalla.
 - [!] Validacion manual de navegador pendiente.
 
 ## 7. Migraciones

@@ -27,6 +27,7 @@ Primer avance completado:
 - [+] La pantalla piloto de administracion usa el flujo Controller -> Service/ViewModel -> Blade.
 - [+] Se creo `app/Support/Authorization/Roles.php`.
 - [+] Se creo `app/Policies/UserPolicy.php`.
+- [+] Se creo `app/Policies/ClientePolicy.php`.
 - [+] Se definieron Gates iniciales por modulo critico.
 - [+] Reportes, Integracion y Administracion usan Gates en rutas.
 - [+] Sidebar/topbar usan Gates para mostrar accesos.
@@ -35,10 +36,10 @@ Primer avance completado:
 Pendiente:
 
 - [ ] Mover controladores a carpetas por dominio.
-- [ ] Crear servicios reales por dominio donde falten.
-- [ ] Crear actions reales para operaciones puntuales.
-- [ ] Crear ViewModels para vistas complejas restantes.
-- [!] Migrar permisos internos restantes de Promesas, CNA y Cliente hacia Policies/Gates sin romper workflow.
+- [+] Crear servicios reales para el modulo Cliente.
+- [+] Crear action puntual para eliminacion de pagos de Cliente.
+- [+] Crear ViewModel para la vista compleja de Cliente.
+- [!] Migrar permisos internos restantes de Promesas y CNA hacia Policies/Gates sin romper workflow.
 
 Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
 La excepcion controlada es `AdminUsersController`, que comenzo a delegar logica simple en un servicio y un ViewModel sin cambiar rutas ni comportamiento esperado.
@@ -186,6 +187,7 @@ Estado actual de carpetas:
 - [+] `app/Support/Helpers`.
 - [+] `app/Support/Authorization`.
 - [+] `app/Policies/UserPolicy.php`.
+- [+] `app/Policies/ClientePolicy.php`.
 
 ### Rutas
 
@@ -316,12 +318,38 @@ routes/web/dashboard.php
 
 Dashboard mantiene el controlador y servicio actual, pero reemplaza Bootstrap por Tailwind y mueve el grafico a Vite.
 
+El primer refactor backend critico usa este flujo:
+
+```text
+routes/web/clientes.php
+  -> ClienteController@show
+    -> ClienteProfileService
+      -> ClienteAccountService
+      -> ClientePaymentService
+      -> ClienteShowViewModel
+    -> resources/views/clientes/show.blade.php
+
+routes/web/clientes.php
+  -> ClienteController@deletePagos
+    -> DeleteClientePaymentAction
+      -> ClientePaymentService
+      -> redirect con mensaje
+
+routes/web/clientes.php
+  -> ClienteLookupController
+    -> ClienteLookupService
+    -> redirect/json
+```
+
+Este refactor mantiene rutas, nombres de rutas, variables de vista y permisos funcionales.
+
 ## Permisos V3
 
 Base implementada:
 
 - `Roles` centraliza listas de roles y reglas reutilizables.
 - `UserPolicy` centraliza permisos de usuarios.
+- `ClientePolicy` centraliza permisos base del modulo Cliente.
 - `AuthServiceProvider` registra Gates de acceso por modulo.
 - Rutas de `admin`, `integracion` y `reportes` ya usan middleware `can:*`.
 - El sidebar usa Gates para decidir visibilidad.
@@ -335,11 +363,15 @@ Gates iniciales:
 - `review-promesas`.
 - `review-cna`.
 - `delete-client-payments`.
+- `view-cliente`.
+- `search-clientes`.
+- `create-cliente-promesa`.
+- `create-cliente-cna`.
 
 Pendiente:
 
-- Convertir validaciones internas de `AutorizacionController`, `CnaController` y `ClienteController` a Policies/Gates especificos.
-- Crear `PromesaPolicy`, `CnaPolicy` y `ClientePolicy` cuando se refactoricen esos modulos.
+- Convertir validaciones internas de `AutorizacionController` y `CnaController` a Policies/Gates especificos.
+- Crear `PromesaPolicy` y `CnaPolicy` cuando se refactoricen esos modulos.
 - Evitar cambios grandes de permisos sin pruebas funcionales completas.
 
 ## Responsabilidades por capa

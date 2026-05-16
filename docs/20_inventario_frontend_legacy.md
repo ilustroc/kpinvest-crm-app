@@ -283,11 +283,28 @@ Estado:
 - [+] No quedan archivos activos en `public/css` ni `public/js`.
 - [+] Bootstrap CSS, JS e Icons no cargan desde el layout.
 - [+] No quedan `data-bs`, `form-control`, `table-responsive` ni `modal fade` en vistas/JS activos.
+- [+] Plantillas Bootstrap de paginacion no usadas eliminadas de `resources/views/vendor/pagination`.
 
 Falsos positivos esperados al buscar Bootstrap:
 
 - `bootstrap/app.php`, `bootstrap/cache` y referencias de PHPUnit/Composer.
 - Menciones historicas o de cierre en documentacion V3.
+
+## Revision post-diseno manual
+
+Estado:
+
+- [+] Se reviso el frontend completo despues de los cambios visuales manuales.
+- [+] No se encontraron scripts grandes embebidos activos en Blade/componentes.
+- [+] `dashboard/index.blade.php` y `panel/resumen.blade.php` conservan solo `<script type="application/json">` como payload de datos.
+- [+] `resources/views/mail/*.blade.php` conserva estilos inline por tratarse de correo HTML.
+- [+] `x-ui.alert` fue normalizado para delegar comportamiento a `resources/js/core/toast.js`.
+- [+] `resources/js/modules/promesas/form.js` usa `notify()` en vez de `window.alert`.
+- [+] No quedan dependencias activas de Bootstrap en vistas o JS.
+
+Documento:
+
+- `docs/21_revision_frontend_post_diseno_manual.md`.
 
 ## Orden recomendado pendiente
 

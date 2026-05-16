@@ -10,7 +10,7 @@
         $totDeuda = (float) $cuentas->sum(fn($x) => (float) ($x->deuda_total ?? 0));
         $totPagos = (float) $pagos->sum(fn($p) => (float) ($p->monto_pagado ?? $p->monto ?? 0));
         $ccdDocs = collect($ccdByDni[$dni] ?? []);
-        $canDeletePagos = in_array(strtolower((string) optional(Auth::user())->role), ['administrador', 'supervisor', 'soporte'], true);
+        $canDeletePagos = \Illuminate\Support\Facades\Gate::allows('delete-client-payments');
     @endphp
 
     <x-layout.page-shell data-module="clientes-show">

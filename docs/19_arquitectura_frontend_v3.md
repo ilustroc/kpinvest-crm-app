@@ -152,6 +152,13 @@ if (root) {
 - `resources/js/core/dropdown.js`.
 - `resources/js/core/toast.js`.
 
+Responsabilidad de `toast.js`:
+
+- Inicializar toasts renderizados por Blade con `data-toast`.
+- Manejar cierre manual con `data-toast-close`.
+- Manejar cierre automatico por `data-toast-timeout`.
+- Exponer `notify(message, variant)` para modulos JS sin usar `window.alert`.
+
 ## Modulos JS creados en Fase 7
 
 - `resources/js/modules/reportes/filters.js`.
@@ -238,3 +245,16 @@ Componentes de dominio creados:
 Fase 7 establece la arquitectura frontend V3 y migra Reportes como primer modulo completo bajo esa arquitectura.
 
 Bootstrap fue eliminado al final de la migracion de Clientes. Vite queda como canal unico de assets frontend.
+
+## Revision post-diseno manual
+
+Despues de los ultimos ajustes visuales manuales, se creo `docs/21_revision_frontend_post_diseno_manual.md`.
+
+Resultado:
+
+- [+] El diseno visual manual se mantuvo.
+- [+] El comportamiento de UI quedo fuera de Blade cuando era logica reutilizable.
+- [+] Los componentes siguen separados por responsabilidad.
+- [+] `resources/js/app.js` importa solo modulos reales.
+- [+] `resources/css/app.css` conserva solo estilos globales/tokens.
+- [+] No se reintrodujeron assets en `public/css` o `public/js`.

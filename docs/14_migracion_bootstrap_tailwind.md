@@ -321,6 +321,19 @@ Estado:
 - [+] Componentes placeholder no usados eliminados.
 - [!] Quedan menciones a Bootstrap en documentacion historica y archivos propios del framework, no como dependencia frontend activa.
 
+## Revision post-diseno manual
+
+Estado:
+
+- [+] Se revisaron los cambios manuales del commit `b49c286 Refactor UI components and layout`.
+- [+] Se mantuvo el diseno visual nuevo de componentes, Cliente, Autorizacion, Panel y Reportes.
+- [+] `x-ui.alert` ya no contiene scripts ni eventos inline.
+- [+] Toast/alertas se manejan desde `resources/js/core/toast.js`.
+- [+] Promesas usa `notify()` para avisos de UI.
+- [+] Sidebar ya no expone `window.toggleRail`.
+- [+] Se eliminaron plantillas Bootstrap de paginacion no usadas publicadas en `resources/views/vendor/pagination`.
+- [!] Las menciones a Bootstrap restantes deben ser documentales, historicas o propias del framework.
+
 ## Validaciones realizadas
 
 - [+] `npm run dev`.

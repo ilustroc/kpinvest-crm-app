@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Policies\ClientePolicy;
 use App\Policies\UserPolicy;
 use App\Support\Authorization\Roles;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -30,6 +31,10 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('access-integracion', fn (User $user) => Roles::canAccessIntegrations($user));
         Gate::define('review-promesas', fn (User $user) => Roles::canReviewWorkflow($user));
         Gate::define('review-cna', fn (User $user) => Roles::canReviewWorkflow($user));
-        Gate::define('delete-client-payments', fn (User $user) => Roles::canDeleteClientPayments($user));
+        Gate::define('view-cliente', [ClientePolicy::class, 'view']);
+        Gate::define('search-clientes', [ClientePolicy::class, 'search']);
+        Gate::define('delete-client-payments', [ClientePolicy::class, 'deletePayment']);
+        Gate::define('create-cliente-promesa', [ClientePolicy::class, 'createPromesa']);
+        Gate::define('create-cliente-cna', [ClientePolicy::class, 'createCna']);
     }
 }

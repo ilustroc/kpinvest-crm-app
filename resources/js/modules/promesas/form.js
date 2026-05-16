@@ -1,4 +1,5 @@
 import { $, $$, escapeHtml } from '../../core/dom';
+import { notify } from '../../core/toast';
 
 function numberValue(value) {
     const parsed = parseFloat(String(value ?? '').replace(/[^\d,.-]/g, '').replaceAll(',', ''));
@@ -276,7 +277,7 @@ export function setupPromesaForm(root) {
             event.stopPropagation();
             error?.classList.remove('hidden');
             sumNode?.classList.add('text-red-700');
-            window.alert('No se puede guardar: el total del cronograma debe coincidir con el Monto convenio.');
+            notify('No se puede guardar: el total del cronograma debe coincidir con el Monto convenio.', 'warning');
         }
     }, true);
 

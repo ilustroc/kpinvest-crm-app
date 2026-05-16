@@ -29,6 +29,8 @@ El objetivo final era eliminar Bootstrap del proyecto de forma controlada. En el
 - [+] `chart.js` se gestiona por npm y Vite para Dashboard.
 - [+] Cliente, Promesas y CNA dentro de Cliente fueron migrados a Tailwind/Vite.
 - [+] Bootstrap CSS, Bootstrap Icons y Bootstrap JS fueron retirados del layout global.
+- [+] Revision frontend post-diseno manual completada y documentada.
+- [+] Toast/alertas globales centralizados en `resources/js/core/toast.js`.
 - [+] `npm run dev` se ejecuto y respondio correctamente.
 - [+] `npm run build` se ejecuto correctamente.
 - [+] `public/build/manifest.json` confirmado.
@@ -88,30 +90,30 @@ Los archivos `public/css/reportes/*` y `public/js/reportes/*` fueron eliminados 
 
 ## Situacion actual
 
-El frontend actual esta en transicion. Todavia existen partes legacy que usan:
+El frontend V3 ya esta consolidado sobre Blade, componentes Blade, Tailwind CSS v4 y Vite.
 
-- Blade.
-- Bootstrap 5 via CDN.
-- Bootstrap Icons via CDN.
-- Google Fonts via CDN.
-- Chart.js instalado por npm y usado desde Vite en Dashboard y Panel.
-- CSS embebido en `resources/views/layouts/app.blade.php`.
+Estado actual:
+
+- Bootstrap CSS, Bootstrap Icons y Bootstrap JS fueron retirados del layout global.
 - No quedan CSS activos en `public/css`.
 - No quedan JS activos en `public/js`.
-- JS embebido en vistas grandes.
-- Vite instalado, pero no como unico canal de assets.
+- Chart.js se usa desde npm/Vite en Dashboard y Panel.
+- Los scripts de comportamiento viven en `resources/js/core` o `resources/js/modules`.
+- Las etiquetas `<script type="application/json">` que quedan en Dashboard y Panel son payloads de datos para modulos Vite.
+- Google Fonts sigue cargando desde el layout.
+- Las vistas migradas conservan `@section('tailwind_only', true)` como marca documental.
 
-Administracion y Dashboard ya usan Tailwind y no cargan Bootstrap desde el layout.
-
-## Problemas actuales
+## Problemas historicos resueltos
 
 - Dependencia fuerte de Bootstrap.
 - CSS global dentro del layout.
 - JS embebido dificil de mantener.
-- Vistas demasiado grandes.
-- Componentes visuales repetidos.
 - Assets repartidos entre CDN, `public/` y Vite.
-- Dificultad para redisenar de forma consistente.
+- Componentes visuales repetidos sin convencion.
+
+Pendiente:
+
+- Validacion manual visual y responsive en navegador real.
 
 ## Objetivo de Tailwind CSS v4
 
@@ -550,6 +552,24 @@ Estado:
 Pendiente:
 
 - [!] Validacion manual visual de Cliente, seleccion de operaciones, cronograma de promesas y generacion CNA.
+
+## Fase 7.7 - Revision post-diseno manual
+
+Estado:
+
+- [+] Se revisaron cambios recientes con `git status`, `git log`, `git diff` y `git diff HEAD~1..HEAD`.
+- [+] Se revisaron layouts, componentes, vistas grandes, JS modular, CSS global, Vite y `package.json`.
+- [+] El diseno manual nuevo se mantuvo cuando respetaba la arquitectura V3.
+- [+] `x-ui.alert` quedo solo como render Blade; su comportamiento vive en `resources/js/core/toast.js`.
+- [+] `resources/js/modules/promesas/form.js` usa `notify()` en vez de `window.alert`.
+- [+] `resources/js/modules/layout/sidebar.js` ya no expone funciones globales innecesarias.
+- [+] Se eliminaron plantillas Bootstrap de paginacion no usadas.
+- [!] Las etiquetas `<script type="application/json">` de Dashboard y Panel se mantienen como payloads de datos, no como scripts de comportamiento.
+- [!] Validacion manual de navegador sigue pendiente.
+
+Documento:
+
+- `docs/21_revision_frontend_post_diseno_manual.md`.
 
 ## Riesgos
 
