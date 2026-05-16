@@ -3,5 +3,4 @@
     <div><b>Cosecha:</b> <span id="cnaCosecha">-</span></div>
     <div><b>Origen / Plantilla:</b> <span id="cnaPlantilla">-</span></div>
     <div><b>Operaciones incluidas:</b> <span id="cnaOpsList" class="inline-flex flex-wrap gap-1 align-middle"></span></div>
-    <div class="mt-1">El correlativo se asignara por serie (KPI, F, F2) al guardar.</div>
 </div>

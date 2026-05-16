@@ -11,8 +11,7 @@
 @section('content')
 <x-layout.page-shell data-module="reportes-promesas">
   <x-layout.page-header
-    title="Reporte de promesas"
-    subtitle="Consulta promesas por fecha, estado, tipo, entidad o DNI.">
+    title="Reporte de promesas">
     <x-slot:actions>
       <x-ui.button href="#" variant="secondary" data-report-export>
         Exportar

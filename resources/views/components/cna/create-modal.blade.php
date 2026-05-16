@@ -14,7 +14,7 @@
                 <x-forms.input label="Monto pagado (S/.)" name="monto_pagado" type="number" step="0.01" min="0.01" required />
             </div>
 
-            <x-forms.textarea name="observacion" label="Observacion (opcional)" rows="3" placeholder="Comentario contextual" />
+            <x-forms.textarea name="observacion" label="Observacion" rows="3" placeholder="Comentario contextual" />
 
             <input type="hidden" name="cuenta" id="cnaCuentaInput">
             <div id="cnaOpsHidden"></div>

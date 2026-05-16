@@ -37,7 +37,6 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 class="text-xl font-bold text-kp-ink">Bienvenido(a)</h1>
-            <p class="mt-1 text-sm text-kp-muted">Panel inicial del CRM.</p>
 
             @if (session('quick_error'))
               <x-feedback.alert variant="warning" class="mt-3">
@@ -118,8 +117,10 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <x-ui.card>
           <div class="flex items-center gap-3">
-            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-sm font-black text-kp-green-dark">
-              PP
+            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-kp-green-dark">
+              <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+              </svg>
             </div>
             <div>
               <p class="text-sm font-semibold text-kp-muted">Promesas creadas hoy</p>
@@ -130,8 +131,10 @@
 
         <x-ui.card>
           <div class="flex items-center gap-3">
-            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-sm font-black text-kp-green-dark">
-              S/
+            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-kp-green-dark">
+              <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+              </svg>
             </div>
             <div>
               <p class="text-sm font-semibold text-kp-muted">Pagos registrados hoy</p>
@@ -189,7 +192,6 @@
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 class="text-base font-bold text-kp-ink">{{ $isAsesor ? 'Tus actividades' : 'Actividades' }}</h2>
-            <p class="mt-1 text-sm text-kp-muted">Pendientes y ultimos movimientos.</p>
           </div>
           <x-ui.badge>{{ strtoupper($role ?: 'ROL') }}</x-ui.badge>
         </div>
@@ -198,7 +200,11 @@
           @if($isAsesor)
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-xs font-black text-kp-green-dark">PP</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">Promesas - En Supervisor</h3>
                 <x-ui.badge class="ml-auto">{{ $misSup->count() }}</x-ui.badge>
               </div>
@@ -208,7 +214,7 @@
                   <a href="{{ route('clientes.show', $p->dni) }}" class="{{ $activityItemClass }}">
                     <span class="size-2 rounded-full bg-kp-green"></span>
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio' }}</span>
+                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
                       <span class="block truncate text-xs text-kp-muted">{{ $p->operacion ?: '-' }} - Pendiente de Supervisor</span>
                     </span>
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">Ver</span>
@@ -221,7 +227,11 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-xs font-black text-amber-700">PP</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">Promesas - Pre-aprobadas</h3>
                 <x-ui.badge class="ml-auto">{{ $misPre->count() }}</x-ui.badge>
               </div>
@@ -231,8 +241,8 @@
                   <a href="{{ route('clientes.show', $p->dni) }}" class="{{ $activityItemClass }}">
                     <span class="size-2 rounded-full bg-amber-500"></span>
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio' }}</span>
-                      <span class="block truncate text-xs text-kp-muted">{{ $p->operacion ?: '-' }} - Esperando Administracion</span>
+                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
+                      <span class="block truncate text-xs text-kp-muted">{{ $p->operacion ?: '-' }} - Esperando Administración</span>
                     </span>
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">Ver</span>
                   </a>
@@ -244,7 +254,11 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-slate-100 text-xs font-black text-slate-700">PP</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">Promesas - Resueltas</h3>
                 <x-ui.badge class="ml-auto">{{ $misRes->count() }}</x-ui.badge>
               </div>
@@ -264,14 +278,18 @@
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">Ver</span>
                   </a>
                 @empty
-                  <p class="px-3 py-2 text-sm text-kp-muted">Aun no hay resoluciones.</p>
+                  <p class="px-3 py-2 text-sm text-kp-muted">Aún no hay resoluciones.</p>
                 @endforelse
               </div>
             </section>
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-xs font-black text-kp-green-dark">CNA</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">CNA - En Supervisor</h3>
                 <x-ui.badge class="ml-auto">{{ $cnaSup->count() }}</x-ui.badge>
               </div>
@@ -294,7 +312,11 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-xs font-black text-amber-700">CNA</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">CNA - Pre-aprobadas</h3>
                 <x-ui.badge class="ml-auto">{{ $cnaPre->count() }}</x-ui.badge>
               </div>
@@ -305,7 +327,7 @@
                     <span class="size-2 rounded-full bg-amber-500"></span>
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-bold">DNI {{ $c->dni }}</span>
-                      <span class="block truncate text-xs text-kp-muted">Esperando Administracion</span>
+                      <span class="block truncate text-xs text-kp-muted">Esperando Administración</span>
                     </span>
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">Ver</span>
                   </a>
@@ -317,7 +339,11 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-slate-100 text-xs font-black text-slate-700">CNA</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">CNA - Resueltas</h3>
                 <x-ui.badge class="ml-auto">{{ $cnaRes->count() }}</x-ui.badge>
               </div>
@@ -341,10 +367,15 @@
                 @endforelse
               </div>
             </section>
+
           @else
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-xs font-black text-kp-green-dark">PP</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">Promesas por aprobar</h3>
                 <x-ui.badge class="ml-auto">{{ $ppPendCount }}</x-ui.badge>
               </div>
@@ -354,7 +385,7 @@
                   <a href="{{ route('autorizacion') }}" class="{{ $activityItemClass }}">
                     <span class="size-2 rounded-full bg-kp-green"></span>
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio' }}</span>
+                      <span class="block truncate font-bold">{{ $p->dni }} - {{ $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }}</span>
                       <span class="block truncate text-xs text-kp-muted">
                         {{ $p->operacion ?: '-' }} - {{ \Carbon\Carbon::parse($p->fecha_promesa)->format('Y-m-d') }} - S/ {{ number_format($p->monto_mostrar, 2) }}
                       </span>
@@ -362,14 +393,18 @@
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">Revisar</span>
                   </a>
                 @empty
-                  <p class="px-3 py-2 text-sm text-kp-muted">Nada pendiente aqui.</p>
+                  <p class="px-3 py-2 text-sm text-kp-muted">Nada pendiente aquí.</p>
                 @endforelse
               </div>
             </section>
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-xs font-black text-kp-green-dark">CNA</div>
+                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                  </svg>
+                </div>
                 <h3 class="text-sm font-bold text-kp-ink">Solicitudes de CNA</h3>
                 <x-ui.badge class="ml-auto">{{ $cnaPendCount }}</x-ui.badge>
               </div>
@@ -393,8 +428,12 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-xs font-black text-amber-700">7D</div>
-                <h3 class="text-sm font-bold text-kp-ink">Cuotas en los proximos 7 dias</h3>
+                <div class="flex size-8 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+                  <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+                  </svg>
+                </div>
+                <h3 class="text-sm font-bold text-kp-ink">Cuotas en los próximos 7 días</h3>
                 <x-ui.badge class="ml-auto">{{ $vencCount }}</x-ui.badge>
               </div>
 
@@ -404,12 +443,12 @@
                     <span class="size-2 rounded-full bg-amber-500"></span>
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-bold">{{ \Carbon\Carbon::parse($v->fecha)->format('d/m') }} - DNI {{ $v->dni }}</span>
-                      <span class="block truncate text-xs text-kp-muted">{{ $v->operacion ?: '-' }} - {{ $v->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio' }} #{{ $v->nro }}</span>
+                      <span class="block truncate text-xs text-kp-muted">{{ $v->operacion ?: '-' }} - {{ $v->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio' }} #{{ $v->nro }}</span>
                     </span>
                     <span class="rounded-full border border-kp-border px-2 py-1 text-xs font-semibold text-kp-muted">S/ {{ number_format((float) $v->monto, 2) }}</span>
                   </div>
                 @empty
-                  <p class="px-3 py-2 text-sm text-kp-muted">No hay vencimientos proximos.</p>
+                  <p class="px-3 py-2 text-sm text-kp-muted">No hay vencimientos próximos.</p>
                 @endforelse
               </div>
             </section>

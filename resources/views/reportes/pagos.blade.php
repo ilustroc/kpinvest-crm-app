@@ -11,8 +11,7 @@
 @section('content')
 <x-layout.page-shell data-module="reportes-pagos">
   <x-layout.page-header
-    title="Reporte de pagos"
-    subtitle="Consulta pagos por fecha, gestor, cosecha, entidad o DNI.">
+    title="Reporte de pagos">
     <x-slot:actions>
       <x-ui.button href="#" variant="secondary" data-report-export>
         Exportar

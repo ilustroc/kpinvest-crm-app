@@ -11,7 +11,7 @@
                 <x-tables.th>Operacion(es)</x-tables.th>
                 <x-tables.th align="right">Monto negociacion</x-tables.th>
                 <x-tables.th align="center">Nota</x-tables.th>
-                <x-tables.th align="center">Campana</x-tables.th>
+                <x-tables.th align="center">Campaña</x-tables.th>
                 <x-tables.th>Usuario creacion</x-tables.th>
                 <x-tables.th>Estado</x-tables.th>
             </tr>

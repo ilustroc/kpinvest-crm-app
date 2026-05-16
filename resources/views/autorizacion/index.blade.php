@@ -14,22 +14,6 @@
     title="Autorizacion"
     subtitle="{{ $isSupervisor ? 'Bandeja del Supervisor' : 'Bandeja del Administrador' }}"
   >
-    <x-slot:actions>
-      <form class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row" method="GET" action="{{ route('autorizacion') }}">
-        <label for="q" class="sr-only">Buscar</label>
-        <input
-          id="q"
-          name="q"
-          value="{{ $q }}"
-          class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm kp-focus placeholder:text-kp-muted sm:w-72"
-          placeholder="DNI / Operacion / Nota"
-        >
-        <x-ui.button type="submit">Buscar</x-ui.button>
-        @if($q)
-          <x-ui.button href="{{ route('autorizacion') }}" variant="secondary">Limpiar</x-ui.button>
-        @endif
-      </form>
-    </x-slot:actions>
   </x-layout.page-header>
 
   @if(session('ok'))

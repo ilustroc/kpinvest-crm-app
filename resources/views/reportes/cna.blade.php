@@ -11,8 +11,7 @@
 @section('content')
 <x-layout.page-shell data-module="reportes-cna">
   <x-layout.page-header
-    title="Reporte CNA"
-    subtitle="Consulta solicitudes CNA por fecha, estado, gestor o entidad.">
+    title="Reporte CNA">
     <x-slot:actions>
       <x-ui.button href="#" variant="secondary" data-report-export>
         Exportar

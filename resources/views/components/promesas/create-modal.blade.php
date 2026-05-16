@@ -14,10 +14,6 @@
 
             <x-promesas.promise-summary />
             <x-promesas.promise-type-fields />
-
-            <p class="text-xs text-kp-muted">
-                La propuesta se asociara al DNI {{ $dni }} y a las operaciones seleccionadas.
-            </p>
         </div>
 
         <div class="flex justify-end gap-2 border-t border-kp-border px-5 py-4">
