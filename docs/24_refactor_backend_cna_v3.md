@@ -167,8 +167,8 @@ Ahora:
 
 Ahora:
 
-- Usa `PromesaQueryService` para Promesas.
-- Usa `CnaQueryService` para CNA.
+- Usa `AutorizacionIndexService` para componer la bandeja.
+- `AutorizacionIndexService` coordina `PromesaQueryService` y `CnaQueryService`.
 - Ya no arma directamente la consulta CNA ni el mapa de productos.
 
 ## Documentos CNA y fallback
@@ -222,6 +222,6 @@ Cobertura:
 
 ## Pendientes
 
-- Refactor especifico de `AutorizacionController` como modulo propio si se desea separar la pantalla de bandeja en ViewModel.
+- Refactor especifico de `AutorizacionController` completado en `docs/25_refactor_backend_autorizacion_v3.md`.
 - Revisar manualmente las plantillas reales en local/staging antes de deploy.
 - Validar visualmente acciones de workflow CNA en navegador real.

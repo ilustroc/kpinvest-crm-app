@@ -192,9 +192,9 @@ Ahora:
 
 Ahora:
 
-- Usa `PromesaQueryService` para bandeja de promesas.
 - Usa Actions para workflow de promesas.
 - La logica CNA fue separada despues en Fase 8.3 hacia `CnaQueryService` y Actions/Services de CNA.
+- La composicion de bandeja fue separada despues en Fase 8.4 hacia `AutorizacionIndexService` y `AutorizacionIndexViewModel`.
 - Conserva rutas, redirects y mensajes actuales.
 
 ### `PromesaPdfController`

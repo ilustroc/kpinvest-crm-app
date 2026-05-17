@@ -391,13 +391,20 @@ Estado:
 - [+] Actions creadas: `CreateCnaAction`, `PreapproveCnaAction`, `ApproveCnaAction`, `RejectCnaAction`, `DownloadCnaDocumentAction`.
 - [+] Policy creada: `CnaPolicy`.
 - [+] Tests creados: `V3CnaModuleTest`.
-- [!] Autorizacion puede separarse despues en ViewModel/modulo propio si se quiere reducir mas la pantalla de bandeja.
+- [+] Fase 8.4 iniciada con modulo Autorizacion.
+- [+] ViewModel creado: `AutorizacionIndexViewModel`.
+- [+] Servicios creados: `AutorizacionIndexService`, `AutorizacionPaymentLookupService`.
+- [+] `AutorizacionController` reducido a orquestacion HTTP.
+- [+] Tests creados: `V3AutorizacionModuleTest`.
+- [+] Fase 8 de backend critico cerrada a nivel tecnico.
+- [!] Validacion manual de navegador queda pendiente antes de deploy.
 
 Documento:
 
 - `docs/22_refactor_backend_clientes_v3.md`.
 - `docs/23_refactor_backend_promesas_v3.md`.
 - `docs/24_refactor_backend_cna_v3.md`.
+- `docs/25_refactor_backend_autorizacion_v3.md`.
 
 ### Fase 9 - Deploy controlado
 
@@ -434,7 +441,8 @@ Antes de produccion:
 15. Refactor backend de Clientes con Services/Actions/ViewModel/Policy.
 16. Extraer servicios/actions de Promesas con cobertura.
 17. Extraer servicios/actions de CNA con cobertura.
-18. Preparar deploy controlado.
+18. Separar Autorizacion con Service/ViewModel y cobertura.
+19. Preparar deploy controlado.
 
 ## Pantalla piloto recomendada
 

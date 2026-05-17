@@ -15,7 +15,7 @@
 - [+] Fase 5 - Baseline de migraciones + limpieza de roles.
 - [+] Fase 6 - Pruebas funcionales reales con cobertura inicial completada.
 - [+] Fase 7 - Arquitectura frontend V3 + migracion Tailwind completada a nivel tecnico.
-- [+] Fase 8 - Refactor backend por modulos criticos iniciado.
+- [+] Fase 8 - Refactor backend por modulos criticos cerrado a nivel tecnico.
 - [ ] Fase 9 - Deploy controlado.
 
 ## 1. Rama y codigo
@@ -74,6 +74,10 @@
 - [+] Crear `CnaPolicy`.
 - [+] Delegar `CnaController` a Actions/Services.
 - [+] Delegar consulta CNA de Autorizacion a `CnaQueryService`.
+- [+] Refactor backend de Autorizacion iniciado.
+- [+] Crear `AutorizacionIndexViewModel`.
+- [+] Crear servicios de Autorizacion.
+- [+] Reducir `AutorizacionController` a orquestacion HTTP.
 - [!] No mover controladores criticos sin pruebas o validacion funcional.
 
 ## 3.1 Fase 8.1 - Refactor backend Clientes
@@ -150,7 +154,29 @@
 - [+] Crear `tests/Feature/V3CnaModuleTest.php`.
 - [+] Documentar refactor en `docs/24_refactor_backend_cna_v3.md`.
 - [!] Validacion manual visual de workflow CNA en navegador queda pendiente.
-- [!] Separar Autorizacion en ViewModel/modulo propio queda como mejora posterior.
+- [+] Separar Autorizacion en ViewModel/modulo propio en Fase 8.4.
+
+## 3.4 Fase 8.4 - Refactor backend Autorizacion
+
+- [+] Analizar `AutorizacionController`.
+- [+] Revisar variables entregadas a `resources/views/autorizacion/index.blade.php`.
+- [+] Revisar dependencias con `PromesaQueryService`.
+- [+] Revisar dependencias con `CnaQueryService`.
+- [+] Crear `app/ViewModels/Autorizacion/AutorizacionIndexViewModel.php`.
+- [+] Crear `app/Services/Autorizacion/AutorizacionIndexService.php`.
+- [+] Crear `app/Services/Autorizacion/AutorizacionPaymentLookupService.php`.
+- [+] Refactorizar `AutorizacionController@index`.
+- [+] Refactorizar `AutorizacionController@pagosDni`.
+- [+] Mantener rutas y nombres de rutas actuales.
+- [+] Mantener filtros `q` y `status`.
+- [+] Mantener paginacion CNA `page_cna`.
+- [+] Mantener variables esperadas por Blade.
+- [+] Mantener workflow de Promesas delegado a Actions.
+- [+] No crear `AutorizacionPolicy` porque Promesas/CNA ya tienen Gates propios.
+- [+] Crear `tests/Feature/V3AutorizacionModuleTest.php`.
+- [+] Documentar refactor en `docs/25_refactor_backend_autorizacion_v3.md`.
+- [+] Fase 8 backend critico cerrada a nivel tecnico.
+- [!] Validacion manual en navegador real queda pendiente.
 
 ## 4. Frontend V3
 
@@ -435,6 +461,9 @@
 - [+] Activar/desactivar usuarios.
 - [+] Cambiar contrasena.
 - [+] Dashboard.
+- [+] Autorizacion index renderiza Promesas y CNA.
+- [+] Filtros de Autorizacion `q` y `status` validados.
+- [+] Endpoint `autorizacion.pagos` validado.
 - [+] Pantallas de importacion principales renderizan.
 - [+] POST principales, exports e imports CSV validados con tests Feature y datos locales transaccionales.
 - [!] Pruebas manuales en navegador real aun pendientes.

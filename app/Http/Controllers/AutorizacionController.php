@@ -5,20 +5,18 @@ namespace App\Http\Controllers;
 use App\Actions\Promesa\ApprovePromesaAction;
 use App\Actions\Promesa\PreapprovePromesaAction;
 use App\Actions\Promesa\RejectPromesaAction;
-use App\Models\PagoPropia as Pago;
 use App\Models\PromesaPago;
-use App\Services\Cna\CnaQueryService;
-use App\Services\Promesa\PromesaQueryService;
+use App\Services\Autorizacion\AutorizacionIndexService;
+use App\Services\Autorizacion\AutorizacionPaymentLookupService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class AutorizacionController extends Controller
 {
     public function __construct(
-        private readonly PromesaQueryService $promesas,
-        private readonly CnaQueryService $cnas,
+        private readonly AutorizacionIndexService $indexService,
+        private readonly AutorizacionPaymentLookupService $payments,
         private readonly PreapprovePromesaAction $preapprovePromesa,
         private readonly ApprovePromesaAction $approvePromesa,
         private readonly RejectPromesaAction $rejectPromesa,
@@ -27,20 +25,7 @@ class AutorizacionController extends Controller
 
     public function index(Request $request)
     {
-        $user = Auth::user();
-        $q = trim((string) ($request->q ?? ''));
-        $status = $request->status;
-
-        $rows = $this->promesas->authorizationRows($user, $q, $status);
-        $cnaData = $this->cnas->authorizationData($user, $q, $status);
-
-        return view('autorizacion.index', [
-            'rows' => $rows,
-            'cnaRows' => $cnaData['cnaRows'],
-            'prodByOp' => $cnaData['prodByOp'],
-            'q' => $q,
-            'isSupervisor' => strtolower((string) $user->role) === 'supervisor',
-        ]);
+        return view('autorizacion.index', $this->indexService->fromRequest($request)->toArray());
     }
 
     public function preaprobar(Request $request, PromesaPago $promesa)
@@ -108,34 +93,9 @@ class AutorizacionController extends Controller
         try {
             $dni = trim($dni);
 
-            $rows = Pago::query()
-                ->where('dni', $dni)
-                ->orderByDesc('lote_id')
-                ->orderByDesc('fecha')
-                ->get([
-                    'operacion',
-                    'fecha',
-                    'monto_pagado',
-                    'gestor',
-                    'entidad',
-                    'cosecha',
-                    'cuenta_recaudo',
-                    'nombre_cliente',
-                ])
-                ->map(fn ($row) => [
-                    'operacion' => (string) ($row->operacion ?? ''),
-                    'fecha' => $row->fecha ? (string) $row->fecha : null,
-                    'monto_pagado' => (float) ($row->monto_pagado ?? 0),
-                    'gestor' => (string) ($row->gestor ?? ''),
-                    'entidad' => (string) ($row->entidad ?? ''),
-                    'cosecha' => (string) ($row->cosecha ?? ''),
-                    'cuenta_recaudo' => (string) ($row->cuenta_recaudo ?? ''),
-                    'nombre_cliente' => (string) ($row->nombre_cliente ?? ''),
-                ]);
-
             return response()->json([
                 'dni' => $dni,
-                'pagos' => $rows,
+                'pagos' => $this->payments->pagosByDni($dni),
             ], 200);
         } catch (\Throwable $e) {
             Log::error('pagosDni error', [

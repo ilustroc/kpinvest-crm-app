@@ -46,7 +46,9 @@ Pendiente:
 - [+] Crear servicios reales para el modulo CNA.
 - [+] Crear actions puntuales para creacion, workflow y descargas de CNA.
 - [+] Migrar permisos internos de CNA hacia Policy/Gates.
-- [!] Separar Autorizacion en ViewModel/modulo propio queda como mejora posterior.
+- [+] Crear ViewModel y servicios de orquestacion para Autorizacion.
+- [+] Reducir `AutorizacionController` sin cambiar variables de vista.
+- [!] Mover controladores a carpetas por dominio queda pendiente hasta tener validacion manual suficiente.
 
 Nota: los controladores grandes no se movieron todavia para evitar cambios de namespace y riesgo innecesario en esta primera separacion.
 La excepcion controlada es `AdminUsersController`, que comenzo a delegar logica simple en un servicio y un ViewModel sin cambiar rutas ni comportamiento esperado.
@@ -132,6 +134,7 @@ app/
     Admin/
     Dashboard/
     Documento/
+    Autorizacion/
 
   Actions/
     Cliente/
@@ -147,6 +150,7 @@ app/
     Reporte/
     Admin/
     Dashboard/
+    Autorizacion/
 
   DTOs/
     Cliente/
@@ -174,6 +178,7 @@ Estado actual de carpetas:
 - [+] `app/Services/Admin`.
 - [+] `app/Services/Dashboard`.
 - [+] `app/Services/Documento`.
+- [+] `app/Services/Autorizacion`.
 - [+] `app/Actions/Cliente`.
 - [+] `app/Actions/Promesa`.
 - [+] `app/Actions/Cna`.
@@ -185,6 +190,7 @@ Estado actual de carpetas:
 - [+] `app/ViewModels/Reporte`.
 - [+] `app/ViewModels/Admin`.
 - [+] `app/ViewModels/Dashboard`.
+- [+] `app/ViewModels/Autorizacion`.
 - [+] `app/DTOs/Cliente`.
 - [+] `app/DTOs/Promesa`.
 - [+] `app/DTOs/Cna`.
@@ -375,7 +381,22 @@ routes/web/promesas.php
       -> PDF o DOCX fallback
 ```
 
-La bandeja de promesas de Autorizacion usa `PromesaQueryService`. La bandeja CNA usa `CnaQueryService`.
+La bandeja de Autorizacion usa `AutorizacionIndexService` y `AutorizacionIndexViewModel` para coordinar `PromesaQueryService` y `CnaQueryService`.
+
+```text
+routes/web/promesas.php
+  -> AutorizacionController@index
+    -> AutorizacionIndexService
+      -> PromesaQueryService
+      -> CnaQueryService
+    -> AutorizacionIndexViewModel
+    -> resources/views/autorizacion/index.blade.php
+
+routes/web/promesas.php
+  -> AutorizacionController@pagosDni
+    -> AutorizacionPaymentLookupService
+    -> JSON para ficha CNA
+```
 
 El tercer refactor backend critico usa este flujo:
 
@@ -444,7 +465,7 @@ Gates iniciales:
 
 Pendiente:
 
-- Separar `AutorizacionController` en ViewModel/modulo propio si se quiere reducir todavia mas la bandeja.
+- Validar manualmente la bandeja de Autorizacion en navegador real.
 - Evitar cambios grandes de permisos sin pruebas funcionales completas.
 
 ## Responsabilidades por capa
@@ -520,6 +541,7 @@ Ejemplos:
 - `ClienteShowViewModel`
 - `PromesaIndexViewModel`
 - `CnaAuthorizationViewModel`
+- `AutorizacionIndexViewModel`
 - `DashboardViewModel`
 
 ### Models
