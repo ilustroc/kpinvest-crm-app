@@ -1,0 +1,40 @@
+@startuml
+title Flujo Promesa V3
+
+actor Usuario
+boundary "Cliente View\nform promesa" as View
+boundary "Route\nclientes.promesas.store" as Route
+control "PromesaController" as Controller
+control "CreatePromesaAction" as CreateAction
+control "PromesaPolicy" as Policy
+control "PromesaCreationService" as Creation
+control "PromesaScheduleService" as Schedule
+entity "PromesaPago" as PromesaPago
+entity "PromesaOperacion" as PromesaOperacion
+entity "PromesaCuota" as PromesaCuota
+control "PromesaWorkflowService" as Workflow
+control "PromesaDocumentService" as Document
+boundary "PromesaPdfController" as PdfController
+folder "Storage DOCX/PDF" as Storage
+
+Usuario -> View: crea promesa
+View -> Route: POST
+Route -> Controller: store(dni, request)
+Controller -> CreateAction: execute()
+CreateAction -> Policy: authorize create
+CreateAction -> Creation: createFromRequest()
+Creation -> Schedule: normalizar cronograma
+Creation -> PromesaPago: crear cabecera
+Creation -> PromesaOperacion: asociar operaciones
+Creation -> PromesaCuota: crear cuotas
+Creation -> Workflow: estado inicial por rol
+Controller --> Usuario: redirect + mensaje
+
+Usuario -> PdfController: descargar acuerdo
+PdfController -> Document: agreementResponse()
+Document -> PromesaPago: datos
+Document -> PromesaOperacion: operaciones
+Document -> PromesaCuota: cronograma
+Document -> Storage: DOCX/PDF o fallback
+
+@enduml

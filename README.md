@@ -1,86 +1,78 @@
 # KP Invest CRM App
 
-Aplicacion CRM desarrollada en Laravel 10 para la gestion operativa de KP Invest: consulta de clientes, promesas de pago, solicitudes CNA, carga de data operativa, reportes y administracion de usuarios.
+CRM interno de cobranzas desarrollado en Laravel para gestionar clientes, cuentas, promesas de pago, solicitudes CNA, importaciones CSV, reportes y administracion de usuarios.
 
-Este repositorio contiene un sistema que ya funciona en produccion. La rama de trabajo para el analisis de version 3 es:
+La version 3 se trabaja en la rama:
 
 ```bash
 v3/analisis-documentacion
 ```
 
-## Estado del analisis
+El sistema productivo ya existe. No se debe tocar `main`, produccion ni una base real sin backup, pruebas sobre copia reciente y plan de rollback.
 
-Este documento y la carpeta `docs/` fueron preparados como diagnostico tecnico inicial para planificar una version 3 sin tocar la logica productiva.
+## Estado V3
 
-No se ejecutaron migraciones, seeders ni cambios de base de datos durante este analisis.
+- Frontend cerrado tecnicamente con Tailwind CSS v4 y Vite.
+- Bootstrap CSS, Bootstrap JS y Bootstrap Icons eliminados del layout global.
+- `public/css` y `public/js` sin uso activo para assets frontend.
+- Backend critico refactorizado por modulos: Clientes, Promesas, CNA y Autorizacion.
+- Migraciones V3 reconstruidas desde `u480021566_kpinvest_bd.sql` y probadas en base local desechable.
+- Roles finales: `administrador`, `supervisor`, `asesor`, `soporte`.
+- Pruebas automatizadas y build pasan en local.
+- Deploy todavia pendiente.
 
-## Punto critico sobre la base de datos
+## Stack actual
 
-El archivo `u480021566_kpinvest_bd.sql` es la referencia principal de la estructura real de produccion. Las migraciones actuales en `database/migrations/` no representan todo el historial ni toda la estructura real del esquema, por lo que no deben ejecutarse sin una estrategia de normalizacion y respaldo.
-
-## Documentacion tecnica
-
-- [01 - Descripcion general](docs/01_descripcion_general.md)
-- [02 - Estructura del proyecto](docs/02_estructura_proyecto.md)
-- [03 - Base de datos](docs/03_base_de_datos.md)
-- [04 - Modulos funcionales](docs/04_modulos_funcionales.md)
-- [05 - Rutas y controladores](docs/05_rutas_y_controladores.md)
-- [06 - Diagnostico tecnico](docs/06_diagnostico_tecnico.md)
-- [07 - Recomendaciones V3](docs/07_recomendaciones_v3.md)
-- [08 - Plan V3](docs/08_plan_v3.md)
-- [09 - Arquitectura V3](docs/09_arquitectura_v3.md)
-- [10 - Base de datos local y migraciones](docs/10_base_datos_local_y_migraciones.md)
-- [11 - Frontend Tailwind y Vite](docs/11_frontend_tailwind_vite.md)
-- [12 - Checklist deploy V3](docs/12_checklist_deploy_v3.md)
-
-## Stack principal
-
-- PHP 8.1 o superior, con plataforma Composer fijada a PHP 8.3.0.
-- Laravel Framework 10.x.
+- Laravel 10.
+- PHP 8.1+ con plataforma Composer fijada a PHP 8.3.0.
 - MySQL/MariaDB.
-- Tailwind CSS v4 y Vite como frontend V3.
-- Bootstrap CSS/JS e Icons fueron retirados del layout global durante la migracion frontend V3.
-- `public/css` y `public/js` ya no tienen assets activos; los assets nuevos pasan por Vite.
-- PhpSpreadsheet para exportaciones Excel.
-- PhpWord y DomPDF/mPDF/iLovePDF para generacion o conversion de documentos.
-- Sanctum instalado, aunque el uso principal del sistema es via sesion web.
+- Blade.
+- Tailwind CSS v4.
+- Vite.
+- PhpSpreadsheet para exportaciones.
+- PhpWord, DomPDF/mPDF e iLovePDF para documentos DOCX/PDF y fallback.
 
-## Modulos principales
+## Arquitectura
 
-- Autenticacion y control de usuarios activos.
-- Panel/resumen operativo.
-- Dashboard estadistico.
-- Consulta de clientes y cuentas.
-- Promesas de pago y flujo de aprobacion.
-- Solicitudes CNA y generacion de documentos.
-- Reportes de pagos, promesas y CNA.
-- Integraciones CSV para data, asignaciones, CCD y pagos.
-- Administracion de usuarios por rol.
+V3 usa MVC modular por dominios:
 
-## Reglas de seguridad para trabajar en V3
+- `routes/web.php` como agregador de rutas por modulo.
+- Controllers como orquestadores HTTP.
+- Services para logica de dominio.
+- Actions para operaciones puntuales.
+- ViewModels para vistas complejas.
+- Policies/Gates para permisos.
+- Blade Components para UI reutilizable.
+- Vite como unico canal de assets frontend nuevos.
 
-- No modificar `main` directamente.
-- No ejecutar `php artisan migrate` contra la base real.
-- No asumir que las migraciones actuales reconstruyen produccion.
-- No eliminar columnas, tablas ni relaciones sin comparacion previa contra el SQL real.
-- No cambiar controladores, modelos, rutas ni vistas productivas sin pruebas y respaldo.
-- No exponer valores reales de `.env` en documentacion o commits.
-
-## Comandos utiles para inventario local
-
-Estos comandos son seguros para inspeccion y no alteran la base de datos:
+## Comandos utiles
 
 ```bash
-php artisan route:list
 composer install
 npm install
+npm run dev
 npm run build
+php artisan test
+php artisan route:list --except-vendor
+php artisan view:clear
+php artisan cache:clear
+php artisan view:cache
 ```
 
-Evitar por ahora:
+## Documentacion
 
-```bash
-php artisan migrate
-php artisan migrate:fresh
-php artisan db:seed
-```
+La documentacion oficial esta en:
+
+- [Indice de documentacion](docs/README.md)
+- [Resumen V3](docs/00_resumen_v3.md)
+- [Arquitectura V3](docs/01_arquitectura/arquitectura_v3.md)
+- [Checklist deploy](docs/04_deploy/checklist_deploy.md)
+- [Diagramas PlantUML](docs/05_diagramas/README.md)
+
+## Reglas de seguridad
+
+- No modificar `main` directamente.
+- No ejecutar migraciones contra produccion en esta fase.
+- No ejecutar `migrate:fresh` sobre una base con datos importantes.
+- No versionar `.env`, dumps sensibles, logs ni archivos temporales.
+- Antes de produccion: dump reciente, pruebas sobre copia, build, checklist funcional, backup y rollback.

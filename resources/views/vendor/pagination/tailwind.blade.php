@@ -25,18 +25,6 @@
 
         <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <div>
-                <p class="text-sm text-kp-muted">
-                    Mostrando
-                    <span class="font-bold text-kp-ink">{{ $paginator->firstItem() }}</span>
-                    a
-                    <span class="font-bold text-kp-ink">{{ $paginator->lastItem() }}</span>
-                    de
-                    <span class="font-bold text-kp-ink">{{ $paginator->total() }}</span>
-                    registros
-                </p>
-            </div>
-
-            <div>
                 <span class="isolate inline-flex rounded-md shadow-sm">
                     
                     @if ($paginator->onFirstPage())

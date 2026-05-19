@@ -1,0 +1,38 @@
+@startuml
+title Permisos V3 - Roles, Gates y Policies
+
+actor User
+component "Roles\nApp\\Support\\Authorization\\Roles" as Roles
+component "AuthServiceProvider" as Auth
+component "Gates" as Gates
+component "UserPolicy" as UserPolicy
+component "ClientePolicy" as ClientePolicy
+component "PromesaPolicy" as PromesaPolicy
+component "CnaPolicy" as CnaPolicy
+boundary "Rutas protegidas" as Routes
+boundary "Vistas Blade\n@can/Gate" as Views
+
+User --> Roles: role
+Auth --> Gates: define()
+Gates --> UserPolicy
+Gates --> ClientePolicy
+Gates --> PromesaPolicy
+Gates --> CnaPolicy
+UserPolicy --> Roles
+ClientePolicy --> Roles
+PromesaPolicy --> Roles
+CnaPolicy --> Roles
+Routes --> Gates: middleware can/role
+Views --> Gates: @can / Gate::allows
+User --> Routes
+User --> Views
+
+note right of Roles
+Roles finales:
+administrador
+supervisor
+asesor
+soporte
+end note
+
+@enduml

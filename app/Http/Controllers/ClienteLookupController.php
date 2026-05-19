@@ -17,7 +17,6 @@ class ClienteLookupController extends Controller
 
         return match ($result['type']) {
             'redirect' => redirect()->route('clientes.show', $result['dni']),
-            'list' => back()->withInput()->with('quick_list', $result['rows']->toArray()),
             default => back()->withInput()->with('quick_error', $result['message']),
         };
     }

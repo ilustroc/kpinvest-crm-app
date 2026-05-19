@@ -24,7 +24,7 @@
     <x-feedback.alert variant="danger">{{ $errors->first() }}</x-feedback.alert>
   @endif
 
-  <x-ui.card title="Promesas de pago" subtitle="Solicitudes pendientes segun el rol actual.">
+  <x-ui.card title="Promesas de pago">
     <x-tables.table>
       <thead>
         <tr>
@@ -132,7 +132,7 @@
     </x-tables.table>
   </x-ui.card>
 
-  <x-ui.card title="Solicitudes de CNA" subtitle="Bandeja paginada de solicitudes pendientes.">
+  <x-ui.card title="Solicitudes de CNA">
     <x-tables.table>
       <thead>
         <tr>
@@ -239,8 +239,6 @@
         @endforelse
       </tbody>
     </x-tables.table>
-
-    <x-tables.pagination :paginator="$cnaRows" />
   </x-ui.card>
 
   <x-autorizacion.decision-modal

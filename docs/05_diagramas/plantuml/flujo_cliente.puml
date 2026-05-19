@@ -1,0 +1,30 @@
+@startuml
+title Flujo Cliente - clientes.show
+
+actor Usuario
+boundary "Route\nclientes.show" as Route
+control "ClienteController" as Controller
+control "ClienteProfileService" as Profile
+control "ClienteAccountService" as Accounts
+control "ClientePaymentService" as Payments
+entity "ClienteCuenta" as ClienteCuenta
+entity "PagoPropia" as PagoPropia
+entity "PromesaPago" as PromesaPago
+entity "CnaSolicitud" as CnaSolicitud
+control "ClienteShowViewModel" as VM
+boundary "clientes/show.blade.php" as View
+
+Usuario -> Route: GET /clientes/{dni}
+Route -> Controller: show(dni)
+Controller -> Profile: show(dni)
+Profile -> Accounts: cuentas/resumen
+Accounts -> ClienteCuenta: consultar por dni
+Profile -> Payments: pagos
+Payments -> PagoPropia: consultar por dni
+Profile -> PromesaPago: promesas del cliente
+Profile -> CnaSolicitud: cnas del cliente
+Profile -> VM: datos compatibles
+Controller -> View: view(VM->toArray())
+View --> Usuario: perfil cliente
+
+@enduml

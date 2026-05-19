@@ -1,0 +1,108 @@
+@startuml
+title Base de datos V3 - Resumen de entidades
+
+entity users {
+  * id
+  --
+  name
+  email
+  role
+  active/is_active
+  supervisor_id
+}
+
+entity clientes_cuentas {
+  * id
+  --
+  numdoc
+  operacion
+  nombre
+  entidad
+  deuda_total
+}
+
+entity pagos_lotes {
+  * id
+  --
+  tipo
+  archivo
+}
+
+entity pagos_propia {
+  * id
+  --
+  lote_id
+  dni
+  operacion
+  monto_pagado
+  fecha
+}
+
+entity promesas_pago {
+  * id
+  --
+  dni
+  operacion
+  workflow_estado
+  tipo
+  user_id
+}
+
+entity promesa_operaciones {
+  * id
+  --
+  promesa_id
+  operacion
+  cartera
+}
+
+entity promesa_cuotas {
+  * id
+  --
+  promesa_id
+  nro
+  fecha
+  monto
+  es_balon
+}
+
+entity cna_solicitudes {
+  * id
+  --
+  nro_carta
+  dni
+  operaciones
+  workflow_estado
+  user_id
+  docx_path
+  pdf_path
+}
+
+entity asignar_clientes {
+  * id
+  --
+  numdoc
+  operacion
+  name
+}
+
+entity ccd_clientes {
+  * id
+  --
+  numdoc
+  pdf
+  link
+}
+
+users ||--o{ promesas_pago : user_id
+users ||--o{ cna_solicitudes : user_id
+clientes_cuentas ||..o{ pagos_propia : dni/operacion
+clientes_cuentas ||..o{ promesas_pago : dni/operacion
+clientes_cuentas ||..o{ cna_solicitudes : dni/operaciones
+promesas_pago ||--o{ promesa_operaciones : promesa_id
+promesas_pago ||--o{ promesa_cuotas : promesa_id
+pagos_lotes ||--o{ pagos_propia : lote_id
+asignar_clientes }o..|| users : name/supervisor
+ccd_clientes }o..|| clientes_cuentas : numdoc
+
+@enduml

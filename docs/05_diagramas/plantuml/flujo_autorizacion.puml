@@ -1,0 +1,33 @@
+@startuml
+title Flujo Autorizacion V3
+
+actor Supervisor
+actor Administrador
+boundary "Route\nautorizacion" as Route
+control "AutorizacionController" as Controller
+control "AutorizacionIndexService" as IndexService
+control "PromesaQueryService" as PromesaQuery
+control "CnaQueryService" as CnaQuery
+control "AutorizacionIndexViewModel" as VM
+boundary "autorizacion/index.blade.php" as View
+control "Promesa Actions" as PromesaActions
+control "CNA Actions" as CnaActions
+
+Supervisor -> Route: GET /autorizacion
+Administrador -> Route: GET /autorizacion
+Route -> Controller: index(request)
+Controller -> IndexService: fromRequest()
+IndexService -> PromesaQuery: authorizationRows()
+IndexService -> CnaQuery: authorizationRows()
+IndexService -> VM: filtros + filas
+Controller -> View: VM->toArray()
+
+Supervisor -> Controller: preaprobar/rechazar
+Controller -> PromesaActions: workflow promesa
+Controller -> CnaActions: workflow cna
+
+Administrador -> Controller: aprobar/rechazar
+Controller -> PromesaActions: workflow promesa
+Controller -> CnaActions: workflow cna
+
+@enduml

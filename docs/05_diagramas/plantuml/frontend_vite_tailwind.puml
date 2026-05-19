@@ -1,0 +1,43 @@
+@startuml
+title Frontend V3 - Blade + Tailwind + Vite
+
+actor Usuario
+node "Browser" as Browser
+
+package "Blade" {
+  component "layouts/app.blade.php" as Layout
+  component "components/layout" as LayoutComponents
+  component "components/ui" as Ui
+  component "components/forms" as Forms
+  component "components/tables" as Tables
+  component "components/feedback" as Feedback
+  component "components/{dominio}" as DomainComponents
+}
+
+package "Assets Vite" {
+  component "resources/css/app.css" as Css
+  component "resources/js/app.js" as AppJs
+  component "resources/js/core" as Core
+  component "resources/js/modules" as Modules
+  component "Vite" as Vite
+  component "Tailwind CSS v4" as Tailwind
+}
+
+Usuario --> Browser
+Browser --> Layout
+Layout --> LayoutComponents
+Layout --> Ui
+Layout --> Forms
+Layout --> Tables
+Layout --> Feedback
+Layout --> DomainComponents
+Layout --> Vite
+Vite --> Css
+Vite --> AppJs
+Css --> Tailwind
+AppJs --> Core
+AppJs --> Modules
+Modules --> Browser
+Core --> Modules
+
+@enduml

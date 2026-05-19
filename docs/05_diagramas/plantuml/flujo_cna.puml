@@ -1,0 +1,39 @@
+@startuml
+title Flujo CNA V3
+
+actor Usuario
+boundary "Cliente View\nform CNA" as View
+boundary "Route\nclientes.cna.store" as Route
+control "CnaController" as Controller
+control "CreateCnaAction" as CreateAction
+control "CnaPolicy" as Policy
+control "CnaCreationService" as Creation
+control "CnaNumberingService" as Numbering
+control "CnaWorkflowService" as Workflow
+control "CnaDocumentService" as Document
+entity "CnaSolicitud" as CnaSolicitud
+entity "ClienteCuenta" as ClienteCuenta
+folder "Storage DOCX/PDF" as Storage
+
+Usuario -> View: crea CNA
+View -> Route: POST
+Route -> Controller: store(dni, request)
+Controller -> CreateAction: execute()
+CreateAction -> Policy: authorize create
+CreateAction -> Creation: crear solicitud
+Creation -> ClienteCuenta: validar operaciones
+Creation -> Numbering: siguiente nro carta
+Creation -> CnaSolicitud: guardar
+Creation -> Workflow: estado inicial
+Controller --> Usuario: redirect + mensaje
+
+Usuario -> Controller: aprobar/preaprobar/rechazar
+Controller -> Workflow: ejecutar transicion
+Workflow -> CnaSolicitud: actualizar estado
+
+Usuario -> Controller: descargar docx/pdf
+Controller -> Document: response()
+Document -> CnaSolicitud: datos
+Document -> Storage: generar/leer DOCX/PDF o fallback
+
+@enduml

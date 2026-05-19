@@ -1,0 +1,48 @@
+@startuml
+title KP Invest CRM V3 - Arquitectura general
+
+actor Usuario
+node "Navegador" as Browser
+
+package "Frontend" {
+  component "Blade Layout" as Layout
+  component "Blade Components" as Components
+  component "resources/css/app.css" as Css
+  component "resources/js/app.js" as Js
+  component "Vite" as Vite
+  component "Tailwind CSS v4" as Tailwind
+}
+
+package "Laravel" {
+  component "Routes\nroutes/web.php + routes/web/*.php" as Routes
+  component "Controllers" as Controllers
+  component "Services" as Services
+  component "Actions" as Actions
+  component "ViewModels" as ViewModels
+  component "Policies / Gates" as Policies
+  component "Models" as Models
+}
+
+database "MySQL" as DB
+folder "Storage\nDOCX/PDF/Templates" as Storage
+
+Usuario --> Browser
+Browser --> Routes
+Routes --> Controllers
+Controllers --> Policies
+Controllers --> Services
+Controllers --> Actions
+Actions --> Services
+Services --> Models
+Models --> DB
+Services --> ViewModels
+Controllers --> ViewModels
+ViewModels --> Layout
+Layout --> Components
+Layout --> Vite
+Vite --> Css
+Vite --> Js
+Css --> Tailwind
+Services --> Storage
+
+@enduml

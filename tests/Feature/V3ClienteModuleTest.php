@@ -36,6 +36,44 @@ class V3ClienteModuleTest extends TestCase
             ->assertRedirect(route('clientes.show', $dni));
     }
 
+    public function test_cliente_quick_lookup_returns_error_when_query_is_ambiguous(): void
+    {
+        $user = $this->makeUser('asesor');
+        $sharedName = 'Cliente Ambiguo '.Str::upper(Str::random(6));
+
+        foreach (range(1, 2) as $index) {
+            $operation = 'V3MULTI'.$index.Str::upper(Str::random(4));
+
+            DB::table('clientes_cuentas')->insert([
+                'numdoc' => 'V3M'.Str::upper(Str::random(8)),
+                'cuenta' => 'CTA-'.$operation,
+                'nombre' => $sharedName,
+                'dpto' => 'Lima',
+                'operacion' => $operation,
+                'entidad' => 'BBVA',
+                'producto' => 'Producto V3',
+                'cosecha' => 'BBVA1',
+                'moneda' => 'PEN',
+                'fecha_compra' => now()->subYear()->toDateString(),
+                'fecha_castigo' => now()->subMonths(6)->toDateString(),
+                'deuda_capital' => 1000,
+                'interes' => 50,
+                'deuda_total' => 1050,
+                'direccion' => 'Direccion V3',
+                'provincia' => 'Lima',
+                'distrito' => 'Lima',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->from('/')
+            ->get(route('clientes.quick', ['q' => $sharedName]))
+            ->assertRedirect('/')
+            ->assertSessionHas('quick_error', 'Hay mas de un cliente. Usa el autocompletado o ingresa DNI/operacion exacta.');
+    }
+
     public function test_cliente_profile_view_receives_accounts_payments_promesas_and_cna(): void
     {
         $user = $this->makeUser('asesor');

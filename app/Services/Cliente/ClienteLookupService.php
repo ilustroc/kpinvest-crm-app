@@ -49,8 +49,8 @@ class ClienteLookupService
         }
 
         return [
-            'type' => 'list',
-            'rows' => $this->candidateRows($candidates),
+            'type' => 'error',
+            'message' => 'Hay mas de un cliente. Usa el autocompletado o ingresa DNI/operacion exacta.',
         ];
     }
 

@@ -13,7 +13,7 @@
 
 <aside id="rail"
        class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-kp-border bg-white shadow-xl transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none">
-    <div class="flex items-center gap-3 border-b border-kp-border px-4 py-4">
+    <div class="flex items-center justify-center gap-3 border-b border-kp-border px-4 py-4">
         <img src="{{ asset('assets/img/logo.png') }}" alt="KP INVEST" class="h-9 w-auto">
     </div>
 

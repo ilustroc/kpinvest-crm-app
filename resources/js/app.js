@@ -1,5 +1,6 @@
 import './core/toast';
 import './modules/layout/sidebar';
+import './modules/layout/client-search';
 import './modules/admin/users';
 import './modules/auth/login';
 import './modules/autorizacion/index';
