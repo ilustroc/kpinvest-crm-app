@@ -56,72 +56,63 @@ class PromesaQueryService
 
     private function addAccountData(Collection $rows): Collection
     {
-        $dnis = $rows->pluck('dni')->filter()->unique()->values()->all();
+        $dnis = $rows->pluck('dni')
+            ->map(fn ($dni) => $this->normalizeValue($dni))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         $opsByDni = $this->operationsByDni($dnis);
         $clientByDni = $this->clientByDni($dnis);
         $allAccountsByDni = $this->allAccountsByDni($dnis);
 
-        $operations = $rows->flatMap(function ($promesa) use ($opsByDni) {
-            if ($promesa->relationLoaded('operaciones') && $promesa->operaciones->count()) {
-                return $promesa->operaciones->pluck('operacion');
-            }
-
-            if (! empty($promesa->operacion)) {
-                return collect(array_filter(array_map('trim', explode(',', (string) $promesa->operacion))));
-            }
-
-            return collect($opsByDni[$promesa->dni] ?? []);
-        })->filter()->unique()->values()->all();
+        $operations = $rows->flatMap(fn ($promesa) => $this->operationsForPromesa($promesa, $opsByDni))
+            ->unique()
+            ->values()
+            ->all();
 
         $accountByDniOperation = $this->accountsByDniOperation($dnis, $operations);
 
         return $rows->map(function ($promesa) use ($opsByDni, $clientByDni, $allAccountsByDni, $accountByDniOperation) {
-            $dni = trim((string) $promesa->dni);
-
-            $operations = $promesa->relationLoaded('operaciones') && $promesa->operaciones->count()
-                ? $promesa->operaciones->pluck('operacion')->map(fn ($operation) => trim((string) $operation))->filter()->values()
-                : collect(array_filter(array_map('trim', explode(',', (string) ($promesa->operacion ?? '')))));
-
-            if ($operations->isEmpty()) {
-                $operations = collect($opsByDni[$dni] ?? [])->map(fn ($operation) => trim((string) $operation))->filter()->values();
-            }
+            $dni = $this->normalizeValue($promesa->dni);
+            $operations = $this->operationsForPromesa($promesa, $opsByDni);
 
             $promesa->operacion = $operations->implode(', ');
             $promesa->ops_list = $operations->values();
 
-            $capitalSum = 0.0;
-            $debtSum = 0.0;
             $includedAccounts = [];
 
             foreach ($operations as $operation) {
-                $key = $dni.'|'.trim((string) $operation);
+                $key = $this->accountKey($dni, $operation);
                 $account = $accountByDniOperation[$key] ?? null;
 
                 if (! $account) {
                     continue;
                 }
 
-                $capitalSum += (float) ($account->deuda_capital ?? 0);
-                $debtSum += (float) ($account->deuda_total ?? 0);
-
-                $includedAccounts[] = [
-                    'operacion' => (string) $account->operacion,
-                    'entidad' => (string) ($account->entidad ?? ''),
-                    'cosecha' => (string) ($account->cosecha ?? ''),
-                    'producto' => (string) ($account->producto ?? ''),
-                    'saldo_capital' => (float) ($account->deuda_capital ?? 0),
-                    'deuda_total' => (float) ($account->deuda_total ?? 0),
-                    'fecha_castigo' => $account->fecha_castigo ? (string) $account->fecha_castigo : null,
-                    'anio_castigo' => $account->fecha_castigo ? (int) substr((string) $account->fecha_castigo, 0, 4) : null,
-                ];
+                $includedAccounts[] = $this->accountPayload($account);
             }
+
+            if ($includedAccounts === []) {
+                $includedAccounts = $this->accountsFromClientList(
+                    $allAccountsByDni[$dni] ?? [],
+                    $operations,
+                );
+            }
+
+            if ($includedAccounts === [] && $operations->isNotEmpty()) {
+                $includedAccounts = $this->placeholderAccounts($operations);
+            }
+
+            $capitalSum = collect($includedAccounts)->sum(fn ($account) => (float) ($account['saldo_capital'] ?? 0));
+            $debtSum = collect($includedAccounts)->sum(fn ($account) => (float) ($account['deuda_total'] ?? 0));
 
             $promesa->titular = (string) ($clientByDni[$dni] ?? '-');
             $promesa->deuda_total = $debtSum;
             $promesa->saldo_capital = $capitalSum;
             $promesa->cuentas_json = $includedAccounts;
-            $promesa->cuentas_cliente_json = $allAccountsByDni[$dni] ?? [];
+            $promesa->cuentas_cliente_json = array_values($allAccountsByDni[$dni] ?? []);
 
             return $promesa;
         });
@@ -164,10 +155,10 @@ class PromesaQueryService
 
         return DB::table('clientes_cuentas')
             ->select(['numdoc as dni', 'operacion'])
-            ->whereIn('numdoc', $dnis)
+            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
             ->get()
-            ->groupBy('dni')
-            ->map(fn ($group) => $group->pluck('operacion')->filter()->values()->all())
+            ->groupBy(fn ($row) => $this->normalizeValue($row->dni))
+            ->map(fn ($group) => $this->normalizeList($group->pluck('operacion'))->all())
             ->all();
     }
 
@@ -179,9 +170,10 @@ class PromesaQueryService
 
         return DB::table('clientes_cuentas')
             ->select(['numdoc as dni', DB::raw('MAX(nombre) as titular')])
-            ->whereIn('numdoc', $dnis)
+            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
             ->groupBy('numdoc')
-            ->pluck('titular', 'dni')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$this->normalizeValue($row->dni) => $row->titular])
             ->all();
     }
 
@@ -202,21 +194,12 @@ class PromesaQueryService
                 'deuda_total',
                 'fecha_castigo',
             ])
-            ->whereIn('numdoc', $dnis)
+            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
             ->orderBy('operacion')
             ->get()
-            ->groupBy('dni')
+            ->groupBy(fn ($row) => $this->normalizeValue($row->dni))
             ->map(function ($group) {
-                return $group->map(fn ($account) => [
-                    'operacion' => (string) $account->operacion,
-                    'entidad' => (string) ($account->entidad ?? ''),
-                    'cosecha' => (string) ($account->cosecha ?? ''),
-                    'producto' => (string) ($account->producto ?? ''),
-                    'saldo_capital' => (float) ($account->deuda_capital ?? 0),
-                    'deuda_total' => (float) ($account->deuda_total ?? 0),
-                    'fecha_castigo' => $account->fecha_castigo ? (string) $account->fecha_castigo : null,
-                    'anio_castigo' => $account->fecha_castigo ? (int) substr((string) $account->fecha_castigo, 0, 4) : null,
-                ])->values();
+                return $group->map(fn ($account) => $this->accountPayload($account))->values()->all();
             })
             ->all();
     }
@@ -239,15 +222,91 @@ class PromesaQueryService
                 'deuda_total',
                 'fecha_castigo',
             ])
-            ->whereIn('operacion', $operations)
-            ->whereIn('numdoc', $dnis)
+            ->whereIn(DB::raw('TRIM(operacion)'), $operations)
+            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
             ->get()
             ->mapWithKeys(function ($row) {
-                $dni = trim((string) $row->dni);
-                $operation = trim((string) $row->operacion);
-
-                return ["{$dni}|{$operation}" => $row];
+                return [$this->accountKey($row->dni, $row->operacion) => $row];
             })
             ->all();
+    }
+
+    private function operationsForPromesa(PromesaPago $promesa, array $opsByDni): Collection
+    {
+        $dni = $this->normalizeValue($promesa->dni);
+
+        if ($promesa->relationLoaded('operaciones') && $promesa->operaciones->count()) {
+            return $this->normalizeList($promesa->operaciones->pluck('operacion'));
+        }
+
+        if (! empty($promesa->operacion)) {
+            return $this->normalizeList(explode(',', (string) $promesa->operacion));
+        }
+
+        return $this->normalizeList($opsByDni[$dni] ?? []);
+    }
+
+    private function accountsFromClientList(array $accounts, Collection $operations): array
+    {
+        $operationLookup = array_flip($operations->map(fn ($operation) => $this->normalizeValue($operation))->all());
+
+        return collect($accounts)
+            ->filter(fn ($account) => isset($operationLookup[$this->normalizeValue($account['operacion'] ?? '')]))
+            ->map(fn ($account) => $this->accountPayload($account))
+            ->values()
+            ->all();
+    }
+
+    private function placeholderAccounts(Collection $operations): array
+    {
+        return $operations->map(fn ($operation) => [
+            'operacion' => $this->normalizeValue($operation),
+            'entidad' => '',
+            'cosecha' => '',
+            'producto' => '',
+            'saldo_capital' => 0.0,
+            'deuda_total' => 0.0,
+            'fecha_castigo' => null,
+            'anio_castigo' => null,
+        ])->values()->all();
+    }
+
+    private function accountPayload(object|array $account): array
+    {
+        $value = fn (string $key, mixed $default = null) => is_array($account)
+            ? ($account[$key] ?? $default)
+            : ($account->{$key} ?? $default);
+
+        $date = $value('fecha_castigo');
+
+        return [
+            'operacion' => $this->normalizeValue($value('operacion')),
+            'entidad' => (string) ($value('entidad', '') ?? ''),
+            'cosecha' => (string) ($value('cosecha', '') ?? ''),
+            'producto' => (string) ($value('producto', '') ?? ''),
+            'saldo_capital' => (float) ($value('saldo_capital', $value('deuda_capital', 0)) ?? 0),
+            'deuda_total' => (float) ($value('deuda_total', 0) ?? 0),
+            'fecha_castigo' => $date ? (string) $date : null,
+            'anio_castigo' => $date ? (int) substr((string) $date, 0, 4) : null,
+        ];
+    }
+
+    private function normalizeList(iterable $values): Collection
+    {
+        return collect($values)
+            ->map(fn ($value) => $this->normalizeValue($value))
+            ->filter(fn ($value) => $value !== '')
+            ->unique()
+            ->values();
+    }
+
+    private function normalizeValue(mixed $value): string
+    {
+        return trim((string) $value);
+    }
+
+    private function accountKey(mixed $dni, mixed $operation): string
+    {
+        return $this->normalizeValue($dni).'|'.$this->normalizeValue($operation);
     }
 }

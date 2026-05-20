@@ -74,7 +74,7 @@
                   data-nota-gen="{{ $p->nota ?? '' }}"
                   data-crono='@json($crono)'
                   data-hasbalon="{{ $hasBalon ? 1 : 0 }}"
-                  data-cuentas='@json($p->cuentas_cliente_json ?? [])'
+                  data-cuentas='@json($p->cuentas_json ?? $p->cuentas_cliente_json ?? [])'
                 >
                   Ver ficha
                 </x-ui.button>

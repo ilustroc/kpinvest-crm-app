@@ -74,17 +74,31 @@ function setupDecisionModals(root) {
     });
 }
 
-function renderAccounts(accounts) {
+function accountsFromOperationText(operationText) {
+    return String(operationText || '')
+        .split(',')
+        .map((operation) => operation.trim())
+        .filter(Boolean)
+        .map((operation) => ({
+            operacion: operation,
+            entidad: '',
+            producto: '',
+            cosecha: '',
+            saldo_capital: 0,
+            deuda_total: 0,
+        }));
+}
+
+function renderAccounts(accounts, operationText = '') {
     const container = $('#acc_cuentas');
 
     if (!container) return;
 
-    if (!accounts.length) {
-        container.innerHTML = '<div class="rounded-md border border-kp-border bg-slate-50 px-3 py-3 text-sm text-kp-muted">No se encontraron cuentas asociadas.</div>';
-        return;
-    }
+    const visibleAccounts = Array.isArray(accounts) && accounts.length
+        ? accounts
+        : accountsFromOperationText(operationText);
 
-    container.innerHTML = accounts.map((account, index) => {
+    container.innerHTML = visibleAccounts.map((account, index) => {
         const year = account?.fecha_castigo ? String(account.fecha_castigo).slice(0, 4) : '-';
 
         return `
@@ -180,7 +194,7 @@ function setupPromiseDetail(root) {
                 setText('nota_sup_txt', noteSupervisor);
             }
 
-            renderAccounts(parseJsonAttribute(button, 'data-cuentas', []));
+            renderAccounts(parseJsonAttribute(button, 'data-cuentas', []), button.dataset.operacion || '');
             renderSchedule(button, type);
         });
     });

@@ -38,9 +38,45 @@ class V3AutorizacionModuleTest extends TestCase
             ->assertViewHas('q', $dni)
             ->assertViewHas('status', 'preaprobada')
             ->assertViewHas('isSupervisor', false)
-            ->assertViewHas('rows', fn ($rows) => $rows->contains(fn ($row) => (int) $row->id === (int) $promesa->id))
+            ->assertViewHas('rows', function ($rows) use ($promesa, $operation) {
+                $row = $rows->first(fn ($item) => (int) $item->id === (int) $promesa->id);
+
+                return $row
+                    && count($row->cuentas_json ?? []) > 0
+                    && collect($row->cuentas_json)->contains(fn ($account) => ($account['operacion'] ?? null) === $operation);
+            })
             ->assertViewHas('cnaRows', fn ($rows) => collect($rows->items())->contains(fn ($row) => (int) $row->id === (int) $cna->id))
             ->assertViewHas('prodByOp', fn ($products) => ($products[$operation] ?? null) === 'Producto Autorizacion V3');
+    }
+
+    public function test_promesa_detail_accounts_are_resolved_with_trimmed_dni_and_operation(): void
+    {
+        $admin = $this->makeUser('administrador');
+        $supervisor = $this->makeUser('supervisor');
+        $asesor = $this->makeUser('asesor', ['supervisor_id' => $supervisor->id]);
+        $dni = 'V3ATRIM'.Str::upper(Str::random(6));
+        $operation = 'V3AOPTRIM'.Str::upper(Str::random(6));
+
+        $this->createClientAccount($dni, $operation, [
+            'numdoc' => " {$dni} ",
+            'operacion' => " {$operation} ",
+            'deuda_capital' => 2000,
+            'deuda_total' => 2193.81,
+        ]);
+
+        $promesa = $this->createPromesa($dni, $operation, $asesor, 'preaprobada', $supervisor, false);
+
+        $this->actingAs($admin)
+            ->get(route('autorizacion', ['q' => $dni]))
+            ->assertOk()
+            ->assertViewHas('rows', function ($rows) use ($promesa, $operation) {
+                $row = $rows->first(fn ($item) => (int) $item->id === (int) $promesa->id);
+                $account = collect($row?->cuentas_json ?? [])->firstWhere('operacion', $operation);
+
+                return $account
+                    && (float) ($account['saldo_capital'] ?? 0) === 2000.0
+                    && (float) ($account['deuda_total'] ?? 0) === 2193.81;
+            });
     }
 
     public function test_supervisor_index_keeps_pending_team_visibility_and_asesor_is_blocked(): void
@@ -148,12 +184,12 @@ class V3AutorizacionModuleTest extends TestCase
         ], $attributes));
     }
 
-    private function createClientAccount(): array
+    private function createClientAccount(?string $dni = null, ?string $operation = null, array $attributes = []): array
     {
-        $dni = 'V3A'.Str::upper(Str::random(8));
-        $operation = 'V3AOP'.Str::upper(Str::random(8));
+        $dni ??= 'V3A'.Str::upper(Str::random(8));
+        $operation ??= 'V3AOP'.Str::upper(Str::random(8));
 
-        DB::table('clientes_cuentas')->insert([
+        DB::table('clientes_cuentas')->insert(array_merge([
             'numdoc' => $dni,
             'cuenta' => 'CTA-'.$operation,
             'nombre' => 'Cliente Autorizacion V3',
@@ -173,7 +209,7 @@ class V3AutorizacionModuleTest extends TestCase
             'distrito' => 'Lima',
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], $attributes));
 
         return [$dni, $operation];
     }
@@ -183,7 +219,8 @@ class V3AutorizacionModuleTest extends TestCase
         string $operation,
         User $owner,
         string $state,
-        ?User $supervisor = null
+        ?User $supervisor = null,
+        bool $withOperationRelation = true
     ): PromesaPago {
         $promesa = PromesaPago::create([
             'dni' => $dni,
@@ -202,12 +239,14 @@ class V3AutorizacionModuleTest extends TestCase
             'aprobado_at' => $state === 'aprobada' ? now() : null,
         ]);
 
-        DB::table('promesa_operaciones')->insert([
-            'promesa_id' => $promesa->id,
-            'operacion' => $operation,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        if ($withOperationRelation) {
+            DB::table('promesa_operaciones')->insert([
+                'promesa_id' => $promesa->id,
+                'operacion' => $operation,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return $promesa;
     }
