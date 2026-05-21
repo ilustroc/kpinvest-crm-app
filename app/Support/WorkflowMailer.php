@@ -2,277 +2,382 @@
 
 namespace App\Support;
 
-use App\Models\User;
-use App\Models\PromesaPago;
+use App\Mail\WorkflowMail;
 use App\Models\CnaSolicitud;
+use App\Models\PromesaPago;
+use App\Models\User;
+use App\Support\Authorization\Roles;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\View;
 
 class WorkflowMailer
 {
-    /* ======================== PROMESAS ======================== */
-
-    public static function promesaPendiente(PromesaPago $p): void
+    public static function promesaPendiente(PromesaPago $promesa): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::promesaContext($p);
+        $context = self::promesaContext($promesa);
+        $subject = "[CRM] Promesa pendiente de preaprobacion - DNI {$context['dni']} - {$context['cliente']}";
 
-        $views = ['mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
+        self::sendActionMail(
+            self::supervisorRecipients($context['asesor']),
+            $subject,
+            'Promesa pendiente de preaprobacion',
+            $context['promesa_fields'],
+            self::authorizationUrl('promesa', $promesa->id, $promesa->dni, 'pendiente'),
+            'Abrir autorización',
+            'El asesor registro una promesa que requiere revision de supervisor.',
+            'Pendiente',
+            'Promesas',
+        );
 
-        if ($supervisor && filter_var($supervisor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $supervisor->email, [
-                'banner'     => '.: CRM :. Pre-aprobación pendiente',
-                'cta'        => 'Abrir Autorización',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, ".: CRM :. Pre-aprobación pendiente — DNI {$p->dni} - Cliente: {$data['cliente']}");
-        }
-
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner'     => 'Tu propuesta fue ENVIADA — esperando a Supervisor',
-                'cta'        => 'Ver estado',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, 'Propuesta enviada — esperando a Supervisor');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] Promesa enviada - DNI {$context['dni']} - {$context['cliente']}",
+            'Promesa enviada para preaprobacion',
+            $context['promesa_fields'],
+            'La promesa fue registrada y esta pendiente de preaprobacion.',
+            'Pendiente',
+            'Promesas',
+        );
     }
 
-    public static function promesaPreaprobada(PromesaPago $p): void
+    public static function promesaPreaprobada(PromesaPago $promesa): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::promesaContext($p);
-        $views = ['mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
+        $context = self::promesaContext($promesa);
+        $subject = "[CRM] Promesa preaprobada - requiere aprobacion - DNI {$context['dni']} - {$context['cliente']}";
 
-        foreach ($admins as $email) {
-            self::send($views, $email, [
-                'banner'     => '.: CRM :. Revisión de Administración',
-                'cta'        => 'Abrir Autorización',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, ".: CRM :. Revisión de Administración — DNI {$p->dni} - Cliente: {$data['cliente']}");
-        }
+        self::sendActionMail(
+            self::adminRecipients(),
+            $subject,
+            'Promesa preaprobada: requiere aprobacion',
+            $context['promesa_fields'],
+            self::authorizationUrl('promesa', $promesa->id, $promesa->dni, 'preaprobada'),
+            'Abrir autorización',
+            'La promesa fue preaprobada por supervision y requiere decision de administracion.',
+            'Preaprobada',
+            'Promesas',
+        );
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner'     => 'Tu propuesta fue PRE-APROBADA — esperando a Administración',
-                'cta'        => 'Ver estado',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, 'Tu propuesta fue PRE-APROBADA — esperando a Administración');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] Promesa preaprobada - DNI {$context['dni']} - {$context['cliente']}",
+            'Promesa preaprobada',
+            $context['promesa_fields'],
+            'La promesa fue preaprobada y paso a revision de administracion.',
+            'Preaprobada',
+            'Promesas',
+        );
     }
 
-    public static function promesaRechazadaSup(PromesaPago $p, ?string $nota = null): void
+    public static function promesaRechazadaSup(PromesaPago $promesa, ?string $note = null): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::promesaContext($p);
-        $data['nota'] = trim((string)$nota);
-        $views = ['mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
+        $context = self::promesaContext($promesa, $note);
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner'     => 'Tu propuesta fue RECHAZADA por Supervisor',
-                'cta'        => 'Ver estado',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, 'Tu propuesta fue RECHAZADA por Supervisor');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] Promesa rechazada por supervisor - DNI {$context['dni']} - {$context['cliente']}",
+            'Promesa rechazada por supervisor',
+            $context['promesa_fields'],
+            'La promesa fue rechazada durante la revision de supervisor.',
+            'Rechazada por supervisor',
+            'Promesas',
+        );
     }
 
-    public static function promesaResuelta(PromesaPago $p, bool $aprobada, ?string $nota = null): void
+    public static function promesaResuelta(PromesaPago $promesa, bool $approved, ?string $note = null): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::promesaContext($p);
-        $data['nota'] = trim((string)$nota);
-        $titulo = $aprobada ? 'APROBADA' : 'RECHAZADA por Administración';
-        $views = ['mail.promesas','mail.promesa','emails.promesas','emails.promesa','mail.notification','emails.notification'];
+        $context = self::promesaContext($promesa, $note);
+        $status = $approved ? 'Aprobada' : 'Rechazada';
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner'     => 'Tu propuesta fue ' . $titulo,
-                'cta'        => 'Ver estado',
-                'label_nro'  => 'N° Propuesta',
-            ] + $data, 'Tu propuesta fue ' . $titulo);
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] Promesa ".strtolower($status)." - DNI {$context['dni']} - {$context['cliente']}",
+            "Promesa {$status}",
+            $context['promesa_fields'],
+            "La promesa fue {$status}.",
+            $status,
+            'Promesas',
+        );
     }
 
-    /* ========================== CNA =========================== */
-
-    public static function cnaPendiente(CnaSolicitud $c): void
+    public static function cnaPendiente(CnaSolicitud $cna): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::cnaContext($c);
-        $views = ['mail.cna','emails.cna','mail.notification','emails.notification'];
+        $context = self::cnaContext($cna);
+        $subject = "[CRM] CNA pendiente de preaprobacion - DNI {$context['dni']} - {$context['cliente']}";
 
-        if ($supervisor && filter_var($supervisor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $supervisor->email, [
-                'banner' => '.: CRM :. Solicitud de CNA — Pre-aprobación',
-                'cta'    => 'Abrir Autorización',
-            ] + $data, ".: CRM :. Solicitud de CNA — DNI {$c->dni} - Cliente: {$data['cliente']}");
-        }
+        self::sendActionMail(
+            self::supervisorRecipients($context['asesor']),
+            $subject,
+            'CNA pendiente de preaprobacion',
+            $context['cna_fields'],
+            self::authorizationUrl('cna', $cna->id, $cna->dni, 'pendiente'),
+            'Abrir autorización',
+            'El asesor registro una solicitud CNA que requiere revision de supervisor.',
+            'Pendiente',
+            'CNA',
+        );
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner' => 'Tu solicitud de CNA fue ENVIADA — esperando a Supervisor',
-                'cta'    => 'Ver estado',
-            ] + $data, 'CNA enviada — esperando a Supervisor');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] CNA enviada - DNI {$context['dni']} - {$context['cliente']}",
+            'CNA enviada para preaprobacion',
+            $context['cna_fields'],
+            'La CNA fue registrada y esta pendiente de preaprobacion.',
+            'Pendiente',
+            'CNA',
+        );
     }
 
-    public static function cnaPreaprobada(CnaSolicitud $c): void
+    public static function cnaPreaprobada(CnaSolicitud $cna): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::cnaContext($c);
-        $views = ['mail.cna','emails.cna','mail.notification','emails.notification'];
+        $context = self::cnaContext($cna);
+        $subject = "[CRM] CNA preaprobada - requiere aprobacion - DNI {$context['dni']} - {$context['cliente']}";
 
-        foreach ($admins as $email) {
-            self::send($views, $email, [
-                'banner' => '.: CRM :. Solicitud de CNA — Revisión de Administración',
-                'cta'    => 'Abrir Autorización',
-            ] + $data, ".: CRM :. CNA para revisión — DNI {$c->dni}");
-        }
+        self::sendActionMail(
+            self::adminRecipients(),
+            $subject,
+            'CNA preaprobada: requiere aprobacion',
+            $context['cna_fields'],
+            self::authorizationUrl('cna', $cna->id, $cna->dni, 'preaprobada'),
+            'Abrir autorización',
+            'La CNA fue preaprobada por supervision y requiere decision de administracion.',
+            'Preaprobada',
+            'CNA',
+        );
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner' => 'Tu CNA fue PRE-APROBADA — esperando a Administración',
-                'cta'    => 'Ver estado',
-            ] + $data, 'CNA PRE-APROBADA — esperando a Administración');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] CNA preaprobada - DNI {$context['dni']} - {$context['cliente']}",
+            'CNA preaprobada',
+            $context['cna_fields'],
+            'La CNA fue preaprobada y paso a revision de administracion.',
+            'Preaprobada',
+            'CNA',
+        );
     }
 
-    public static function cnaRechazadaSup(CnaSolicitud $c, ?string $nota = null): void
+    public static function cnaRechazadaSup(CnaSolicitud $cna, ?string $note = null): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::cnaContext($c);
-        $data['nota'] = trim((string)$nota);
-        $views = ['mail.cna','emails.cna','mail.notification','emails.notification'];
+        $context = self::cnaContext($cna, $note);
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner' => 'Tu CNA fue RECHAZADA por Supervisor',
-                'cta'    => 'Ver estado',
-            ] + $data, 'CNA RECHAZADA por Supervisor');
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] CNA rechazada por supervisor - DNI {$context['dni']} - {$context['cliente']}",
+            'CNA rechazada por supervisor',
+            $context['cna_fields'],
+            'La CNA fue rechazada durante la revision de supervisor.',
+            'Rechazada por supervisor',
+            'CNA',
+        );
     }
 
-    public static function cnaResuelta(CnaSolicitud $c, bool $aprobada, ?string $nota = null): void
+    public static function cnaResuelta(CnaSolicitud $cna, bool $approved, ?string $note = null): void
     {
-        [$asesor, $supervisor, $admins, $data] = self::cnaContext($c);
-        $data['nota'] = trim((string)$nota);
-        $titulo = $aprobada ? 'APROBADA' : 'RECHAZADA por Administración';
-        $views = ['mail.cna','emails.cna','mail.notification','emails.notification'];
+        $context = self::cnaContext($cna, $note);
+        $status = $approved ? 'Aprobada' : 'Rechazada';
 
-        if ($asesor && filter_var($asesor->email, FILTER_VALIDATE_EMAIL)) {
-            self::send($views, $asesor->email, [
-                'banner' => 'Tu CNA fue ' . $titulo,
-                'cta'    => 'Ver estado',
-            ] + $data, 'Tu CNA fue ' . $titulo);
-        }
+        self::sendInformativeMail(
+            $context['asesor'],
+            "[CRM] CNA ".strtolower($status)." - DNI {$context['dni']} - {$context['cliente']}",
+            "CNA {$status}",
+            $context['cna_fields'],
+            "La CNA fue {$status}.",
+            $status,
+            'CNA',
+        );
     }
 
-    /* ========================= Helpers ======================= */
-
-    /** Nombre de cliente desde clientes_cuentas (nuevo esquema). */
-    private static function nombreClientePorDni(string $dni): string
+    public static function promesaContext(PromesaPago $promesa, ?string $note = null): array
     {
-        return (string) DB::table('clientes_cuentas')
-            ->where('numdoc', $dni)
-            ->value('nombre') ?: '';
-    }
+        $promesa->loadMissing('operaciones', 'user');
 
-    private static function promesaContext(PromesaPago $p): array
-    {
-        $asesor     = User::find($p->user_id);
-        $supervisor = $asesor?->supervisor ?: User::where('role','supervisor')->first();
-        $admins     = User::where('role','administrador')->pluck('email')->all();
+        $asesor = $promesa->user ?: User::find($promesa->user_id);
+        $cliente = self::nombreClientePorDni((string) $promesa->dni);
+        $operations = $promesa->operaciones->pluck('operacion')->filter()->implode(', ')
+            ?: (string) ($promesa->operacion ?? '');
+        $amount = $promesa->tipo === 'cancelacion'
+            ? (float) ($promesa->monto ?? 0)
+            : (float) ($promesa->monto_convenio ?? 0);
 
-        $cliente = $p->titular ?: self::nombreClientePorDni($p->dni);
-
-        $ops = $p->relationLoaded('operaciones') && $p->operaciones->count()
-            ? $p->operaciones->pluck('operacion')->implode(', ')
-            : (string)($p->operacion ?? '');
-
-        $data = [
-            'tipo'        => $p->tipo === 'cancelacion' ? 'Cancelación' : 'Convenio',
-            'dni'         => $p->dni,
-            'cliente'     => $cliente ?: '—',
-            'nro'         => $p->id,
-            'operacion'   => $ops ?: '—',
-            'procede'     => $supervisor?->name ?: '—',
-            'link'        => route('autorizacion'),
-            // opcionales para la vista:
-            'nota'        => (string)($p->nota ?? ''),
-            'observa'     => (string)($p->nota ?? ''),
-            'banner'      => $data['banner'] ?? null,
-            'cta'         => $data['cta'] ?? null,
-            'label_nro'   => 'N° Propuesta',
+        $fields = [
+            'Cliente' => $cliente ?: '-',
+            'Documento' => (string) $promesa->dni,
+            'Operacion(es)' => $operations ?: '-',
+            'Tipo de promesa' => $promesa->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio',
+            'Monto' => 'S/ '.number_format($amount, 2),
+            'Fecha de pago' => optional($promesa->fecha_pago)->format('Y-m-d') ?: '-',
+            'Asesor' => $asesor?->name ?: '-',
         ];
 
-        return [$asesor, $supervisor, $admins, $data];
-    }
-
-    private static function cnaContext(CnaSolicitud $c): array
-    {
-        $asesor     = User::find($c->user_id);
-        $supervisor = $asesor?->supervisor ?: User::where('role','supervisor')->first();
-        $admins     = User::where('role','administrador')->pluck('email')->all();
-
-        $cliente = $c->titular ?: self::nombreClientePorDni($c->dni);
-        $ops = collect((array)($c->operaciones ?? []))->filter()->implode(', ');
-
-        $data = [
-            'dni'        => $c->dni,
-            'cliente'    => $cliente ?: '—',
-            'nro'        => $c->nro_carta,
-            'operacion'  => $ops ?: '—',
-            'procede'    => $supervisor?->name ?: '—',
-            'observa'    => (string)($c->observacion ?? ''),
-            'link'       => route('autorizacion') . '#cna',
-            // opcionales:
-            'banner'     => $data['banner'] ?? null,
-            'cta'        => $data['cta'] ?? null,
-            'label_nro'  => 'N° Carta',
-        ];
-
-        return [$asesor, $supervisor, $admins, $data];
-    }
-
-    /**
-     * Envía usando la primera vista existente; si ninguna existe, usa Mail::raw.
-     *
-     * @param string|array $view Nombre de vista o lista de candidatos
-     */
-    private static function send(string|array $view, string $to, array $data, string $subject): void
-    {
-        $candidates = is_array($view) ? $view : [$view];
-        $chosen = null;
-        foreach ($candidates as $v) {
-            if (is_string($v) && View::exists($v)) { $chosen = $v; break; }
+        if ($promesa->nota) {
+            $fields['Observacion'] = (string) $promesa->nota;
         }
 
-        if ($chosen) {
-            Mail::send($chosen, $data, function ($m) use ($to, $subject) {
-                $m->to($to)->subject($subject);
-            });
+        if (trim((string) $note) !== '') {
+            $fields['Nota de decision'] = trim((string) $note);
+        }
+
+        return [
+            'asesor' => $asesor,
+            'dni' => (string) $promesa->dni,
+            'cliente' => $cliente ?: '-',
+            'fields' => $fields,
+            'promesa_fields' => $fields,
+        ];
+    }
+
+    public static function cnaContext(CnaSolicitud $cna, ?string $note = null): array
+    {
+        $asesor = User::find($cna->user_id);
+        $cliente = $cna->titular ?: self::nombreClientePorDni((string) $cna->dni);
+        $operations = collect((array) ($cna->operaciones ?? []))
+            ->map(fn ($operation) => trim((string) $operation))
+            ->filter()
+            ->implode(', ');
+
+        $fields = [
+            'Nro. carta' => (string) $cna->nro_carta,
+            'Cliente' => $cliente ?: '-',
+            'Documento' => (string) $cna->dni,
+            'Operacion(es)' => $operations ?: '-',
+            'Procede de / asesor' => $asesor?->name ?: '-',
+        ];
+
+        if ($cna->observacion) {
+            $fields['Observacion'] = (string) $cna->observacion;
+        }
+
+        if (trim((string) $note) !== '') {
+            $fields['Nota de decision'] = trim((string) $note);
+        }
+
+        return [
+            'asesor' => $asesor,
+            'dni' => (string) $cna->dni,
+            'cliente' => $cliente ?: '-',
+            'fields' => $fields,
+            'cna_fields' => $fields,
+        ];
+    }
+
+    private static function supervisorRecipients(?User $asesor): array
+    {
+        return self::supervisorRecipientUsers($asesor)
+            ->pluck('email')
+            ->all();
+    }
+
+    public static function supervisorRecipientUsers(?User $asesor): Collection
+    {
+        $supervisor = $asesor?->supervisor;
+
+        if ($supervisor && self::isActiveRecipient($supervisor)) {
+            return collect([$supervisor]);
+        }
+
+        return self::adminRecipientUsers();
+    }
+
+    private static function adminRecipients(): array
+    {
+        return self::adminRecipientUsers()
+            ->pluck('email')
+            ->all();
+    }
+
+    public static function adminRecipientUsers(): Collection
+    {
+        return User::query()
+            ->where('role', Roles::ADMINISTRADOR)
+            ->where('active', 1)
+            ->get()
+            ->filter(fn (User $user) => self::isActiveRecipient($user))
+            ->unique('id')
+            ->values()
+            ->values();
+    }
+
+    private static function sendInformativeMail(
+        ?User $recipient,
+        string $subject,
+        string $title,
+        array $fields,
+        string $intro,
+        string $status,
+        string $module,
+    ): void {
+        if (! self::isActiveRecipient($recipient)) {
             return;
         }
 
-        // Fallback en texto plano y log para diagnosticar
-        \Log::warning('Email view not found. Using raw fallback.', [
-            'to'         => $to,
-            'subject'    => $subject,
-            'candidates' => $candidates,
-        ]);
-
-        $text = self::fallbackText($data);
-        Mail::raw($text, function ($m) use ($to, $subject) {
-            $m->to($to)->subject($subject);
-        });
+        self::sendActionMail(
+            [$recipient->email],
+            $subject,
+            $title,
+            $fields,
+            route('clientes.show', $fields['Documento']),
+            'Ver estado',
+            $intro,
+            $status,
+            $module,
+        );
     }
 
-    /** Construye un cuerpo de texto simple como respaldo. */
-    private static function fallbackText(array $d): string
+    private static function sendActionMail(
+        array $recipients,
+        string $subject,
+        string $title,
+        array $fields,
+        string $actionUrl,
+        string $actionText,
+        string $intro,
+        string $status,
+        string $module,
+    ): void {
+        foreach (array_unique(array_filter($recipients)) as $email) {
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            Mail::to($email)->send(new WorkflowMail(
+                subject: $subject,
+                title: $title,
+                fields: $fields,
+                actionUrl: $actionUrl,
+                actionText: $actionText,
+                intro: $intro,
+                status: $status,
+                module: $module,
+            ));
+        }
+    }
+
+    public static function authorizationUrl(string $type, int|string $id, string $dni, string $status): string
     {
-        $lines = [];
-        if (!empty($d['banner']))   $lines[] = $d['banner'];
-        if (!empty($d['tipo']))     $lines[] = "Tipo: {$d['tipo']}";
-        if (!empty($d['dni']))      $lines[] = "DNI: {$d['dni']}";
-        if (!empty($d['cliente']))  $lines[] = "Cliente: {$d['cliente']}";
-        if (!empty($d['nro']))      $lines[] = "Nro: {$d['nro']}";
-        if (!empty($d['operacion']))$lines[] = "Operación(es): {$d['operacion']}";
-        if (!empty($d['nota']))     $lines[] = "Nota: {$d['nota']}";
-        if (!empty($d['observa']))  $lines[] = "Observación: {$d['observa']}";
-        if (!empty($d['link']))     $lines[] = "Abrir: {$d['link']}";
-        return implode("\n", $lines) ?: 'Notificación';
+        return route('autorizacion', [
+            'tipo' => $type,
+            'id' => $id,
+            'q' => $dni,
+            'status' => $status,
+        ]);
+    }
+
+    public static function statusUrl(string $dni): string
+    {
+        return route('clientes.show', $dni);
+    }
+
+    private static function nombreClientePorDni(string $dni): string
+    {
+        return (string) DB::table('clientes_cuentas')
+            ->where('numdoc', trim($dni))
+            ->value('nombre') ?: '';
+    }
+
+    private static function isActiveRecipient(?User $user): bool
+    {
+        return $user
+            && (bool) $user->active
+            && filter_var($user->email, FILTER_VALIDATE_EMAIL);
     }
 }

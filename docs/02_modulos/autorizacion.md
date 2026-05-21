@@ -33,9 +33,16 @@ No se creo `AutorizacionPolicy`; la pantalla reutiliza:
 - Workflow de Promesas y CNA.
 - Mensajes y redirects.
 
+## Correos
+
+Los correos que requieren accion usan la bandeja de Autorizacion como destino. El link incluye filtros `tipo`, `id`, `q` y `status` para ubicar la solicitud. Los correos informativos no deben apuntar a Autorizacion; usan `clientes.show`.
+
+Detalle completo en [Correos de workflow](correos_workflow.md).
+
 ## Tests
 
 `tests/Feature/V3AutorizacionModuleTest.php` cubre index, filtros, bandejas, visibilidad y rutas de workflow.
+`tests/Feature/V3MailWorkflowTest.php` cubre que los botones de correo apunten al destino correcto.
 
 ## Pendientes
 

@@ -12,6 +12,7 @@ V3 es la reorganizacion tecnica del CRM de cobranzas KP Invest sin reescritura t
 - Bootstrap fue eliminado globalmente.
 - Los assets frontend nuevos viven en `resources/css` y `resources/js`.
 - Clientes, Promesas, CNA y Autorizacion fueron refactorizados hacia Services, Actions, ViewModels y Policies.
+- Los correos de Promesas/CNA quedaron centralizados en `WorkflowMailer` con botones separados para accion pendiente y estado informativo.
 - Roles validos quedaron reducidos a `administrador`, `supervisor`, `asesor` y `soporte`.
 - Las migraciones V3 fueron reconstruidas desde `u480021566_kpinvest_bd.sql`.
 - Se amplio la cobertura con tests Feature para flujos criticos.
@@ -24,6 +25,7 @@ V3 es la reorganizacion tecnica del CRM de cobranzas KP Invest sin reescritura t
 - [+] Backend critico de Promesas.
 - [+] Backend critico de CNA.
 - [+] Backend critico de Autorizacion.
+- [+] Correos de workflow de Promesas/CNA profesionalizados y cubiertos por tests.
 - [+] Baseline de migraciones probado en base limpia.
 - [+] Roles finales centralizados.
 - [+] Tests automatizados locales.

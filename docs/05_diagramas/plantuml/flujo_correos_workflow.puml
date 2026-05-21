@@ -1,0 +1,54 @@
+@startuml
+title Flujo Correos Workflow - Promesas y CNA
+
+actor Asesor
+actor Supervisor
+actor Administrador
+participant "Promesa/CNA\nCreationService" as Creation
+participant "Promesa/CNA\nWorkflowService" as Workflow
+participant "WorkflowMailer" as Mailer
+boundary "Autorizacion" as Auth
+boundary "Cliente\nclientes.show" as Cliente
+
+== Asesor crea solicitud ==
+Asesor -> Creation: crear Promesa/CNA
+Creation -> Creation: estado = pendiente
+Creation -> Mailer: correo a supervisor
+Mailer -> Supervisor: Abrir autorizacion
+Supervisor -> Auth: preaprobar
+Auth -> Workflow: preapprove()
+Workflow -> Mailer: correo a administradores
+Mailer -> Administrador: Abrir autorizacion
+Administrador -> Auth: aprobar/rechazar
+Auth -> Workflow: approve()/reject()
+Workflow -> Mailer: correo informativo
+Mailer -> Asesor: Ver estado
+Asesor -> Cliente: revisar ficha
+
+== Supervisor crea solicitud ==
+Supervisor -> Creation: crear Promesa/CNA
+Creation -> Creation: estado = preaprobada
+Creation -> Mailer: correo a administradores
+Mailer -> Administrador: Abrir autorizacion
+Administrador -> Auth: aprobar/rechazar
+Auth -> Workflow: approve()/reject()
+Workflow -> Mailer: correo informativo
+Mailer -> Supervisor: Ver estado
+Supervisor -> Cliente: revisar ficha
+
+== Administrador crea solicitud ==
+Administrador -> Creation: crear Promesa/CNA
+Creation -> Creation: estado = aprobada
+Creation -> Mailer: correo informativo
+Mailer -> Administrador: Ver estado
+Administrador -> Cliente: revisar ficha
+
+note right of Mailer
+Abrir autorizacion:
+/autorizacion?tipo=&id=&q=&status=
+
+Ver estado:
+/clientes/{dni}
+end note
+
+@enduml

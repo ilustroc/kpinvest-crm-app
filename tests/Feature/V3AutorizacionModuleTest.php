@@ -28,7 +28,7 @@ class V3AutorizacionModuleTest extends TestCase
         $promesa = $this->createPromesa($dni, $operation, $asesor, 'preaprobada', $supervisor);
         $cna = $this->createCna($dni, $operation, $asesor, 'preaprobada', $supervisor);
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->get(route('autorizacion', [
                 'q' => $dni,
                 'status' => 'preaprobada',
@@ -47,6 +47,11 @@ class V3AutorizacionModuleTest extends TestCase
             })
             ->assertViewHas('cnaRows', fn ($rows) => collect($rows->items())->contains(fn ($row) => (int) $row->id === (int) $cna->id))
             ->assertViewHas('prodByOp', fn ($products) => ($products[$operation] ?? null) === 'Producto Autorizacion V3');
+
+        preg_match('/data-operaciones-b64="([^"]+)"/', $response->getContent(), $matches);
+
+        $this->assertNotEmpty($matches[1] ?? null);
+        $this->assertSame([$operation], json_decode(base64_decode($matches[1]), true));
     }
 
     public function test_promesa_detail_accounts_are_resolved_with_trimmed_dni_and_operation(): void
@@ -65,8 +70,36 @@ class V3AutorizacionModuleTest extends TestCase
         ]);
 
         $promesa = $this->createPromesa($dni, $operation, $asesor, 'preaprobada', $supervisor, false);
+        $promesa->forceFill([
+            'tipo' => 'convenio',
+            'monto' => 0,
+            'monto_convenio' => 2193.81,
+            'monto_cuota' => 1096.91,
+            'nro_cuotas' => 2,
+        ])->save();
 
-        $this->actingAs($admin)
+        DB::table('promesa_cuotas')->insert([
+            [
+                'promesa_id' => $promesa->id,
+                'nro' => 1,
+                'fecha' => now()->toDateString(),
+                'monto' => 1000,
+                'es_balon' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'promesa_id' => $promesa->id,
+                'nro' => 2,
+                'fecha' => now()->addMonth()->toDateString(),
+                'monto' => 1193.81,
+                'es_balon' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->actingAs($admin)
             ->get(route('autorizacion', ['q' => $dni]))
             ->assertOk()
             ->assertViewHas('rows', function ($rows) use ($promesa, $operation) {
@@ -77,6 +110,27 @@ class V3AutorizacionModuleTest extends TestCase
                     && (float) ($account['saldo_capital'] ?? 0) === 2000.0
                     && (float) ($account['deuda_total'] ?? 0) === 2193.81;
             });
+
+        $content = $response->getContent();
+        preg_match('/data-cuentas-b64="([^"]+)"/', $content, $matches);
+
+        $this->assertNotEmpty($matches[1] ?? null);
+
+        $accounts = json_decode(base64_decode($matches[1]), true);
+        $account = collect($accounts)->firstWhere('operacion', $operation);
+
+        $this->assertSame(2000.0, (float) ($account['saldo_capital'] ?? 0));
+        $this->assertSame(2193.81, (float) ($account['deuda_total'] ?? 0));
+
+        preg_match('/data-crono-b64="([^"]+)"/', $content, $scheduleMatches);
+
+        $this->assertNotEmpty($scheduleMatches[1] ?? null);
+
+        $schedule = json_decode(base64_decode($scheduleMatches[1]), true);
+
+        $this->assertCount(2, $schedule);
+        $this->assertSame(1000.0, (float) ($schedule[0]['monto'] ?? 0));
+        $this->assertSame(1193.81, (float) ($schedule[1]['monto'] ?? 0));
     }
 
     public function test_supervisor_index_keeps_pending_team_visibility_and_asesor_is_blocked(): void

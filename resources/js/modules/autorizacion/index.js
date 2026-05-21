@@ -24,6 +24,24 @@ function parseJsonAttribute(element, name, fallback = []) {
     }
 }
 
+function parseBase64JsonAttribute(element, name, fallback = []) {
+    const encoded = element.getAttribute(name);
+
+    if (!encoded) {
+        return fallback;
+    }
+
+    try {
+        const binary = atob(encoded);
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        const decoded = new TextDecoder().decode(bytes);
+
+        return JSON.parse(decoded);
+    } catch (_) {
+        return fallback;
+    }
+}
+
 function toDmy(value) {
     if (!value) return '-';
 
@@ -89,6 +107,16 @@ function accountsFromOperationText(operationText) {
         }));
 }
 
+function uniqueOperations(values) {
+    return [...new Set((values || [])
+        .map((value) => String(value || '').trim())
+        .filter(Boolean))];
+}
+
+function operationsFromPayments(payments) {
+    return uniqueOperations((payments || []).map((payment) => payment?.operacion ?? payment?.oper));
+}
+
 function renderAccounts(accounts, operationText = '') {
     const container = $('#acc_cuentas');
 
@@ -104,10 +132,9 @@ function renderAccounts(accounts, operationText = '') {
         return `
             <details class="rounded-lg border border-kp-border bg-white" ${index === 0 ? 'open' : ''}>
                 <summary class="cursor-pointer px-4 py-3 text-sm font-bold text-kp-ink">
-                    Operacion ${escapeHtml(account?.operacion || '-')} / ${escapeHtml(account?.entidad || '-')} / ${escapeHtml(account?.producto || '-')} / ${escapeHtml(account?.cosecha || '-')}
+                    Operacion ${escapeHtml(account?.operacion || '-')} / ${escapeHtml(account?.entidad || '-')} / ${escapeHtml(account?.cosecha || '-')}
                 </summary>
                 <dl class="grid gap-2 border-t border-kp-border p-4 text-sm sm:grid-cols-2">
-                    <div><dt class="font-bold text-kp-muted">Numero de Operacion</dt><dd>${escapeHtml(account?.operacion || '-')}</dd></div>
                     <div><dt class="font-bold text-kp-muted">Anio Castigo</dt><dd>${escapeHtml(year)}</dd></div>
                     <div><dt class="font-bold text-kp-muted">Entidad</dt><dd>${escapeHtml(account?.entidad || '-')}</dd></div>
                     <div><dt class="font-bold text-kp-muted">Producto</dt><dd>${escapeHtml(account?.producto || '-')}</dd></div>
@@ -128,7 +155,11 @@ function renderSchedule(button, type) {
 
     if (!wrapper || !body || !total || !title) return;
 
-    const schedule = parseJsonAttribute(button, 'data-crono', []);
+    const schedule = parseBase64JsonAttribute(
+        button,
+        'data-crono-b64',
+        parseJsonAttribute(button, 'data-crono', []),
+    );
 
     if (type === 'cancelacion') {
         wrapper.classList.add('hidden');
@@ -194,7 +225,13 @@ function setupPromiseDetail(root) {
                 setText('nota_sup_txt', noteSupervisor);
             }
 
-            renderAccounts(parseJsonAttribute(button, 'data-cuentas', []), button.dataset.operacion || '');
+            const accounts = parseBase64JsonAttribute(
+                button,
+                'data-cuentas-b64',
+                parseJsonAttribute(button, 'data-cuentas', []),
+            );
+
+            renderAccounts(accounts, button.dataset.operacion || '');
             renderSchedule(button, type);
         });
     });
@@ -243,7 +280,11 @@ function setupCnaDetail(root) {
             setText('cna_monto_pagado', money(button.dataset.montoPagado));
             setText('cna_obs', button.dataset.observacion || '-');
 
-            const operations = parseJsonAttribute(button, 'data-operaciones', []);
+            let operations = uniqueOperations(parseBase64JsonAttribute(
+                button,
+                'data-operaciones-b64',
+                parseJsonAttribute(button, 'data-operaciones', []),
+            ));
             setText('cna_ops', operations.length ? operations.join(', ') : '-');
 
             if (body) {
@@ -260,6 +301,12 @@ function setupCnaDetail(root) {
 
                 const json = await response.json();
                 const payments = Array.isArray(json.pagos) ? json.pagos : [];
+                const paymentOperations = operationsFromPayments(payments);
+
+                if (!operations.length && paymentOperations.length) {
+                    operations = paymentOperations;
+                    setText('cna_ops', operations.join(', '));
+                }
 
                 if (!payments.length) {
                     renderEmptyPayments('Sin pagos registrados.');

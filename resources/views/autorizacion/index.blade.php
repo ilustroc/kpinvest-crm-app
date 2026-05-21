@@ -42,6 +42,9 @@
             $fechaYmd = $p->fecha_promesa ? substr((string) $p->fecha_promesa, 0, 10) : '-';
             $fechaDmy = $p->fecha_promesa ? \Carbon\Carbon::parse($p->fecha_promesa)->format('d/m/Y') : '';
             $crono = $p->cuotas_json ?? [];
+            $cronoJson = json_encode($crono, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
+            $cuentas = $p->cuentas_json ?? $p->cuentas_cliente_json ?? [];
+            $cuentasJson = json_encode($cuentas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
             $hasBalon = (bool) ($p->has_balon ?? false);
             $montoMostrar = (float) ($p->monto > 0 ? $p->monto : $p->monto_convenio);
           @endphp
@@ -73,8 +76,10 @@
                   data-nota-sup="{{ $p->nota_preaprobacion ?? '' }}"
                   data-nota-gen="{{ $p->nota ?? '' }}"
                   data-crono='@json($crono)'
+                  data-crono-b64="{{ base64_encode($cronoJson) }}"
                   data-hasbalon="{{ $hasBalon ? 1 : 0 }}"
-                  data-cuentas='@json($p->cuentas_json ?? $p->cuentas_cliente_json ?? [])'
+                  data-cuentas='@json($cuentas)'
+                  data-cuentas-b64="{{ base64_encode($cuentasJson) }}"
                 >
                   Ver ficha
                 </x-ui.button>
@@ -150,6 +155,8 @@
                 ->map(fn ($x) => trim((string) $x))
                 ->filter()
                 ->values();
+            $opsArray = $ops->all();
+            $opsJson = json_encode($opsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
 
             $productos = $ops->map(fn ($op) => $prodByOp[(string) $op] ?? null)
                 ->filter()
@@ -179,7 +186,8 @@
                   data-dni="{{ $cna->dni }}"
                   data-nrocarta="{{ $cna->nro_carta }}"
                   data-producto="{{ $productoTxt }}"
-                  data-operaciones='@json($ops)'
+                  data-operaciones='@json($opsArray)'
+                  data-operaciones-b64="{{ base64_encode($opsJson) }}"
                   data-fecha="{{ optional($cna->created_at)->format('Y-m-d') }}"
                   data-fecha-pago="{{ $cna->fecha_pago_realizado }}"
                   data-monto-pagado="{{ (float) ($cna->monto_pagado ?? 0) }}"

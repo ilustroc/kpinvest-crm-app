@@ -22,7 +22,7 @@ class CnaCreationService
         $operations = array_values(array_filter(array_map('strval', $data['operaciones'] ?? [])));
 
         if ($operations === []) {
-            throw new DomainException('Selecciona al menos una operación para la CNA.');
+            throw new DomainException('Selecciona al menos una operacion para la CNA.');
         }
 
         $titular = $data['titular'] ?? DB::table('clientes_cuentas')
@@ -48,12 +48,14 @@ class CnaCreationService
         $origin = $this->numbering->originFromAccountRows($accountRows);
 
         if (! $origin) {
-            throw new DomainException('No se pudo determinar el origen para numeración (cosecha/entidad).');
+            throw new DomainException('No se pudo determinar el origen para numeracion (cosecha/entidad).');
         }
 
         ['serie' => $serie, 'suffix' => $suffix] = $this->numbering->seriesConfig($origin);
 
-        $isAdminAuto = Roles::normalize($user->role) === Roles::ADMINISTRADOR;
+        $role = Roles::normalize($user->role);
+        $isAdminAuto = $role === Roles::ADMINISTRADOR;
+        $isSupervisorAuto = $role === Roles::SUPERVISOR;
         $now = now();
 
         $solicitud = DB::transaction(function () use (
@@ -65,6 +67,7 @@ class CnaCreationService
             $serie,
             $suffix,
             $isAdminAuto,
+            $isSupervisorAuto,
             $now,
             $user,
         ) {
@@ -90,6 +93,10 @@ class CnaCreationService
                 $payload['pre_aprobado_at'] = $now;
                 $payload['aprobado_por'] = $user->id;
                 $payload['aprobado_at'] = $now;
+            } elseif ($isSupervisorAuto) {
+                $payload['workflow_estado'] = 'preaprobada';
+                $payload['pre_aprobado_por'] = $user->id;
+                $payload['pre_aprobado_at'] = $now;
             } else {
                 $payload['workflow_estado'] = 'pendiente';
             }
@@ -99,12 +106,19 @@ class CnaCreationService
 
         if ($isAdminAuto) {
             $this->documents->generateOutputsFromTemplate($solicitud);
+            WorkflowMailer::cnaResuelta($solicitud, true);
 
-            return [$solicitud, "CNA APROBADA automáticamente. N.º {$solicitud->nro_carta}"];
+            return [$solicitud, "CNA APROBADA automaticamente. N. {$solicitud->nro_carta}"];
+        }
+
+        if ($isSupervisorAuto) {
+            WorkflowMailer::cnaPreaprobada($solicitud);
+
+            return [$solicitud, "Solicitud de CNA PRE-APROBADA. N. {$solicitud->nro_carta}"];
         }
 
         WorkflowMailer::cnaPendiente($solicitud);
 
-        return [$solicitud, "Solicitud de CNA enviada. N.º {$solicitud->nro_carta}"];
+        return [$solicitud, "Solicitud de CNA enviada. N. {$solicitud->nro_carta}"];
     }
 }

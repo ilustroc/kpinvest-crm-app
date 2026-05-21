@@ -43,9 +43,20 @@ Policy:
 - Formularios POST y CSRF.
 - Descarga DOCX/PDF o fallback.
 
+## Correos
+
+Los correos de CNA usan `WorkflowMailer`:
+
+- Asesor crea: estado `pendiente`, correo al supervisor con `Abrir autorizacion`.
+- Supervisor crea o preaprueba: estado `preaprobada`, correo a administradores con `Abrir autorizacion`.
+- Administrador crea o resuelve: estado final, correo informativo con `Ver estado` hacia `clientes.show`.
+
+Detalle completo en [Correos de workflow](correos_workflow.md).
+
 ## Tests
 
 `tests/Feature/V3CnaModuleTest.php` cubre creacion, workflow, permisos, descargas y fallback.
+`tests/Feature/V3MailWorkflowTest.php` cubre correos y destinos por rol.
 
 ## Pendientes
 

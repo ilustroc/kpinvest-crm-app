@@ -48,9 +48,20 @@ La variante de cuota balon se conserva sin cambio de persistencia. La cuota se m
 - Fallback DOCX cuando no hay claves iLovePDF.
 - Rutas y nombres de rutas.
 
+## Correos
+
+Los correos de Promesas usan `WorkflowMailer`:
+
+- Asesor crea: estado `pendiente`, correo al supervisor con `Abrir autorizacion`.
+- Supervisor crea o preaprueba: estado `preaprobada`, correo a administradores con `Abrir autorizacion`.
+- Administrador crea o resuelve: estado final, correo informativo con `Ver estado` hacia `clientes.show`.
+
+Detalle completo en [Correos de workflow](correos_workflow.md).
+
 ## Tests
 
 `tests/Feature/V3PromesaModuleTest.php` cubre creacion, workflow, permisos y acuerdo con fallback.
+`tests/Feature/V3MailWorkflowTest.php` cubre correos y destinos por rol.
 
 ## Pendientes
 

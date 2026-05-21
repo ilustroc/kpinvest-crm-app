@@ -17,6 +17,7 @@ Indice oficial de documentacion tecnica para KP Invest CRM App V3.
 - [Promesas](02_modulos/promesas.md)
 - [CNA](02_modulos/cna.md)
 - [Autorizacion](02_modulos/autorizacion.md)
+- [Correos de workflow](02_modulos/correos_workflow.md)
 - [Reportes](02_modulos/reportes.md)
 - [Integracion](02_modulos/integracion.md)
 - [Admin](02_modulos/admin.md)
