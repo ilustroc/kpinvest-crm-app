@@ -13,6 +13,7 @@ V3 es la reorganizacion tecnica del CRM de cobranzas KP Invest sin reescritura t
 - Los assets frontend nuevos viven en `resources/css` y `resources/js`.
 - Clientes, Promesas, CNA y Autorizacion fueron refactorizados hacia Services, Actions, ViewModels y Policies.
 - Los correos de Promesas/CNA quedaron centralizados en `WorkflowMailer` con botones separados para accion pendiente y estado informativo.
+- Las notificaciones internas de Promesas/CNA usan Laravel Notifications con canal `database`, campanita en la topbar y actualizacion realtime con Reverb/Echo.
 - Roles validos quedaron reducidos a `administrador`, `supervisor`, `asesor` y `soporte`.
 - Las migraciones V3 fueron reconstruidas desde `u480021566_kpinvest_bd.sql`.
 - Se amplio la cobertura con tests Feature para flujos criticos.
@@ -26,6 +27,8 @@ V3 es la reorganizacion tecnica del CRM de cobranzas KP Invest sin reescritura t
 - [+] Backend critico de CNA.
 - [+] Backend critico de Autorizacion.
 - [+] Correos de workflow de Promesas/CNA profesionalizados y cubiertos por tests.
+- [+] Notificaciones internas tipo campanita para workflow Promesas/CNA.
+- [+] Notificaciones realtime con Laravel Reverb y Echo para sistema abierto.
 - [+] Baseline de migraciones probado en base limpia.
 - [+] Roles finales centralizados.
 - [+] Tests automatizados locales.
@@ -37,6 +40,8 @@ V3 es la reorganizacion tecnica del CRM de cobranzas KP Invest sin reescritura t
 - [ ] Confirmar responsive/desktop visual.
 - [ ] Revisar logs luego de pruebas completas.
 - [ ] Confirmar plantillas DOCX reales en entorno objetivo.
+- [ ] Configurar proceso permanente de Reverb para produccion.
+- [ ] Definir si se implementara Web Push para navegador cerrado.
 - [ ] Confirmar credenciales iLovePDF/SMTP si aplican.
 - [ ] Probar deploy sobre dump productivo reciente.
 - [ ] Definir ventana, responsable y rollback.

@@ -293,7 +293,6 @@ class WorkflowMailer
             ->get()
             ->filter(fn (User $user) => self::isActiveRecipient($user))
             ->unique('id')
-            ->values()
             ->values();
     }
 

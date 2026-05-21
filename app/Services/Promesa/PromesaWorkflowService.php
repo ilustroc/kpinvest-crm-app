@@ -3,7 +3,7 @@
 namespace App\Services\Promesa;
 
 use App\Models\PromesaPago;
-use App\Support\WorkflowMailer;
+use App\Support\WorkflowNotifier;
 use Illuminate\Support\Facades\Log;
 
 class PromesaWorkflowService
@@ -24,7 +24,7 @@ class PromesaWorkflowService
             'nota_rechazo' => null,
         ]);
 
-        $this->safe(fn () => WorkflowMailer::promesaPreaprobada($promesa), ['promesa_id' => $promesa->id]);
+        $this->safe(fn () => WorkflowNotifier::promesaPreaprobada($promesa), ['promesa_id' => $promesa->id]);
     }
 
     public function rejectBySupervisor(PromesaPago $promesa, int $userId, ?string $note = null): void
@@ -40,7 +40,7 @@ class PromesaWorkflowService
             'nota_rechazo' => $note ? mb_substr($note, 0, 500) : null,
         ]);
 
-        $this->safe(fn () => WorkflowMailer::promesaRechazadaSup($promesa, $note), ['promesa_id' => $promesa->id]);
+        $this->safe(fn () => WorkflowNotifier::promesaRechazadaSup($promesa, $note), ['promesa_id' => $promesa->id]);
     }
 
     public function approve(PromesaPago $promesa, int $userId, ?string $note = null): void
@@ -59,7 +59,7 @@ class PromesaWorkflowService
             'nota_rechazo' => null,
         ]);
 
-        $this->safe(fn () => WorkflowMailer::promesaResuelta($promesa, true, $note), ['promesa_id' => $promesa->id]);
+        $this->safe(fn () => WorkflowNotifier::promesaResuelta($promesa, true, $note), ['promesa_id' => $promesa->id]);
     }
 
     public function rejectByAdministrator(PromesaPago $promesa, int $userId, ?string $note = null): void
@@ -75,7 +75,7 @@ class PromesaWorkflowService
             'nota_rechazo' => $note ? mb_substr($note, 0, 500) : null,
         ]);
 
-        $this->safe(fn () => WorkflowMailer::promesaResuelta($promesa, false, $note), ['promesa_id' => $promesa->id]);
+        $this->safe(fn () => WorkflowNotifier::promesaResuelta($promesa, false, $note), ['promesa_id' => $promesa->id]);
     }
 
     private function safe(callable $callback, array $context = []): void
@@ -83,7 +83,7 @@ class PromesaWorkflowService
         try {
             $callback();
         } catch (\Throwable $e) {
-            Log::error('WorkflowMailer error', $context + [
+            Log::error('WorkflowNotifier error', $context + [
                 'msg' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

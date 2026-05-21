@@ -6,7 +6,7 @@ use App\Http\Requests\StorePromesaRequest;
 use App\Models\PromesaCuota;
 use App\Models\PromesaOperacion;
 use App\Models\PromesaPago;
-use App\Support\WorkflowMailer;
+use App\Support\WorkflowNotifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -149,11 +149,11 @@ class PromesaCreationService
     {
         try {
             if ($role === 'administrador') {
-                WorkflowMailer::promesaResuelta($promesa, true);
+                WorkflowNotifier::promesaResuelta($promesa, true);
             } elseif ($role === 'supervisor') {
-                WorkflowMailer::promesaPreaprobada($promesa);
+                WorkflowNotifier::promesaPreaprobada($promesa);
             } else {
-                WorkflowMailer::promesaPendiente($promesa);
+                WorkflowNotifier::promesaPendiente($promesa);
             }
         } catch (\Throwable) {
         }

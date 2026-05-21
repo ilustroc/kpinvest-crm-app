@@ -1,0 +1,43 @@
+@startuml
+title Flujo de notificaciones internas V3
+
+actor Asesor
+actor Supervisor
+actor Administrador
+participant "Promesa/CNA Service" as Service
+participant "WorkflowNotifier" as Notifier
+participant "WorkflowMailer" as Mailer
+participant "Laravel Notification" as Notification
+database "notifications" as Notifications
+participant "Topbar campanita" as Bell
+actor "Usuario receptor" as Receiver
+
+== Asesor crea solicitud ==
+Asesor -> Service: Crear Promesa/CNA
+Service -> Notifier: pendiente()
+Notifier -> Mailer: Enviar correo accion requerida
+Notifier -> Notification: WorkflowActionRequiredNotification
+Notification -> Notifications: Guardar para supervisor
+Supervisor -> Bell: Abre campanita
+Bell -> Notifications: GET /notificaciones
+Bell -> Supervisor: Abrir autorizacion
+
+== Supervisor crea o preaprueba ==
+Supervisor -> Service: Crear/preaprobar
+Service -> Notifier: preaprobada()
+Notifier -> Mailer: Enviar correo accion requerida
+Notifier -> Notification: WorkflowActionRequiredNotification
+Notification -> Notifications: Guardar para administradores
+Administrador -> Bell: Abre campanita
+Bell -> Administrador: Abrir autorizacion
+
+== Administrador crea o resuelve ==
+Administrador -> Service: Crear/aprobar/rechazar
+Service -> Notifier: resuelta()
+Notifier -> Mailer: Enviar correo informativo
+Notifier -> Notification: WorkflowStatusNotification
+Notification -> Notifications: Guardar estado informativo
+Receiver -> Bell: Ver estado
+Bell -> Receiver: /clientes/{dni}
+
+@enduml

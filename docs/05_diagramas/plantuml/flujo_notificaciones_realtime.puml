@@ -1,0 +1,33 @@
+@startuml
+title Flujo realtime de notificaciones V3
+
+actor Usuario
+participant "Promesa/CNA Service" as Service
+participant "WorkflowNotifier" as Notifier
+participant "Laravel Notification" as Notification
+database "notifications" as Db
+participant "Broadcast channel\nprivate-App.Models.User.{id}" as Channel
+participant "Laravel Reverb" as Reverb
+participant "Laravel Echo" as Echo
+participant "Campanita Topbar" as Bell
+
+Usuario -> Service: Crea o resuelve Promesa/CNA
+Service -> Notifier: Notificar workflow
+Notifier -> Notification: database + broadcast
+Notification -> Db: Guardar notificacion
+Notification -> Channel: Broadcast payload
+Channel -> Reverb: WebSocket
+Reverb -> Echo: Evento realtime
+Echo -> Bell: notification(payload)
+Bell -> Bell: Actualizar contador
+Bell -> Bell: Insertar item si panel abierto
+Bell -> Usuario: Toast + sonido
+
+note right of Bell
+Si Reverb no esta activo,
+la campanita sigue usando fetch:
+/notificaciones
+/notificaciones/unread-count
+end note
+
+@enduml

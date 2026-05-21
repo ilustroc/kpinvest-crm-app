@@ -5,7 +5,7 @@ namespace App\Services\Cna;
 use App\Models\CnaSolicitud;
 use App\Models\User;
 use App\Support\Authorization\Roles;
-use App\Support\WorkflowMailer;
+use App\Support\WorkflowNotifier;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -106,18 +106,18 @@ class CnaCreationService
 
         if ($isAdminAuto) {
             $this->documents->generateOutputsFromTemplate($solicitud);
-            WorkflowMailer::cnaResuelta($solicitud, true);
+            WorkflowNotifier::cnaResuelta($solicitud, true);
 
             return [$solicitud, "CNA APROBADA automaticamente. N. {$solicitud->nro_carta}"];
         }
 
         if ($isSupervisorAuto) {
-            WorkflowMailer::cnaPreaprobada($solicitud);
+            WorkflowNotifier::cnaPreaprobada($solicitud);
 
             return [$solicitud, "Solicitud de CNA PRE-APROBADA. N. {$solicitud->nro_carta}"];
         }
 
-        WorkflowMailer::cnaPendiente($solicitud);
+        WorkflowNotifier::cnaPendiente($solicitud);
 
         return [$solicitud, "Solicitud de CNA enviada. N. {$solicitud->nro_carta}"];
     }

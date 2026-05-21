@@ -4,7 +4,7 @@ namespace App\Services\Cna;
 
 use App\Models\CnaSolicitud;
 use App\Models\User;
-use App\Support\WorkflowMailer;
+use App\Support\WorkflowNotifier;
 use DomainException;
 
 class CnaWorkflowService
@@ -30,7 +30,7 @@ class CnaWorkflowService
             'motivo_rechazo' => null,
         ]);
 
-        WorkflowMailer::cnaPreaprobada($cna);
+        WorkflowNotifier::cnaPreaprobada($cna);
     }
 
     public function rejectBySupervisor(CnaSolicitud $cna, User $user, ?string $note = null): void
@@ -48,7 +48,7 @@ class CnaWorkflowService
             'motivo_rechazo' => $note,
         ]);
 
-        WorkflowMailer::cnaRechazadaSup($cna, $note);
+        WorkflowNotifier::cnaRechazadaSup($cna, $note);
     }
 
     public function approve(CnaSolicitud $cna, User $user, ?string $note = null): void
@@ -67,7 +67,7 @@ class CnaWorkflowService
 
         $this->documents->generateOutputsFromTemplate($cna);
 
-        WorkflowMailer::cnaResuelta($cna, true, $note);
+        WorkflowNotifier::cnaResuelta($cna, true, $note);
     }
 
     public function rejectByAdministrator(CnaSolicitud $cna, User $user, ?string $note = null): void
@@ -85,7 +85,7 @@ class CnaWorkflowService
             'motivo_rechazo' => $note,
         ]);
 
-        WorkflowMailer::cnaResuelta($cna, false, $note);
+        WorkflowNotifier::cnaResuelta($cna, false, $note);
     }
 
     private function appendNote(CnaSolicitud $cna, User $user, ?string $note): void

@@ -13,33 +13,37 @@
         </div>
 
         @auth
-            <form
-                class="relative flex w-full flex-col gap-2 sm:flex-row xl:max-w-xl"
-                role="search"
-                action="{{ route('clientes.quick') }}"
-                method="GET"
-                autocomplete="off"
-                data-quick-form
-                data-suggest-url="{{ route('clientes.suggest') }}"
-            >
-                <label for="layoutClientSearch" class="sr-only">Buscar cliente</label>
-                <input
-                    id="layoutClientSearch"
-                    name="q"
-                    class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm kp-focus placeholder:text-kp-muted"
-                    placeholder="DNI / Operacion / Nombre"
-                    aria-label="Buscar por DNI, Operacion o Nombre"
-                    data-quick-input
+            <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-start sm:justify-end xl:max-w-3xl">
+                <form
+                    class="relative flex w-full flex-col gap-2 sm:flex-row xl:max-w-xl"
+                    role="search"
+                    action="{{ route('clientes.quick') }}"
+                    method="GET"
+                    autocomplete="off"
+                    data-quick-form
+                    data-suggest-url="{{ route('clientes.suggest') }}"
                 >
-                <x-ui.button type="submit" class="sm:w-auto">
-                    Buscar
-                </x-ui.button>
+                    <label for="layoutClientSearch" class="sr-only">Buscar cliente</label>
+                    <input
+                        id="layoutClientSearch"
+                        name="q"
+                        class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm kp-focus placeholder:text-kp-muted"
+                        placeholder="DNI / Operacion / Nombre"
+                        aria-label="Buscar por DNI, Operacion o Nombre"
+                        data-quick-input
+                    >
+                    <x-ui.button type="submit" class="sm:w-auto">
+                        Buscar
+                    </x-ui.button>
 
-                <div
-                    class="absolute left-0 top-full z-50 mt-2 hidden max-h-80 w-full overflow-auto rounded-lg border border-kp-border bg-white p-1 shadow-xl shadow-slate-950/10"
-                    data-quick-suggestions
-                ></div>
-            </form>
+                    <div
+                        class="absolute left-0 top-full z-50 mt-2 hidden max-h-80 w-full overflow-auto rounded-lg border border-kp-border bg-white p-1 shadow-xl shadow-slate-950/10"
+                        data-quick-suggestions
+                    ></div>
+                </form>
+
+                <x-layout.notifications-bell />
+            </div>
         @endauth
     </div>
 

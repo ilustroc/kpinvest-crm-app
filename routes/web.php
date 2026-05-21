@@ -32,6 +32,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     require __DIR__.'/web/reportes.php';
     require __DIR__.'/web/promesas.php';
     require __DIR__.'/web/cna.php';
+    require __DIR__.'/web/notificaciones.php';
     require __DIR__.'/web/integracion.php';
     require __DIR__.'/web/admin.php';
 });

@@ -4,6 +4,8 @@
 
 Los correos de Promesas y CNA notifican acciones pendientes o cambios de estado sin reemplazar la bandeja de Autorizacion ni la vista del Cliente.
 
+Desde Fase 8.8, el mismo flujo tambien genera notificaciones internas en la tabla `notifications` mediante `WorkflowNotifier`.
+
 ## Regla de botones
 
 - `Abrir autorizacion`: solo se usa cuando el receptor tiene una accion pendiente.
@@ -82,6 +84,7 @@ CNA:
 ## Implementacion
 
 - `app/Support/WorkflowMailer.php` centraliza destinatarios, asuntos, CTA y rutas.
+- `app/Support/WorkflowNotifier.php` reutiliza esas reglas y genera correos + notificaciones internas.
 - `app/Mail/WorkflowMail.php` representa el correo.
 - `resources/views/mail/workflow.blade.php` contiene el diseno HTML compatible con clientes de correo.
 - `PromesaCreationService` y `PromesaWorkflowService` disparan correos de Promesas.
@@ -95,3 +98,5 @@ CNA:
 - Botones correctos segun si hay accion pendiente o solo estado informativo.
 - Destinos correctos: Autorizacion para acciones, Cliente para estado.
 - Correos informativos de resolucion.
+
+`tests/Feature/V3NotificationModuleTest.php` valida el equivalente interno en campanita y endpoints JSON.

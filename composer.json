@@ -11,6 +11,7 @@
         "guzzlehttp/guzzle": "^7.2",
         "ilovepdf/ilovepdf-php": "^1.2",
         "laravel/framework": "^10.10",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
         "mpdf/mpdf": "^8.2",

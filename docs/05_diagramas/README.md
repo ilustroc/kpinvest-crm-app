@@ -10,6 +10,8 @@ Estos diagramas explican la arquitectura oficial V3 y los flujos criticos.
 - `plantuml/flujo_cna.puml`: creacion, workflow y documentos CNA.
 - `plantuml/flujo_autorizacion.puml`: bandeja de aprobaciones.
 - `plantuml/flujo_correos_workflow.puml`: correos y botones por rol creador.
+- `plantuml/flujo_notificaciones.puml`: notificaciones internas y campanita.
+- `plantuml/flujo_notificaciones_realtime.puml`: entrega realtime con Reverb/Echo.
 - `plantuml/frontend_vite_tailwind.puml`: arquitectura frontend.
 - `plantuml/permisos_gates_policies.puml`: roles, gates y policies.
 - `plantuml/base_datos_resumen.puml`: entidades principales.
@@ -19,7 +21,7 @@ Estos diagramas explican la arquitectura oficial V3 y los flujos criticos.
 - Para explicar el proyecto al equipo: `arquitectura_general.puml`.
 - Para explicar el frontend: `frontend_vite_tailwind.puml`.
 - Para explicar permisos: `permisos_gates_policies.puml`.
-- Para explicar flujos operativos: `flujo_cliente`, `flujo_promesa`, `flujo_cna`, `flujo_autorizacion` y `flujo_correos_workflow`.
+- Para explicar flujos operativos: `flujo_cliente`, `flujo_promesa`, `flujo_cna`, `flujo_autorizacion`, `flujo_correos_workflow`, `flujo_notificaciones` y `flujo_notificaciones_realtime`.
 - Para explicar la base: `base_datos_resumen.puml`.
 
 ## Convertir a imagen
