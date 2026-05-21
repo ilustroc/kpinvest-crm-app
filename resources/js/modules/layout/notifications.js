@@ -5,29 +5,15 @@ import { notify } from '../../core/toast';
 const LAST_COUNT_KEY = 'kp_notifications_unread_count';
 
 function playNotificationSound() {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-
-    if (!AudioContext) return;
-
     try {
-        const context = new AudioContext();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
+        const audio = new Audio('/assets/sounds/notification.mp3');
+        audio.volume = 0.35;
 
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, context.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(660, context.currentTime + 0.18);
-
-        gain.gain.setValueAtTime(0.0001, context.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.22);
-
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
-        oscillator.stop(context.currentTime + 0.24);
+        audio.play().catch(() => {
+            // El navegador puede bloquear audio automático.
+        });
     } catch (error) {
-        // Audio can be blocked by the browser until the user interacts with the page.
+        // Si el archivo no existe o el navegador bloquea audio, no rompemos la campanita.
     }
 }
 
