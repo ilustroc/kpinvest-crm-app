@@ -3,18 +3,18 @@
     'subtitle' => null,
 ])
 
-<section {{ $attributes->merge(['class' => 'rounded-lg border border-kp-border bg-white shadow-sm']) }}>
+<section {{ $attributes->merge(['class' => 'rounded-lg border border-kp-border bg-white kp-surface-shadow']) }}>
     @if($title || $subtitle)
-        <header class="border-b border-kp-border px-4 py-3">
+        <header class="flex min-h-12 flex-col justify-center border-b border-kp-border px-3 py-2.5 sm:px-4">
             @if($title)
-                <h2 class="text-base font-bold text-kp-ink">{{ $title }}</h2>
+                <h2 class="text-sm font-bold leading-5 text-kp-ink">{{ $title }}</h2>
             @endif
             @if($subtitle)
-                <p class="mt-1 text-sm text-kp-muted">{{ $subtitle }}</p>
+                <p class="mt-0.5 text-xs text-kp-muted">{{ $subtitle }}</p>
             @endif
         </header>
     @endif
-    <div class="p-4">
+    <div class="p-3 sm:p-4">
         {{ $slot }}
     </div>
 </section>

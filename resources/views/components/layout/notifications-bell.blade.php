@@ -10,7 +10,7 @@
 >
     <button
         type="button"
-        class="relative inline-flex size-10 items-center justify-center rounded-md border border-kp-border bg-white text-kp-ink shadow-sm kp-focus hover:bg-slate-50"
+        class="relative inline-flex size-9 items-center justify-center rounded-md border border-kp-border bg-white text-kp-muted shadow-sm transition kp-focus hover:bg-slate-50 hover:text-kp-ink"
         aria-label="Abrir notificaciones"
         aria-expanded="false"
         data-notifications-toggle
@@ -26,14 +26,14 @@
     </button>
 
     <section
-        class="absolute right-0 top-full z-50 mt-2 hidden w-[min(92vw,380px)] overflow-hidden rounded-lg border border-kp-border bg-white shadow-xl shadow-slate-950/15"
+        class="absolute right-0 top-full z-50 mt-2 hidden w-[min(92vw,390px)] overflow-hidden rounded-lg border border-kp-border bg-white shadow-xl shadow-slate-950/15"
         aria-label="Notificaciones"
         data-notifications-panel
     >
-        <div class="flex items-center justify-between gap-3 border-b border-kp-border px-4 py-3">
+        <div class="flex items-center justify-between gap-3 border-b border-kp-border bg-slate-50 px-3.5 py-3">
             <div>
                 <h2 class="text-sm font-bold text-kp-ink">Notificaciones</h2>
-                <p class="text-xs text-kp-muted">Promesas y CNA pendientes o actualizadas.</p>
+                <p class="mt-0.5 text-[11px] text-kp-muted">Promesas y CNA pendientes o actualizadas.</p>
             </div>
             <button
                 type="button"

@@ -5,13 +5,13 @@
 
 <label class="block space-y-1">
     @if($label)
-        <span class="block text-sm font-semibold text-kp-ink">{{ $label }}</span>
+        <span class="block text-xs font-semibold text-slate-700">{{ $label }}</span>
     @endif
     
     <div class="relative">
         <select
             @if($name) name="{{ $name }}" @endif
-            {{ $attributes->merge(['class' => 'w-full appearance-none rounded-md border border-kp-border bg-white py-2 pl-3 pr-10 text-sm font-semibold text-kp-ink shadow-sm transition hover:bg-slate-50 kp-focus']) }}
+            {{ $attributes->merge(['class' => 'w-full appearance-none rounded-md border border-kp-border bg-white py-2 pl-3 pr-10 text-sm font-medium text-kp-ink shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:border-kp-green kp-focus']) }}
         >
             {{ $slot }}
         </select>

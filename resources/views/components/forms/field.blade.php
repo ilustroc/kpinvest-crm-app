@@ -3,7 +3,7 @@
     'name' => null,
 ])
 
-<div {{ $attributes->merge(['class' => 'space-y-1']) }}>
+<div {{ $attributes->merge(['class' => 'space-y-1.5']) }}>
     @if($label)
         <x-forms.label :for="$name">{{ $label }}</x-forms.label>
     @endif

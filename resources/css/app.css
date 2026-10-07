@@ -3,27 +3,80 @@
 @theme {
     --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
     --color-kp-green: #00a81c;
-    --color-kp-green-dark: #008517;
-    --color-kp-green-soft: #e9f9ec;
-    --color-kp-ink: #151a23;
-    --color-kp-muted: #6d7b8a;
-    --color-kp-border: #e8ecf3;
-    --color-kp-bg: #f7f8fc;
+    --color-kp-green-dark: #087a1d;
+    --color-kp-green-soft: #eaf8ed;
+    --color-kp-sidebar: #111827;
+    --color-kp-sidebar-deep: #0b1220;
+    --color-kp-sidebar-muted: #94a3b8;
+    --color-kp-ink: #1f2937;
+    --color-kp-muted: #64748b;
+    --color-kp-border: #dfe4ea;
+    --color-kp-bg: #f3f5f7;
+    --color-kp-info: #2563eb;
+    --color-kp-warning: #d97706;
+    --color-kp-danger: #dc2626;
 }
 
 @layer base {
     html {
         font-family: var(--font-sans);
+        background: var(--color-kp-bg);
     }
 
     body {
+        min-width: 320px;
         background: var(--color-kp-bg);
         color: var(--color-kp-ink);
+        font-size: 14px;
+    }
+
+    ::selection {
+        background: var(--color-kp-green-soft);
+        color: var(--color-kp-green-dark);
+    }
+
+    button,
+    [role="button"],
+    summary {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled="true"] {
+        cursor: not-allowed;
+    }
+
+    summary::-webkit-details-marker {
+        display: none;
     }
 }
 
 @layer components {
     .kp-focus {
-        @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kp-green;
+        @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kp-green focus-visible:ring-offset-2;
+    }
+
+    .kp-surface-shadow {
+        box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+    }
+
+    .kp-scrollbar {
+        scrollbar-color: #475569 transparent;
+        scrollbar-width: thin;
+    }
+
+    .kp-icon-button {
+        @apply inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-kp-border bg-white text-kp-muted transition hover:border-slate-300 hover:bg-slate-50 hover:text-kp-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kp-green focus-visible:ring-offset-2;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
     }
 }

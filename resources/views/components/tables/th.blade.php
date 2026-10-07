@@ -10,6 +10,6 @@
     ][$align] ?? 'text-left';
 @endphp
 
-<th scope="col" {{ $attributes->merge(['class' => 'whitespace-nowrap bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-kp-muted '.$alignClass]) }}>
+<th scope="col" {{ $attributes->merge(['class' => 'whitespace-nowrap bg-slate-100/80 px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.07em] text-slate-600 '.$alignClass]) }}>
     {{ $slot }}
 </th>

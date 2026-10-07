@@ -23,14 +23,16 @@
          class="fixed inset-0 z-30 hidden bg-slate-950/40 lg:hidden"
          data-toggle-rail></div>
 
-    <main class="min-w-0 flex-1">
+    <main class="min-w-0 flex-1 bg-kp-bg">
       <x-layout.topbar>
         @yield('crumb','')
       </x-layout.topbar>
 
-      <div class="mx-auto flex max-w-[1220px] flex-col gap-4 px-4 py-4 sm:px-5">
+      <div class="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-3 py-3 sm:px-4 lg:px-5 lg:py-4">
         @yield('content')
-        <footer class="pt-2 text-xs text-kp-muted">&copy; {{ date('Y') }} KP INVEST</footer>
+        <footer class="border-t border-kp-border pt-3 text-[11px] text-kp-muted">
+          &copy; {{ date('Y') }} KP INVEST · Plataforma de cobranza y operaciones
+        </footer>
       </div>
     </main>
   </div>
