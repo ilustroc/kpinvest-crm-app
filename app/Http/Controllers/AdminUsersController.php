@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Services\Admin\UserStatusService;
 use App\Services\UserService;
@@ -68,6 +69,23 @@ class AdminUsersController extends Controller
         } catch (\RuntimeException $e) {
             return back()->withErrors($e->getMessage());
         }
+    }
+
+    public function update(UpdateUserRequest $r, User $user)
+    {
+        $data = $r->validated();
+
+        $user->fill([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'supervisor_id' => $this->userService->resolveSupervisorId(
+                $r->user(),
+                $user->role,
+                $r->integer('supervisor_id') ?: null
+            ),
+        ])->save();
+
+        return back()->with('ok', 'Configuracion del usuario actualizada correctamente.');
     }
 
     public function updatePassword(Request $r, User $user)

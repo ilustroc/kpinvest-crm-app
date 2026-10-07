@@ -25,17 +25,17 @@
      role="dialog"
      aria-modal="true">
      
-    <div class="fixed inset-0 bg-slate-950/60 transition-opacity" aria-hidden="true"></div>
+    <div class="fixed inset-0 bg-slate-950/55 transition-opacity" aria-hidden="true"></div>
 
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-3 text-center sm:p-5">
+        <div class="flex min-h-full items-center justify-center p-2 text-center sm:p-4">
             
-            <div class="relative w-full transform overflow-hidden rounded-lg border border-slate-200 bg-white text-left shadow-2xl transition-all sm:my-8 {{ $widths[$maxWidth] ?? $widths['md'] }}">
+            <div class="relative w-full transform overflow-hidden rounded-sm border border-slate-300 bg-white text-left shadow-lg transition-all sm:my-6 {{ $widths[$maxWidth] ?? $widths['md'] }}">
                 
                 @if($title || $subtitle)
-                    <div class="border-b border-kp-border bg-slate-50 px-4 py-3.5 sm:px-5">
+                    <div class="border-b border-kp-border bg-[#eef1f4] px-3 py-2.5 sm:px-4">
                         @if($title)
-                            <h3 class="text-sm font-bold text-kp-ink" id="modal-title">{{ $title }}</h3>
+                            <h3 class="text-xs font-bold text-kp-ink" id="modal-title">{{ $title }}</h3>
                         @endif
                         @if($subtitle)
                             <p class="mt-0.5 text-xs text-kp-muted">{{ $subtitle }}</p>

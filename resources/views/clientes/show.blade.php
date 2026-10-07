@@ -9,6 +9,7 @@
         $totCapital = (float) $cuentas->sum(fn($x) => (float) ($x->deuda_capital ?? $x->saldo_capital ?? 0));
         $totDeuda = (float) $cuentas->sum(fn($x) => (float) ($x->deuda_total ?? 0));
         $totPagos = (float) $pagos->sum(fn($p) => (float) ($p->monto_pagado ?? $p->monto ?? 0));
+        $advisor = $cuentas->pluck('asesor')->filter()->first();
         $canDeletePagos = \Illuminate\Support\Facades\Gate::allows('delete-client-payments');
     @endphp
 
@@ -22,17 +23,19 @@
         @endif
 
         <x-clientes.header
+            id="resumen"
             :dni="$dni"
             :titular="$titular"
             :cuentas="$cuentas"
             :pagos="$pagos"
             :promesas="$promesas"
+            :advisor="$advisor"
             :tot-capital="$totCapital"
             :tot-deuda="$totDeuda"
             :tot-pagos="$totPagos"
         />
 
-        <x-clientes.action-panel title="Cuentas" subtitle="Unidad operativa principal · {{ count($cuentas ?? []) }} registro(s)">
+        <x-clientes.action-panel id="cuentas" class="kp-section-anchor" title="Cuentas" subtitle="Unidad operativa principal · {{ count($cuentas ?? []) }} registro(s)">
             <x-slot:actions>
                 <x-ui.button id="btnPropuesta" type="button" data-modal-open="#modalPropuesta" disabled>
                     <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
@@ -47,13 +50,12 @@
                 <thead>
                     <tr>
                         <x-tables.th align="center">
-                            <input type="checkbox" id="chkAll" class="size-4 rounded border-kp-border text-kp-green kp-focus" aria-label="Seleccionar todas las cuentas">
+                            <input type="checkbox" id="chkAll" class="size-4 rounded-sm border-kp-border text-kp-blue kp-focus" aria-label="Seleccionar todas las cuentas">
                         </x-tables.th>
                         <x-tables.th>Operación</x-tables.th>
                         <x-tables.th>Asesor</x-tables.th>
-                        <x-tables.th>Entidad</x-tables.th>
+                        <x-tables.th>Entidad / Cosecha</x-tables.th>
                         <x-tables.th>Producto</x-tables.th>
-                        <x-tables.th>Cosecha</x-tables.th>
                         <x-tables.th align="right">Capital</x-tables.th>
                         <x-tables.th align="right">Deuda total</x-tables.th>
                         <x-tables.th align="center">CCD</x-tables.th>
@@ -87,7 +89,7 @@
                             data-entidad="{{ $c->entidad }}">
                             <x-tables.td align="center">
                                 <input type="checkbox"
-                                       class="chkOp size-4 rounded border-kp-border text-kp-green kp-focus"
+                                       class="chkOp size-4 rounded-sm border-kp-border text-kp-blue kp-focus"
                                        value="{{ $c->operacion }}"
                                        aria-label="Seleccionar operación {{ $c->operacion }}"
                                        {{ empty($c->operacion) ? 'disabled' : '' }}>
@@ -103,9 +105,11 @@
                                     <x-ui.badge variant="warning">Sin asignar</x-ui.badge>
                                 @endif
                             </x-tables.td>
-                            <x-tables.td><span class="font-medium">{{ $c->entidad ?? '-' }}</span></x-tables.td>
+                            <x-tables.td>
+                                <div class="font-semibold text-kp-ink">{{ $c->entidad ?? '-' }}</div>
+                                <div class="mt-0.5 text-[10px] text-kp-muted">Cosecha {{ $c->cosecha ?? '-' }}</div>
+                            </x-tables.td>
                             <x-tables.td>{{ $c->producto ?? '-' }}</x-tables.td>
-                            <x-tables.td><x-ui.badge>{{ $c->cosecha ?? '-' }}</x-ui.badge></x-tables.td>
                             <x-tables.td align="right" class="font-medium tabular-nums">S/ {{ number_format((float) ($c->deuda_capital ?? $c->saldo_capital ?? 0), 2) }}</x-tables.td>
                             <x-tables.td align="right" class="font-bold tabular-nums">S/ {{ number_format((float) ($c->deuda_total ?? 0), 2) }}</x-tables.td>
                             <x-tables.td align="center">
@@ -128,13 +132,13 @@
                                                              target="_blank"
                                                              rel="noopener"
                                                              variant="info"
-                                                             size="icon-sm"
+                                                             size="sm"
                                                              title="Abrir {{ $ccdLabel }}"
                                                              aria-label="Abrir documento CCD {{ $ccdLabel }}">
-                                                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V14.25Z" />
+                                                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" />
                                                     </svg>
-                                                    <span class="sr-only">Abrir CCD</span>
+                                                    CCD{{ $accountCcdDocs->count() > 1 ? ' '.$loop->iteration : '' }}
                                                 </x-ui.button>
                                             @endif
                                         @endforeach
@@ -151,19 +155,19 @@
                                     <x-ui.button :href="route('cna.pdf', $last->id)"
                                                  target="_blank"
                                                  rel="noopener"
-                                                 size="icon-sm"
+                                                 size="sm"
                                                  variant="danger"
                                                  title="Descargar CNA aprobada"
                                                  aria-label="Descargar CNA aprobada">
-                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V14.25ZM9 15h6m-3-3v6" />
                                         </svg>
-                                        <span class="sr-only">Descargar CNA</span>
+                                        PDF
                                     </x-ui.button>
                                 @else
                                     <x-ui.button type="button"
                                                  variant="secondary"
-                                                 size="icon-sm"
+                                                 size="sm"
                                                  class="genCnaBtn"
                                                  title="Generar CNA para esta cuenta"
                                                  aria-label="Generar CNA para la operación {{ $c->operacion }}"
@@ -173,10 +177,10 @@
                                                  data-oper="{{ $c->operacion }}"
                                                  data-cosecha="{{ $c->cosecha }}"
                                                  data-entidad="{{ $c->entidad }}">
-                                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V14.25ZM12 11.25v6m3-3H9" />
+                                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" />
                                         </svg>
-                                        <span class="sr-only">Generar CNA</span>
+                                        CNA
                                     </x-ui.button>
                                 @endif
                             </x-tables.td>
@@ -203,7 +207,7 @@
                                 </div>
 
                                 @if($hasList)
-                                    <div id="{{ $collapseId }}" class="mt-2 hidden min-w-56 rounded-md border border-kp-border bg-slate-50 p-2">
+                                    <div id="{{ $collapseId }}" class="mt-2 hidden min-w-56 rounded-sm border border-kp-border bg-slate-50 p-2">
                                         <ul class="space-y-1 text-[11px] text-kp-ink">
                                             @foreach($c->pagos_list as $p)
                                                 @php
@@ -223,15 +227,17 @@
                             </x-tables.td>
                         </tr>
                     @empty
-                        <x-tables.empty-row colspan="11" message="Sin cuentas registradas" />
+                        <x-tables.empty-row colspan="10" message="Sin cuentas registradas" />
                     @endforelse
                 </tbody>
             </x-tables.table>
         </x-clientes.action-panel>
 
-        <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
+        <div class="grid items-start gap-2.5 xl:grid-cols-2">
+            <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
+            <x-promesas.promise-history :promesas="$promesas" />
+        </div>
 
-        <x-promesas.promise-history :promesas="$promesas" />
         <x-promesas.payment-schedule />
         <x-promesas.create-modal :dni="$dni" />
         <x-cna.create-modal :dni="$dni" />

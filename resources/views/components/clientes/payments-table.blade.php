@@ -4,11 +4,11 @@
     'dni',
 ])
 
-<x-clientes.action-panel title="Pagos" subtitle="{{ count($pagos ?? []) }} registro(s)">
+<x-clientes.action-panel id="pagos" class="kp-section-anchor" title="Pagos" subtitle="{{ count($pagos ?? []) }} registro(s)">
     <x-slot:actions>
         @if($canDelete)
-            <label class="inline-flex items-center gap-2 text-sm font-semibold text-kp-ink">
-                <input type="checkbox" id="toggleDeletePagos" class="size-4 rounded border-kp-border text-kp-green kp-focus">
+            <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-kp-ink">
+                <input type="checkbox" id="toggleDeletePagos" class="size-4 rounded-sm border-kp-border text-kp-blue kp-focus">
                 Eliminar pagos
             </label>
             <form id="frmDeletePagos"
@@ -27,13 +27,13 @@
         </x-ui.button>
     </x-slot:actions>
 
-    <div id="pagosCollapse">
+    <div id="pagosCollapse" class="max-h-[300px] overflow-auto">
         <x-tables.table id="tblPagos">
             <thead>
                 <tr>
                     @if($canDelete)
                         <x-tables.th class="col-del hidden">
-                            <input type="checkbox" id="chkAllPagos" class="size-4 rounded border-kp-border text-kp-green kp-focus">
+                            <input type="checkbox" id="chkAllPagos" class="size-4 rounded-sm border-kp-border text-kp-blue kp-focus">
                         </x-tables.th>
                     @endif
                     <x-tables.th>Fecha</x-tables.th>
@@ -60,7 +60,7 @@
                                     <input type="checkbox"
                                            name="ids[]"
                                            form="frmDeletePagos"
-                                           class="chkPago size-4 rounded border-kp-border text-kp-green kp-focus"
+                                           class="chkPago size-4 rounded-sm border-kp-border text-kp-blue kp-focus"
                                            value="{{ $id }}">
                                 @endif
                             </x-tables.td>

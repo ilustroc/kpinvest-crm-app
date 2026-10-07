@@ -29,10 +29,10 @@
       <thead>
         <tr>
           <x-tables.th>DNI</x-tables.th>
+          <x-tables.th>Tipo</x-tables.th>
           <x-tables.th>Operacion(es)</x-tables.th>
           <x-tables.th>Fecha</x-tables.th>
           <x-tables.th align="right">Monto (S/)</x-tables.th>
-          <x-tables.th>Nota</x-tables.th>
           <x-tables.th align="right">Acciones</x-tables.th>
         </tr>
       </thead>
@@ -47,13 +47,19 @@
             $cuentasJson = json_encode($cuentas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
             $hasBalon = (bool) ($p->has_balon ?? false);
             $montoMostrar = (float) ($p->monto > 0 ? $p->monto : $p->monto_convenio);
+            $tipoLabel = match($p->tipo) {
+              'convenio_balon' => 'Convenio balon',
+              'convenio' => 'Convenio',
+              'cancelacion' => 'Cancelacion',
+              default => ucfirst((string) $p->tipo),
+            };
           @endphp
           <tr>
             <x-tables.td>{{ $p->dni }}</x-tables.td>
+            <x-tables.td>{{ $tipoLabel }}</x-tables.td>
             <x-tables.td class="max-w-56 truncate">{{ $p->operacion ?: '-' }}</x-tables.td>
             <x-tables.td>{{ $fechaYmd }}</x-tables.td>
             <x-tables.td align="right">{{ number_format($montoMostrar, 2) }}</x-tables.td>
-            <x-tables.td class="max-w-72 truncate" title="{{ $p->nota }}">{{ $p->nota ?: '-' }}</x-tables.td>
             <x-tables.td align="right">
               <div class="flex flex-wrap justify-end gap-2">
                 <x-ui.button
@@ -271,27 +277,27 @@
     confirm-text="Guardar"
   />
 
-  <x-ui.modal id="modalFicha" title="Detalle de Propuesta" max-width="5xl">
-    <div class="max-h-[78vh] space-y-5 overflow-y-auto px-5 py-4">
-      <div class="grid gap-3 md:grid-cols-3">
+  <x-ui.modal id="modalFicha" title="Detalle de propuesta" max-width="3xl">
+    <div class="max-h-[68vh] space-y-3 overflow-y-auto px-3 py-3">
+      <div class="grid gap-2 md:grid-cols-4">
         <x-autorizacion.detail-field label="DNI" id="f_dni" />
-        <x-autorizacion.detail-field label="Operacion(es)" id="f_op" />
         <x-autorizacion.detail-field label="Fecha" id="t_fecha" />
         <x-autorizacion.detail-field label="Tipo" id="t_tipo" />
+        <x-autorizacion.detail-field label="Monto negociado" id="t_neg" />
+        <x-autorizacion.detail-field label="Operacion(es)" id="f_op" class="md:col-span-2" />
         <x-autorizacion.detail-field label="Asesor" id="t_asesor" />
-        <x-autorizacion.detail-field label="Cliente" id="t_titular" />
         <x-autorizacion.detail-field label="Deuda Total" id="t_deuda" />
-        <x-autorizacion.detail-field label="Monto Negociado" id="t_neg" />
+        <x-autorizacion.detail-field label="Cliente" id="t_titular" class="md:col-span-4" />
       </div>
 
       <section>
-        <h3 class="text-sm font-bold uppercase tracking-wide text-kp-muted">Notas</h3>
-        <div class="mt-2 grid gap-2">
-          <div id="nota_general_wrap" class="hidden rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink">
+        <h3 class="text-[10px] font-bold uppercase tracking-wide text-kp-muted">Notas</h3>
+        <div class="mt-1.5 grid gap-1.5">
+          <div id="nota_general_wrap" class="hidden rounded-sm border border-kp-border bg-white px-2.5 py-2 text-xs text-kp-ink">
             <x-ui.badge class="mr-2">General</x-ui.badge>
             <span id="nota_general_txt"></span>
           </div>
-          <div id="nota_sup_wrap" class="hidden rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink">
+          <div id="nota_sup_wrap" class="hidden rounded-sm border border-kp-border bg-white px-2.5 py-2 text-xs text-kp-ink">
             <x-ui.badge variant="info" class="mr-2">Supervisor</x-ui.badge>
             <span id="nota_sup_txt"></span>
           </div>
@@ -299,13 +305,13 @@
       </section>
 
       <section>
-        <h3 class="text-sm font-bold uppercase tracking-wide text-kp-muted">Cuentas incluidas</h3>
-        <div id="acc_cuentas" class="mt-2 space-y-3"></div>
+        <h3 class="text-[10px] font-bold uppercase tracking-wide text-kp-muted">Cuentas incluidas</h3>
+        <div id="acc_cuentas" class="mt-1.5 space-y-2"></div>
       </section>
 
       <section id="crono_wrap" class="hidden">
-        <h3 id="crono_titulo" class="text-sm font-bold uppercase tracking-wide text-kp-muted">Cronograma de cuotas</h3>
-        <div class="mt-2">
+        <h3 id="crono_titulo" class="text-[10px] font-bold uppercase tracking-wide text-kp-muted">Cronograma de cuotas</h3>
+        <div class="mt-1.5">
           <x-tables.table>
             <thead>
               <tr>
@@ -328,14 +334,14 @@
       </section>
     </div>
 
-    <div class="flex justify-end border-t border-kp-border px-5 py-4">
-      <x-ui.button type="button" variant="secondary" data-modal-close>Cerrar</x-ui.button>
+    <div class="flex justify-end border-t border-kp-border px-3 py-2.5">
+      <x-ui.button type="button" variant="secondary" size="sm" data-modal-close>Cerrar</x-ui.button>
     </div>
   </x-ui.modal>
 
-  <x-ui.modal id="modalCnaFicha" title="Ficha CNA" max-width="5xl">
-    <div class="max-h-[78vh] space-y-5 overflow-y-auto px-5 py-4">
-      <div class="grid gap-3 md:grid-cols-2">
+  <x-ui.modal id="modalCnaFicha" title="Ficha CNA" max-width="3xl">
+    <div class="max-h-[68vh] space-y-3 overflow-y-auto px-3 py-3">
+      <div class="grid gap-2 md:grid-cols-3">
         <x-autorizacion.detail-field label="DNI" id="cna_dni" />
         <x-autorizacion.detail-field label="Carta" id="cna_carta" />
         <x-autorizacion.detail-field label="Fecha solicitud" id="cna_fecha" />
@@ -345,18 +351,18 @@
       </div>
 
       <section>
-        <h3 class="text-sm font-bold uppercase tracking-wide text-kp-muted">Observacion</h3>
-        <div id="cna_obs" class="mt-2 rounded-md border border-kp-border bg-slate-50 px-3 py-2 text-sm text-kp-ink">-</div>
+        <h3 class="text-[10px] font-bold uppercase tracking-wide text-kp-muted">Observacion</h3>
+        <div id="cna_obs" class="mt-1.5 rounded-sm border border-kp-border bg-slate-50 px-2.5 py-2 text-xs text-kp-ink">-</div>
       </section>
 
-      <section class="rounded-lg border border-kp-border bg-kp-green-soft px-4 py-4 text-center">
-        <p class="text-sm font-semibold text-kp-green-dark">Total de pagos del cliente</p>
-        <p id="cna_total_pagos" class="mt-1 text-2xl font-black text-kp-ink">S/ 0.00</p>
+      <section class="flex items-center justify-between rounded-sm border border-kp-border bg-kp-green-soft px-3 py-2">
+        <p class="text-xs font-semibold text-kp-green-dark">Total de pagos del cliente</p>
+        <p id="cna_total_pagos" class="text-lg font-black tabular-nums text-kp-ink">S/ 0.00</p>
       </section>
 
       <section>
-        <h3 class="text-sm font-bold uppercase tracking-wide text-kp-muted">Pagos realizados</h3>
-        <div class="mt-2">
+        <h3 class="text-[10px] font-bold uppercase tracking-wide text-kp-muted">Pagos realizados</h3>
+        <div class="mt-1.5 max-h-64 overflow-auto">
           <x-tables.table>
             <thead>
               <tr>
@@ -364,7 +370,6 @@
                 <x-tables.th>Fecha</x-tables.th>
                 <x-tables.th align="right">Monto (S/)</x-tables.th>
                 <x-tables.th>Gestor</x-tables.th>
-                <x-tables.th>Entidad</x-tables.th>
                 <x-tables.th>Cosecha</x-tables.th>
                 <x-tables.th>Cuenta recaudo</x-tables.th>
               </tr>
@@ -375,8 +380,8 @@
       </section>
     </div>
 
-    <div class="flex justify-end border-t border-kp-border px-5 py-4">
-      <x-ui.button type="button" variant="secondary" data-modal-close>Cerrar</x-ui.button>
+    <div class="flex justify-end border-t border-kp-border px-3 py-2.5">
+      <x-ui.button type="button" variant="secondary" size="sm" data-modal-close>Cerrar</x-ui.button>
     </div>
   </x-ui.modal>
 </x-layout.page-shell>

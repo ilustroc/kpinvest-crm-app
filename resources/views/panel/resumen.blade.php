@@ -25,50 +25,50 @@
       'data' => $chartData,
   ];
 
-  $activityItemClass = 'group flex items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-sm text-kp-ink transition hover:border-kp-border hover:bg-slate-50';
+  $activityItemClass = 'group flex items-center gap-2 rounded-sm border border-transparent px-2.5 py-2 text-xs text-kp-ink transition hover:border-kp-border hover:bg-slate-50';
 @endphp
 
 <x-layout.page-shell data-module="panel-resumen">
   <script id="panel-chart-json" type="application/json">{!! json_encode($chartJson, JSON_UNESCAPED_SLASHES) !!}</script>
 
-  <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-    <div class="space-y-4">
+  <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div class="space-y-3">
 
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-3 sm:grid-cols-2">
         <x-ui.card>
           <div class="flex items-center gap-3">
-            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-kp-green-dark">
-              <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <div class="flex size-9 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
+              <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
               </svg>
             </div>
             <div>
-              <p class="text-sm font-semibold text-kp-muted">Promesas creadas hoy</p>
-              <p class="mt-1 text-2xl font-black text-kp-ink">{{ number_format($kpiPromHoy) }}</p>
+              <p class="text-[11px] font-semibold text-kp-muted">Promesas creadas hoy</p>
+              <p class="text-xl font-bold text-kp-ink">{{ number_format($kpiPromHoy) }}</p>
             </div>
           </div>
         </x-ui.card>
 
         <x-ui.card>
           <div class="flex items-center gap-3">
-            <div class="flex size-12 items-center justify-center rounded-full bg-kp-green-soft text-kp-green-dark">
-              <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <div class="flex size-9 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
+              <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
               </svg>
             </div>
             <div>
-              <p class="text-sm font-semibold text-kp-muted">Pagos registrados hoy</p>
-              <p class="mt-1 text-2xl font-black text-kp-ink">S/ {{ number_format($kpiPagosHoy, 2) }}</p>
+              <p class="text-[11px] font-semibold text-kp-muted">Pagos registrados hoy</p>
+              <p class="text-xl font-bold text-kp-ink">S/ {{ number_format($kpiPagosHoy, 2) }}</p>
             </div>
           </div>
         </x-ui.card>
       </div>
 
       <x-ui.card>
-        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 class="text-base font-bold text-kp-ink">Pagos del mes</h2>
-            <p class="mt-1 text-sm text-kp-muted">Evolucion diaria de pagos registrados.</p>
+            <h2 class="text-xs font-bold text-kp-ink">Pagos del mes</h2>
+            <p class="text-[11px] text-kp-muted">Evolución diaria de pagos registrados.</p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
@@ -86,7 +86,7 @@
               type="month"
               id="mesPicker"
               value="{{ $curr->format('Y-m') }}"
-              class="rounded-md border border-kp-border bg-white px-3 py-1.5 text-sm font-semibold text-kp-ink shadow-sm kp-focus"
+              class="h-7 rounded-sm border border-kp-border bg-white px-2 py-1 text-xs font-semibold text-kp-ink kp-focus"
               data-month-picker
             >
 
@@ -101,13 +101,13 @@
           </div>
         </div>
 
-        <div class="h-72">
+        <div class="h-64">
           <canvas id="chartPagos" aria-label="Pagos del mes" role="img"></canvas>
         </div>
       </x-ui.card>
     </div>
 
-    <aside class="space-y-4 xl:sticky xl:top-4 xl:self-start">
+    <aside class="space-y-3 xl:sticky xl:top-24 xl:self-start">
       <x-ui.card>
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -120,7 +120,7 @@
           @if($isAsesor)
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                <div class="flex size-7 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                   </svg>
@@ -205,7 +205,7 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                <div class="flex size-7 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                   </svg>
@@ -291,7 +291,7 @@
           @else
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                <div class="flex size-7 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                   </svg>
@@ -320,7 +320,7 @@
 
             <section class="space-y-2">
               <div class="flex items-center gap-2">
-                <div class="flex size-8 items-center justify-center rounded-md bg-kp-green-soft text-kp-green-dark">
+                <div class="flex size-7 items-center justify-center rounded-sm bg-kp-blue-soft text-kp-blue">
                   <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                   </svg>
@@ -377,7 +377,7 @@
 
         @unless($isAsesor)
           <div class="mt-4 border-t border-kp-border pt-4 text-right">
-            <a href="{{ route('autorizacion') }}" class="text-sm font-semibold text-kp-green hover:text-kp-green-dark">
+            <a href="{{ route('autorizacion') }}" class="text-xs font-semibold text-kp-blue hover:text-kp-blue-dark">
               Ver bandeja completa
             </a>
           </div>

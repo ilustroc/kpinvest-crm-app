@@ -10,7 +10,7 @@
 >
     <button
         type="button"
-        class="relative inline-flex size-9 items-center justify-center rounded-md border border-kp-border bg-white text-kp-muted shadow-sm transition kp-focus hover:bg-slate-50 hover:text-kp-ink"
+        class="relative inline-flex size-8 items-center justify-center rounded-sm text-white/85 transition kp-focus hover:bg-white/10 hover:text-white"
         aria-label="Abrir notificaciones"
         aria-expanded="false"
         data-notifications-toggle
@@ -20,24 +20,24 @@
             <path d="M10 19a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
         </svg>
         <span
-            class="absolute -right-1 -top-1 hidden min-w-5 rounded-full bg-kp-green px-1.5 py-0.5 text-center text-[11px] font-bold leading-none text-white shadow-sm"
+            class="absolute right-0 top-0 hidden min-w-4 rounded-full bg-red-500 px-1 py-0.5 text-center text-[9px] font-bold leading-none text-white"
             data-notifications-count
         ></span>
     </button>
 
     <section
-        class="absolute right-0 top-full z-50 mt-2 hidden w-[min(92vw,390px)] overflow-hidden rounded-lg border border-kp-border bg-white shadow-xl shadow-slate-950/15"
+        class="absolute right-0 top-full z-50 mt-1 hidden w-[min(92vw,390px)] overflow-hidden rounded-sm border border-kp-border bg-white text-kp-ink shadow-lg"
         aria-label="Notificaciones"
         data-notifications-panel
     >
-        <div class="flex items-center justify-between gap-3 border-b border-kp-border bg-slate-50 px-3.5 py-3">
+        <div class="flex items-center justify-between gap-3 border-b border-kp-border bg-slate-50 px-3 py-2.5">
             <div>
-                <h2 class="text-sm font-bold text-kp-ink">Notificaciones</h2>
+                <h2 class="text-xs font-bold text-kp-ink">Notificaciones</h2>
                 <p class="mt-0.5 text-[11px] text-kp-muted">Promesas y CNA pendientes o actualizadas.</p>
             </div>
             <button
                 type="button"
-                class="rounded-md border border-kp-border px-2.5 py-1.5 text-xs font-bold text-kp-muted hover:bg-slate-50 hover:text-kp-ink kp-focus"
+                class="rounded-sm border border-kp-border px-2 py-1 text-[10px] font-bold text-kp-muted hover:bg-white hover:text-kp-ink kp-focus"
                 data-notifications-mark-all
             >
                 Leer todas

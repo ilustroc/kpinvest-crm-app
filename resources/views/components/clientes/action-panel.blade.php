@@ -4,11 +4,11 @@
 ])
 
 <x-ui.card {{ $attributes }}>
-    <div class="mb-3 flex flex-col gap-2 border-b border-kp-border pb-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="-mx-3 -mt-3 mb-2.5 flex min-h-10 flex-col gap-2 border-b border-kp-border bg-slate-50/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-sm font-bold text-kp-ink">{{ $title }}</h2>
+            <h2 class="text-xs font-bold text-kp-ink">{{ $title }}</h2>
             @if($subtitle)
-                <p class="mt-0.5 text-xs text-kp-muted">{{ $subtitle }}</p>
+                <p class="text-[10px] text-kp-muted">{{ $subtitle }}</p>
             @endif
         </div>
 

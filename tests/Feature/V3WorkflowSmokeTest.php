@@ -77,6 +77,25 @@ class V3WorkflowSmokeTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertTrue(Hash::check('new-secret-v3', $target->fresh()->password));
+
+        $supervisor = $this->makeUser('supervisor');
+        $updatedEmail = 'v3-updated-'.Str::uuid().'@example.test';
+
+        $this->actingAs($admin)
+            ->patch(route('administracion.usuarios.update', $target), [
+                'name' => 'V3 Updated User',
+                'email' => $updatedEmail,
+                'supervisor_id' => $supervisor->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $target->id,
+            'name' => 'V3 Updated User',
+            'email' => $updatedEmail,
+            'supervisor_id' => $supervisor->id,
+        ]);
     }
 
     public function test_promesa_creation_and_workflow_posts_work(): void

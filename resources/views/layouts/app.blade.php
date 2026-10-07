@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>@yield('title','KP INVEST')</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#00a81c">
+  <meta name="theme-color" content="#062b60">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,11 +16,11 @@
   @stack('head')
 </head>
 <body class="min-h-screen bg-kp-bg text-kp-ink antialiased">
-  <div class="min-h-screen lg:flex">
+  <div class="min-h-screen md:flex">
     <x-layout.sidebar />
 
     <div id="backdrop"
-         class="fixed inset-0 z-30 hidden bg-slate-950/40 lg:hidden"
+         class="fixed inset-0 z-30 hidden bg-slate-950/40 md:hidden"
          data-toggle-rail></div>
 
     <main class="min-w-0 flex-1 bg-kp-bg">
@@ -28,9 +28,9 @@
         @yield('crumb','')
       </x-layout.topbar>
 
-      <div class="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-3 py-3 sm:px-4 lg:px-5 lg:py-4">
+      <div class="mx-auto flex w-full max-w-[1720px] flex-col gap-2.5 px-2.5 py-2.5 sm:px-3 lg:px-4 lg:py-3">
         @yield('content')
-        <footer class="border-t border-kp-border pt-3 text-[11px] text-kp-muted">
+        <footer class="border-t border-kp-border pt-2 text-[10px] text-kp-muted">
           &copy; {{ date('Y') }} KP INVEST · Plataforma de cobranza y operaciones
         </footer>
       </div>

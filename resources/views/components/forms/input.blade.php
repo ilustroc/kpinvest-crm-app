@@ -14,6 +14,6 @@
         type="{{ $type }}"
         @if($fieldId) id="{{ $fieldId }}" @endif
         @if($name) name="{{ $name }}" @endif
-        {{ $attributes->merge(['class' => 'w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-kp-green kp-focus']) }}
+        {{ $attributes->merge(['class' => 'h-8 w-full rounded-sm border border-kp-border bg-white px-2.5 py-1.5 text-xs text-kp-ink transition placeholder:text-slate-400 hover:border-slate-400 focus:border-kp-blue kp-focus']) }}
     >
 </x-forms.field>

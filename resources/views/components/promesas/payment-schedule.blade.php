@@ -1,5 +1,5 @@
-<x-ui.modal id="cronModal" title="Cronograma" max-width="3xl">
-    <div class="px-5 py-5">
+<x-ui.modal id="cronModal" title="Cronograma" max-width="lg">
+    <div class="px-3 py-3">
         <x-tables.table>
             <thead>
                 <tr>
@@ -12,7 +12,7 @@
             <tbody id="cronTbody"></tbody>
         </x-tables.table>
     </div>
-    <div class="flex justify-end border-t border-kp-border px-5 py-4">
+    <div class="flex justify-end border-t border-kp-border px-3 py-2.5">
         <x-ui.button type="button" variant="secondary" data-modal-close>
             Cerrar
         </x-ui.button>

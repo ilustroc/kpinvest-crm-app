@@ -1,5 +1,5 @@
-<div class="space-y-4">
-    <div class="grid gap-4 md:grid-cols-2">
+<div class="space-y-3">
+    <div class="grid gap-3 md:grid-cols-2">
         <x-forms.select label="Tipo de propuesta" name="tipo" id="tipoPropuesta" required>
             <optgroup label="Convenios">
                 <option value="convenio" data-balon="0">Convenio</option>
@@ -32,13 +32,13 @@
     />
 </div>
 
-<hr class="my-5 border-kp-border">
+<hr class="my-3 border-kp-border">
 
-<div id="formConvenio" class="space-y-4">
-    <h4 class="text-sm font-bold text-kp-ink">Configuración del cronograma</h4>
+<div id="formConvenio" class="space-y-3">
+    <h4 class="text-xs font-bold text-kp-ink">Configuración del cronograma</h4>
     
-    <div class="rounded-lg border border-kp-border bg-slate-50 p-4">
-        <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-sm border border-kp-border bg-slate-50 p-3">
+        <div class="grid gap-3 md:grid-cols-3">
             <x-forms.input label="Monto convenio (S/)" name="monto_convenio" type="number" id="cvTotal" step="0.01" min="0.01" required />
             <x-forms.input label="Nro. cuotas" name="nro_cuotas" type="number" id="cvNro" min="1" step="1" required />
             <x-forms.input label="Monto de cuota (S/)" name="monto_cuota" type="number" id="cvCuota" step="0.01" min="0.01" />
@@ -47,7 +47,7 @@
         <div class="mt-4 flex flex-wrap items-end gap-3 sm:flex-nowrap">
             <div class="w-full sm:w-auto sm:flex-1">
                 <x-forms.label for="cvFechaIni">Fecha inicial auto</x-forms.label>
-                <input type="date" id="cvFechaIni" class="mt-1 w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm transition kp-focus">
+                <input type="date" id="cvFechaIni" class="mt-1 h-8 w-full rounded-sm border border-kp-border bg-white px-2.5 py-1.5 text-xs text-kp-ink transition kp-focus">
                 <div class="mt-1 text-xs font-semibold text-kp-muted" id="cvHintDia">Día de pago: -</div>
             </div>
             <div class="w-full pb-5 sm:w-auto">
@@ -94,7 +94,7 @@
 <div id="formCancelacion" class="mt-4 hidden space-y-4">
     <h4 class="text-sm font-bold text-kp-ink">Detalles de cancelación</h4>
     
-    <div class="rounded-lg border border-kp-border bg-slate-50 p-4 grid gap-4 md:grid-cols-2">
+    <div class="grid gap-3 rounded-sm border border-kp-border bg-slate-50 p-3 md:grid-cols-2">
         <x-forms.input label="Monto a cancelar (S/)" name="monto_cancel" type="number" step="0.01" min="0.01" />
         <x-forms.date label="Fecha límite de pago" name="fecha_pago_cancel" />
     </div>

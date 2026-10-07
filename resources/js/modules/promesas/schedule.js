@@ -62,10 +62,10 @@ export function setupPromiseSchedule(root) {
 
         body.innerHTML = (data.cuotas || []).map((quota) => `
             <tr>
-                <td class="whitespace-nowrap border-t border-kp-border px-4 py-3 text-right text-sm text-kp-ink">${escapeHtml(quota?.nro ?? '')}</td>
-                <td class="whitespace-nowrap border-t border-kp-border px-4 py-3 text-sm text-kp-ink">${escapeHtml(formatDate(quota?.fecha))}</td>
-                <td class="whitespace-nowrap border-t border-kp-border px-4 py-3 text-right text-sm text-kp-ink">${escapeHtml(money(quota?.monto))}</td>
-                ${showBalloon ? `<td class="whitespace-nowrap border-t border-kp-border px-4 py-3 text-center text-sm text-kp-ink">${quota?.es_balon == 1 ? '<span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700">Balon</span>' : ''}</td>` : ''}
+                <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-right text-xs text-kp-ink">${escapeHtml(quota?.nro ?? '')}</td>
+                <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-xs text-kp-ink">${escapeHtml(formatDate(quota?.fecha))}</td>
+                <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-right text-xs text-kp-ink">${escapeHtml(money(quota?.monto))}</td>
+                ${showBalloon ? `<td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-center text-xs text-kp-ink">${quota?.es_balon == 1 ? '<span class="rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">Balon</span>' : ''}</td>` : ''}
             </tr>
         `).join('');
 
