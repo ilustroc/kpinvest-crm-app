@@ -1,15 +1,9 @@
 import Chart from 'chart.js/auto';
 import { $, ready } from '../../core/dom';
+import { formatMoney } from '../../core/money';
 
 function getCssValue(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
-
-function formatMoney(value, digits = 0) {
-    return 'S/ ' + Intl.NumberFormat('es-PE', {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-    }).format(Number(value || 0));
 }
 
 function hexToRgba(hex, alpha = 1) {
@@ -45,9 +39,12 @@ function setupPanelChart(root) {
     const payload = JSON.parse(jsonNode.textContent || '{}');
     const labels = payload.labels || [];
     const data = payload.data || [];
-    const brand = getCssValue('--color-kp-green', '#00a81c');
-    const border = getCssValue('--color-kp-border', '#e8ecf3');
-    const muted = getCssValue('--color-kp-muted', '#6d7b8a');
+    const brand = getCssValue('--color-kp-primary', '#00a81c');
+    const navy = getCssValue('--color-kp-navy', '#062b60');
+    const border = getCssValue('--color-kp-border', '#e4e7ec');
+    const muted = getCssValue('--color-kp-muted', '#667085');
+
+    $('[data-panel-chart-loading]', root)?.remove();
 
     new Chart(canvas, {
         type: 'bar',
@@ -56,11 +53,11 @@ function setupPanelChart(root) {
             datasets: [{
                 label: 'S/ por dia',
                 data,
-                borderWidth: 2,
-                borderColor: brand,
-                backgroundColor: hexToRgba(brand, 0.16),
-                hoverBackgroundColor: hexToRgba(brand, 0.28),
-                borderRadius: 6,
+                borderWidth: 0,
+                backgroundColor: hexToRgba(brand, 0.78),
+                hoverBackgroundColor: brand,
+                borderRadius: 4,
+                maxBarThickness: 28,
             }],
         },
         options: {
@@ -71,8 +68,13 @@ function setupPanelChart(root) {
                 legend: { display: false },
                 tooltip: {
                     displayColors: false,
+                    backgroundColor: navy,
+                    titleFont: { family: 'Inter', size: 12, weight: '600' },
+                    bodyFont: { family: 'Inter', size: 12, weight: '500' },
+                    padding: 10,
+                    cornerRadius: 8,
                     callbacks: {
-                        label: (context) => formatMoney(context.parsed.y, 2),
+                        label: (context) => formatMoney(context.parsed.y, 'PEN'),
                     },
                 },
             },
@@ -89,7 +91,9 @@ function setupPanelChart(root) {
                     grid: { color: border },
                     ticks: {
                         color: muted,
-                        callback: (value) => formatMoney(value, 0),
+                        maxTicksLimit: 4,
+                        font: { family: 'Inter', size: 9, weight: '500' },
+                        callback: (value) => formatMoney(value, 'PEN'),
                     },
                 },
             },

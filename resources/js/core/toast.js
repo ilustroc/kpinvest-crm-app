@@ -1,10 +1,10 @@
 import { $$, escapeHtml, ready } from './dom';
 
 const variants = {
-    success: 'border-l-emerald-500',
+    success: 'border-l-kp-primary-dark',
     danger: 'border-l-red-500',
     warning: 'border-l-amber-500',
-    info: 'border-l-sky-500',
+    info: 'border-l-kp-secondary',
 };
 
 function closeToast(toast) {

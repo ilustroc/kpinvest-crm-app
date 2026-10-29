@@ -11,6 +11,11 @@ Indice oficial de documentacion tecnica para KP Invest CRM App V3.
 - [Base de datos y migraciones](01_arquitectura/base_datos_migraciones.md)
 - [Permisos, Policies y Gates](01_arquitectura/permisos_policies_gates.md)
 
+## Meridian UI
+
+- [Estado de olas](06_meridian/estado_olas.md)
+- [Ola 7 - Auditoria y plan](06_meridian/ola7_auditoria.md)
+
 ## Modulos
 
 - [Clientes](02_modulos/clientes.md)

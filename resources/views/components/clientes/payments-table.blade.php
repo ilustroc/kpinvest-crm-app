@@ -4,17 +4,26 @@
     'dni',
 ])
 
-<x-clientes.action-panel title="Pagos" subtitle="{{ count($pagos ?? []) }} registro(s)">
+@php
+    $paymentTotal = (float) collect($pagos ?? [])->sum(fn ($payment) => (float) ($payment->monto_pagado ?? 0));
+@endphp
+
+<x-clientes.action-panel
+    title="Historial de pagos"
+    subtitle="{{ count($pagos ?? []) }} {{ count($pagos ?? []) === 1 ? 'registro' : 'registros' }} · {{ \App\Support\Money::format($paymentTotal, 'PEN') }}"
+    accent="success"
+>
     <x-slot:actions>
         @if($canDelete)
-            <label class="inline-flex items-center gap-2 text-sm font-semibold text-kp-ink">
-                <input type="checkbox" id="toggleDeletePagos" class="size-4 rounded border-kp-border text-kp-green kp-focus">
+            <label class="inline-flex items-center gap-2 rounded-lg border border-kp-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600">
+                <input type="checkbox" id="toggleDeletePagos" class="size-4 rounded border-kp-border accent-kp-primary kp-focus">
                 Eliminar pagos
             </label>
             <form id="frmDeletePagos"
                   method="POST"
                   action="{{ route('clientes.pagos.delete', $dni) }}"
-                  data-confirm="Eliminar los pagos seleccionados?">
+                  data-confirm="Eliminar los pagos seleccionados?"
+                  class="inline-flex">
                 @csrf
                 <x-ui.button type="submit" id="btnDeletePagos" variant="danger" size="sm" disabled>
                     Eliminar seleccionados
@@ -27,20 +36,20 @@
         </x-ui.button>
     </x-slot:actions>
 
-    <div id="pagosCollapse">
-        <x-tables.table id="tblPagos">
+    <div id="pagosCollapse" class="min-w-0">
+        <x-tables.table id="tblPagos" :flush="true" :contained="true" min-width="min-w-[580px]" class="[&_th]:px-3 [&_td]:px-3">
             <thead>
                 <tr>
                     @if($canDelete)
-                        <x-tables.th class="col-del hidden">
-                            <input type="checkbox" id="chkAllPagos" class="size-4 rounded border-kp-border text-kp-green kp-focus">
+                        <x-tables.th class="col-del hidden w-10">
+                            <input type="checkbox" id="chkAllPagos" class="size-4 rounded border-kp-border accent-kp-primary kp-focus" aria-label="Seleccionar todos los pagos">
                         </x-tables.th>
                     @endif
                     <x-tables.th>Fecha</x-tables.th>
-                    <x-tables.th>Operacion</x-tables.th>
-                    <x-tables.th align="right">Monto (S/)</x-tables.th>
+                    <x-tables.th>Operación</x-tables.th>
+                    <x-tables.th align="right">Monto</x-tables.th>
                     <x-tables.th>Agente</x-tables.th>
-                    <x-tables.th>Cuenta recaudo</x-tables.th>
+                    <x-tables.th>Cuenta de recaudo</x-tables.th>
                 </tr>
             </thead>
             <tbody>
@@ -53,28 +62,42 @@
                         $gestor = $p->gestor ?? $p['gestor'] ?? '-';
                         $cuenta = $p->cuenta_recaudo ?? $p['cuenta_recaudo'] ?? '-';
                     @endphp
-                    <tr>
+                    <tr class="transition-colors hover:bg-slate-50/80">
                         @if($canDelete)
                             <x-tables.td class="col-del hidden">
                                 @if($id)
                                     <input type="checkbox"
                                            name="ids[]"
                                            form="frmDeletePagos"
-                                           class="chkPago size-4 rounded border-kp-border text-kp-green kp-focus"
-                                           value="{{ $id }}">
+                                           class="chkPago size-4 rounded border-kp-border accent-kp-primary kp-focus"
+                                           value="{{ $id }}"
+                                           aria-label="Seleccionar pago del {{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '' }}">
                                 @endif
                             </x-tables.td>
                         @endif
-                        <x-tables.td>{{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '' }}</x-tables.td>
-                        <x-tables.td>{{ $oper }}</x-tables.td>
-                        <x-tables.td align="right">{{ number_format((float) $monto, 2, '.', ',') }}</x-tables.td>
+                        <x-tables.td>
+                            <span class="font-medium tabular-nums">{{ $fecha ? \Carbon\Carbon::parse($fecha)->format('d/m/Y') : '-' }}</span>
+                        </x-tables.td>
+                        <x-tables.td>
+                            <span class="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-600">{{ $oper }}</span>
+                        </x-tables.td>
+                        <x-tables.td align="right">
+                            <span class="font-semibold tabular-nums text-kp-ink">{{ \App\Support\Money::format($monto, 'PEN') }}</span>
+                        </x-tables.td>
                         <x-tables.td>{{ $gestor }}</x-tables.td>
-                        <x-tables.td>{{ $cuenta }}</x-tables.td>
+                        <x-tables.td>
+                            <span class="text-[12px] text-slate-600">{{ $cuenta }}</span>
+                        </x-tables.td>
                     </tr>
                 @empty
-                    <x-tables.empty-row :colspan="$canDelete ? 6 : 5" message="Sin pagos" />
+                    <x-tables.empty-row :colspan="$canDelete ? 6 : 5" message="Sin pagos registrados para este cliente." />
                 @endforelse
             </tbody>
         </x-tables.table>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-kp-border px-4 py-2.5 text-[10.5px] text-kp-muted">
+            <span>Los pagos se ordenan del más reciente al más antiguo. La cuenta de recaudo es el medio de destino del pago, no la cuenta de deuda.</span>
+            <span class="sm:hidden">Desliza para ver más →</span>
+        </div>
     </div>
 </x-clientes.action-panel>

@@ -127,7 +127,7 @@ function setupPaymentPrecheck(root) {
             const headerOk = missing.length === 0;
 
             headerMessage.innerHTML = headerOk
-                ? `Encabezados: OK (<span class="font-semibold text-emerald-700">${header.length}</span>)`
+                ? `Encabezados: OK (<span class="font-semibold text-kp-success-ink">${header.length}</span>)`
                 : `Encabezados: faltan <span class="font-semibold text-red-700">${escapeHtml(missing.join(', ') || '-')}</span>${extra.length ? `, extra: <span class="font-semibold text-amber-700">${escapeHtml(extra.join(', '))}</span>` : ''}`;
 
             const issues = [];

@@ -3,11 +3,11 @@
     'subtitle' => null,
 ])
 
-<header {{ $attributes->merge(['class' => 'flex flex-col gap-3 rounded-lg border border-kp-border bg-white px-4 py-4 shadow-sm lg:flex-row lg:items-center lg:justify-between']) }}>
+<header {{ $attributes->merge(['class' => 'flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between']) }}>
     <div>
-        <h1 class="text-xl font-bold text-kp-ink">{{ $title }}</h1>
+        <h1 class="text-[22px] font-semibold tracking-tight text-kp-ink">{{ $title }}</h1>
         @if($subtitle)
-            <p class="mt-1 text-sm text-kp-muted">{{ $subtitle }}</p>
+            <p class="mt-1 text-[13px] text-kp-muted">{{ $subtitle }}</p>
         @endif
     </div>
 

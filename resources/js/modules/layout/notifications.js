@@ -30,6 +30,7 @@ function setupNotifications(root) {
     const panel = $('[data-notifications-panel]', root);
     const list = $('[data-notifications-list]', root);
     const empty = $('[data-notifications-empty]', root);
+    const loading = $('[data-notifications-loading]', root);
     const badge = $('[data-notifications-count]', root);
     const markAllButton = $('[data-notifications-mark-all]', root);
 
@@ -116,27 +117,34 @@ function setupNotifications(root) {
         }
 
         empty.classList.add('hidden');
-        list.innerHTML = items.map((item) => `
-            <article class="rounded-lg border border-kp-border bg-white p-3 ${item.is_read ? 'opacity-75' : 'shadow-sm'}">
+        list.innerHTML = items.map((item) => {
+            const meta = [
+                item.module ? escapeHtml(item.module) : null,
+                item.dni ? `DNI ${escapeHtml(item.dni)}` : null,
+                item.estado ? escapeHtml(item.estado) : null,
+            ].filter(Boolean);
+
+            return `
+            <article class="rounded-lg border border-kp-border bg-white p-3 ${item.is_read ? 'opacity-75' : 'shadow-[0_1px_2px_rgba(16,24,40,0.04)]'}">
                 <div class="flex gap-3">
-                    <div class="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full ${item.is_read ? 'bg-slate-100 text-kp-muted' : 'bg-kp-green-soft text-kp-green-dark'}">
-                        <svg class="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">${notificationIcon(item.module)}</svg>
+                    <div class="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg ${item.is_read ? 'bg-slate-100 text-kp-muted' : 'bg-kp-primary-soft text-kp-primary-ink'}">
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">${notificationIcon(item.module)}</svg>
                     </div>
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-2">
-                            <h3 class="text-sm font-bold text-kp-ink">${escapeHtml(item.title)}</h3>
-                            <span class="shrink-0 text-[11px] text-kp-muted">${escapeHtml(item.created_at_label || '')}</span>
+                            <h3 class="text-[13px] font-semibold leading-5 text-kp-ink">${escapeHtml(item.title)}</h3>
+                            <span class="shrink-0 text-[10px] text-kp-muted">${escapeHtml(item.created_at_label || '')}</span>
                         </div>
-                        <p class="mt-1 text-xs leading-5 text-kp-muted">${escapeHtml(item.message)}</p>
-                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-kp-muted">
-                            <span>${escapeHtml(item.module || '-')}</span>
-                            <span>DNI ${escapeHtml(item.dni || '-')}</span>
-                            <span>${escapeHtml(item.estado || '-')}</span>
-                        </div>
+                        <p class="mt-1 text-[12px] leading-5 text-kp-muted">${escapeHtml(item.message)}</p>
+                        ${meta.length ? `
+                            <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">
+                                ${meta.map((value) => `<span>${value}</span>`).join('')}
+                            </div>
+                        ` : ''}
                         ${item.action_url ? `
                             <button
                                 type="button"
-                                class="mt-3 inline-flex rounded-md border border-kp-border px-3 py-1.5 text-xs font-bold text-kp-green-dark hover:bg-kp-green-soft kp-focus"
+                                class="mt-3 inline-flex rounded-md border border-kp-border px-2.5 py-1 text-[11px] font-semibold text-kp-secondary hover:bg-kp-secondary-soft kp-focus"
                                 data-notification-open
                                 data-id="${escapeHtml(item.id)}"
                                 data-url="${escapeHtml(item.action_url)}"
@@ -147,7 +155,8 @@ function setupNotifications(root) {
                     </div>
                 </div>
             </article>
-        `).join('<div class="h-2"></div>');
+        `;
+        }).join('<div class="h-2"></div>');
 
         list.querySelectorAll('[data-notification-open]').forEach((button) => {
             button.addEventListener('click', () => {
@@ -159,15 +168,24 @@ function setupNotifications(root) {
         });
     };
 
-    const loadList = () => request(root.dataset.listUrl)
-        .then((data) => {
-            updateBadge(data.unread_count, true);
-            render(data.notifications || []);
-        })
-        .catch(() => {
-            list.innerHTML = '<div class="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700">No se pudieron cargar las notificaciones.</div>';
-            empty.classList.add('hidden');
-        });
+    const setLoading = (isLoading) => {
+        loading?.classList.toggle('hidden', !isLoading);
+    };
+
+    const loadList = () => {
+        setLoading(true);
+
+        return request(root.dataset.listUrl)
+            .then((data) => {
+                updateBadge(data.unread_count, true);
+                render(data.notifications || []);
+            })
+            .catch(() => {
+                list.innerHTML = '<div class="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700">No se pudieron cargar las notificaciones.</div>';
+                empty.classList.add('hidden');
+            })
+            .finally(() => setLoading(false));
+    };
 
     const loadCount = (allowSound = false) => {
         if (!root.dataset.countUrl) return;

@@ -11,6 +11,20 @@
         $totPagos = (float) $pagos->sum(fn($p) => (float) ($p->monto_pagado ?? $p->monto ?? 0));
         $ccdDocs = collect($ccdByDni[$dni] ?? []);
         $canDeletePagos = \Illuminate\Support\Facades\Gate::allows('delete-client-payments');
+
+        $accountCount = $cuentas->pluck('cuenta')->filter(fn ($account) => trim((string) $account) !== '')->unique()->count();
+        $operationCount = $cuentas->count();
+        $cnaHasErrors = $errors->has('fecha_pago_realizado')
+            || $errors->has('monto_pagado')
+            || $errors->has('operaciones')
+            || $errors->has('cuenta')
+            || $errors->has('observacion');
+
+        // La CNA se persiste por operación. Se normaliza la clave para no depender
+        // de espacios accidentales en el valor almacenado.
+        $cnasByOperationKey = collect($cnasByOperacion ?? [])->mapWithKeys(
+            fn ($items, $operation) => [trim((string) $operation) => collect($items)]
+        );
     @endphp
 
     <x-layout.page-shell data-module="clientes-show">
@@ -34,137 +48,201 @@
             :tot-pagos="$totPagos"
         />
 
-        <x-clientes.action-panel title="Cuentas">
-            <x-slot:actions>
-                <x-ui.button id="btnPropuesta" type="button" data-modal-open="#modalPropuesta" disabled>
-                    Generar propuesta
-                    <span id="selCount" class="rounded-full bg-white/20 px-2 py-0.5 text-xs">0</span>
-                </x-ui.button>
-            </x-slot:actions>
+        <div class="min-w-0 space-y-5">
+            <x-clientes.action-panel
+                id="cuentas"
+                title="Cuentas y operaciones"
+                subtitle="{{ $accountCount }} {{ $accountCount === 1 ? 'cuenta' : 'cuentas' }} · {{ $operationCount }} {{ $operationCount === 1 ? 'operación' : 'operaciones' }} · Selecciona una operación para generar una propuesta"
+            >
+                <x-slot:actions>
+                    <x-ui.button
+                        id="btnPropuesta"
+                        type="button"
+                        data-modal-open="#modalPropuesta"
+                        disabled
+                        class="w-full justify-center sm:w-auto"
+                    >
+                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Generar propuesta
+                        <span id="selCount" class="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none">0</span>
+                    </x-ui.button>
+                </x-slot:actions>
 
-            <x-tables.table id="tblCuentas">
-                <thead>
-                    <tr>
-                        <x-tables.th align="center">
-                            <input type="checkbox" id="chkAll" class="size-4 rounded border-kp-border text-kp-green kp-focus">
-                        </x-tables.th>
-                        <x-tables.th>Operacion</x-tables.th>
-                        <x-tables.th>Asesor asignado</x-tables.th>
-                        <x-tables.th>Entidad</x-tables.th>
-                        <x-tables.th>Producto</x-tables.th>
-                        <x-tables.th>Cosecha</x-tables.th>
-                        <x-tables.th align="right">Deuda capital</x-tables.th>
-                        <x-tables.th align="right">Deuda total</x-tables.th>
-                        <x-tables.th>CNA(s)</x-tables.th>
-                        <x-tables.th>Pagos</x-tables.th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($cuentas as $c)
-                        @php
-                            $cnt = (int) ($c->pagos_count ?? 0);
-                            $sum = (float) ($c->pagos_sum ?? 0);
-                            $hasList = isset($c->pagos_list) && (
-                                ($c->pagos_list instanceof \Illuminate\Support\Collection && $c->pagos_list->count()) ||
-                                (is_array($c->pagos_list) && count($c->pagos_list))
-                            );
-                            $cnas = collect($cnasByCuenta[$c->cuenta] ?? []);
-                            $last = $cnas->sortByDesc(fn($x) => $x->created_at)->first();
-                            $estado = strtolower((string) ($last->workflow_estado ?? ''));
-                        @endphp
+                <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[1080px]" class="[&_th]:px-3 [&_td]:px-3">
+                    <thead>
+                        <tr>
+                            <x-tables.th align="center" class="w-9">
+                                <input type="checkbox" id="chkAll" class="size-4 rounded border-kp-border accent-kp-primary kp-focus" aria-label="Seleccionar todas las operaciones">
+                            </x-tables.th>
+                            <x-tables.th>Operación</x-tables.th>
+                            <x-tables.th>Cuenta de deuda</x-tables.th>
+                            <x-tables.th>Entidad / producto</x-tables.th>
+                            <x-tables.th>Cosecha / lote</x-tables.th>
+                            <x-tables.th>Asesor</x-tables.th>
+                            <x-tables.th align="right">Capital</x-tables.th>
+                            <x-tables.th align="right">Total</x-tables.th>
+                            <x-tables.th align="center">CNA</x-tables.th>
+                            <x-tables.th>Pagos</x-tables.th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($cuentas as $c)
+                            @php
+                                $cnt = (int) ($c->pagos_count ?? 0);
+                                $sum = (float) ($c->pagos_sum ?? 0);
+                                $cnas = $cnasByOperationKey->get(trim((string) $c->operacion), collect());
+                                $last = $cnas->sortByDesc(fn($x) => (string) ($x->created_at ?? ''))->first();
+                                $estado = strtolower((string) ($last->workflow_estado ?? ''));
+                                $capital = (float) ($c->deuda_capital ?? $c->saldo_capital ?? 0);
+                                $total = (float) ($c->deuda_total ?? 0);
+                                $currency = strtoupper(trim((string) ($c->moneda ?? 'PEN'))) ?: 'PEN';
+                                $asesor = trim((string) ($c->asesor ?? ''));
+                                $cnaIds = $cnas->pluck('id')->filter()->unique()->implode(',');
+                            @endphp
 
-                        <tr data-cuenta="{{ $c->cuenta }}"
-                            data-oper="{{ $c->operacion }}"
-                            data-cosecha="{{ $c->cosecha }}"
-                            data-entidad="{{ $c->entidad }}">
-                            <x-tables.td align="center">
-                                <input type="checkbox"
-                                       class="chkOp size-4 rounded border-kp-border text-kp-green kp-focus"
-                                       value="{{ $c->operacion }}"
-                                       {{ empty($c->operacion) ? 'disabled' : '' }}>
-                            </x-tables.td>
-                            <x-tables.td>{{ $c->operacion ?? '-' }}</x-tables.td>
-                            <x-tables.td>
-                                {{ $c->asesor ?: 'Sin asignar' }}
-                            </x-tables.td>
-                            <x-tables.td>{{ $c->entidad ?? '-' }}</x-tables.td>
-                            <x-tables.td>{{ $c->producto ?? '-' }}</x-tables.td>
-                            <x-tables.td>{{ $c->cosecha ?? '-' }}</x-tables.td>
-                            <x-tables.td align="right">{{ number_format((float) ($c->deuda_capital ?? $c->saldo_capital ?? 0), 2) }}</x-tables.td>
-                            <x-tables.td align="right">{{ number_format((float) ($c->deuda_total ?? 0), 2) }}</x-tables.td>
-                            <x-tables.td>
-                                @if($last && (str_contains($estado, 'pend') || str_contains($estado, 'pre')))
-                                    <x-clientes.status-badge :status="$last->workflow_estado">
-                                        En proceso
-                                    </x-clientes.status-badge>
-                                @elseif($last && str_contains($estado, 'aprob') && !str_contains($estado, 'pre'))
-                                    <x-ui.button :href="route('cna.pdf', $last->id)" target="_blank" size="sm" variant="danger" title="Descargar CNA aprobada">
-                                        PDF
-                                    </x-ui.button>
-                                @else
-                                    <x-ui.button type="button"
-                                                variant="bare"
-                                                size="none"
-                                                class="genCnaBtn"
-                                                title="Generar CNA para esta cuenta"
-                                                data-modal-open="#modalCna"
-                                                data-dni="{{ $dni }}"
-                                                data-cuenta="{{ $c->cuenta }}"
-                                                data-oper="{{ $c->operacion }}"
-                                                data-cosecha="{{ $c->cosecha }}"
-                                                data-entidad="{{ $c->entidad }}">
-                                        <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 0 1 9 9v.375M10.125 2.25A3.375 3.375 0 0 1 13.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 0 1 3.375 3.375M9 15l2.25 2.25L15 12" />
-                                        </svg>
-                                    </x-ui.button>                                
-                                @endif
-                            </x-tables.td>
-                            <x-tables.td>
-                                <div class="flex flex-col gap-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <x-ui.badge>{{ $cnt }} pago(s)</x-ui.badge>
-                                        @if($sum > 0)
-                                            <span class="text-xs text-kp-muted">S/ {{ number_format($sum, 2) }}</span>
-                                        @endif
+                            <tr data-cuenta="{{ $c->cuenta }}"
+                                data-oper="{{ $c->operacion }}"
+                                data-cosecha="{{ $c->cosecha }}"
+                                data-entidad="{{ $c->entidad }}"
+                                data-producto="{{ $c->producto }}"
+                                data-moneda="{{ $currency }}"
+                                data-asesor="{{ $asesor }}"
+                                data-capital="{{ $capital }}"
+                                data-total="{{ $total }}"
+                                data-pagos-count="{{ $cnt }}"
+                                data-pagos-sum="{{ $sum }}"
+                                data-cna-count="{{ $cnas->count() }}"
+                                data-cna-ids="{{ $cnaIds }}"
+                                data-cna-status="{{ $last->workflow_estado ?? '' }}"
+                                data-cna-nro="{{ $last->nro_carta ?? '' }}"
+                                data-cna-reason="{{ $last->motivo_rechazo ?? '' }}"
+                                class="group cursor-pointer transition-colors hover:bg-slate-50/80 has-[:checked]:bg-kp-primary-soft/50">
+                                <x-tables.td align="center">
+                                    <input type="checkbox"
+                                           class="chkOp size-4 rounded border-kp-border accent-kp-primary kp-focus"
+                                           value="{{ $c->operacion }}"
+                                           aria-label="Seleccionar operación {{ $c->operacion }}"
+                                           {{ empty($c->operacion) ? 'disabled' : '' }}>
+                                </x-tables.td>
+                                <x-tables.td>
+                                    <div class="font-semibold text-kp-ink">{{ $c->operacion ?? '-' }}</div>
+                                    <div class="mt-0.5 max-w-[190px] truncate text-[10.5px] text-kp-muted" title="{{ $c->producto }}">
+                                        {{ $c->producto ?? 'Sin producto' }}
                                     </div>
-
-                                    @if($hasList)
-                                        @php
-                                            $collapseId = 'pagos-'.$loop->index;
-                                        @endphp
-                                        <x-ui.button type="button" variant="secondary" size="sm" data-toggle-target="#{{ $collapseId }}">
-                                            Ver detalle
-                                        </x-ui.button>
-                                        <div id="{{ $collapseId }}" class="hidden rounded-md border border-kp-border bg-slate-50 p-3">
-                                            <ul class="space-y-1 text-xs text-kp-ink">
-                                                @foreach($c->pagos_list as $p)
-                                                    @php
-                                                        $f = !empty($p->fecha) ? \Carbon\Carbon::parse($p->fecha)->format('d/m/Y') : '-';
-                                                        $m = number_format((float) ($p->monto ?? 0), 2);
-                                                        $src = $p->fuente ?? '-';
-                                                    @endphp
-                                                    <li class="flex flex-wrap items-center gap-2">
-                                                        <span>{{ $f }}</span>
-                                                        <span>S/ {{ $m }}</span>
-                                                        <span class="text-kp-muted">{{ $src }}</span>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
+                                </x-tables.td>
+                                <x-tables.td>
+                                    <div class="font-mono text-[11.5px] font-medium text-slate-600" title="{{ $c->cuenta }}">
+                                        {{ $c->cuenta ?: 'Sin cuenta' }}
+                                    </div>
+                                </x-tables.td>
+                                <x-tables.td>
+                                    <div class="max-w-[180px] truncate font-medium text-slate-700" title="{{ $c->entidad }}">{{ $c->entidad ?? 'Sin entidad' }}</div>
+                                </x-tables.td>
+                                <x-tables.td>
+                                    <div class="font-medium text-slate-700">{{ $c->cosecha ?? 'Sin cosecha' }}</div>
+                                    <div class="mt-0.5 text-[10px] text-kp-muted">Lote de cartera</div>
+                                </x-tables.td>
+                                <x-tables.td>
+                                    @if(str_contains(mb_strtoupper($asesor), 'CANCEL'))
+                                        <div class="flex max-w-[150px] items-center" title="Operación en CANCELADOS; no implica que la deuda esté pagada">
+                                            <x-ui.badge variant="warning">CANCELADOS</x-ui.badge>
+                                        </div>
+                                    @else
+                                        <div class="flex max-w-[150px] items-center gap-1.5 text-[11px] text-slate-600" title="Asesor asignado a esta operación">
+                                            <svg class="size-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                                            </svg>
+                                            <span class="truncate font-medium">{{ $asesor !== '' ? $asesor : 'Sin asignar' }}</span>
                                         </div>
                                     @endif
-                                </div>
-                            </x-tables.td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </x-tables.table>
-        </x-clientes.action-panel>
+                                </x-tables.td>
+                                <x-tables.td align="right">
+                                    <span class="tabular-nums text-slate-600">{{ \App\Support\Money::format($capital, $currency) }}</span>
+                                </x-tables.td>
+                                <x-tables.td align="right">
+                                    <span class="font-semibold tabular-nums text-kp-ink">{{ \App\Support\Money::format($total, $currency) }}</span>
+                                </x-tables.td>
+                                <x-tables.td align="center">
+                                    @if($last)
+                                        @php
+                                            $cnaRejected = str_contains($estado, 'rechaz');
+                                        @endphp
+                                        <div class="flex flex-col items-center gap-1">
+                                            <x-clientes.status-badge :status="$last->workflow_estado">
+                                                @if($cnaRejected) Rechazada @endif
+                                            </x-clientes.status-badge>
+                                            <div class="flex flex-wrap items-center justify-center gap-1" title="Última CNA de la operación">
+                                                <span class="font-mono text-[10px] text-kp-muted">{{ $last->nro_carta ?: 'CNA' }}</span>
+                                                @if($cnas->count() > 1)
+                                                    <span class="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold text-slate-500" title="{{ $cnas->count() }} solicitudes registradas">x{{ $cnas->count() }}</span>
+                                                @endif
+                                            </div>
+                                            @if($cnaRejected)
+                                                <x-cna.request-button
+                                                    :dni="$dni"
+                                                    :cuenta="$c->cuenta"
+                                                    :operacion="$c->operacion"
+                                                    :cosecha="$c->cosecha"
+                                                    :entidad="$c->entidad"
+                                                    :producto="$c->producto"
+                                                    :pagos-count="$cnt"
+                                                    :pagos-sum="$sum"
+                                                    :moneda="$currency"
+                                                    label="Solicitar nueva"
+                                                    title="Solicitar una nueva CNA para esta cuenta de deuda"
+                                                />
+                                            @else
+                                                <x-cna.document-state :cna="$last" mode="compact" />
+                                            @endif
+                                        </div>
+                                    @else
+                                        <x-cna.request-button
+                                            :dni="$dni"
+                                            :cuenta="$c->cuenta"
+                                            :operacion="$c->operacion"
+                                            :cosecha="$c->cosecha"
+                                            :entidad="$c->entidad"
+                                            :producto="$c->producto"
+                                            :pagos-count="$cnt"
+                                            :pagos-sum="$sum"
+                                            :moneda="$currency"
+                                            label="Solicitar"
+                                            title="Solicitar CNA para las operaciones de esta cuenta de deuda"
+                                        />
+                                    @endif
+                                </x-tables.td>
+                                <x-tables.td>
+                                    <div class="flex flex-col items-start gap-1">
+                                        <x-ui.badge :variant="$cnt > 0 ? 'success' : 'neutral'">{{ $cnt }} {{ $cnt === 1 ? 'pago' : 'pagos' }}</x-ui.badge>
+                                        @if($sum > 0)
+                                            <span class="text-[10.5px] font-medium tabular-nums text-kp-muted">{{ \App\Support\Money::format($sum, $currency) }}</span>
+                                        @endif
+                                    </div>
+                                </x-tables.td>
+                            </tr>
+                        @empty
+                            <x-tables.empty-row colspan="10" message="Sin cuentas u operaciones registradas." />
+                        @endforelse
+                    </tbody>
+                </x-tables.table>
 
-        <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-kp-border px-4 py-2.5 text-[10.5px] text-kp-muted">
+                    <span>Importes según la moneda de cada operación. Asignación, pagos y CNA se muestran por operación.</span>
+                    <span class="sm:hidden">Desliza para ver más →</span>
+                </div>
+            </x-clientes.action-panel>
 
-        <x-promesas.promise-history :promesas="$promesas" />
+            <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
+
+            <x-promesas.promise-history :promesas="$promesas" />
+
+            <x-clientes.documents-panel :ccd-docs="$ccdDocs" />
+        </div>
+
         <x-promesas.payment-schedule />
-        <x-promesas.create-modal :dni="$dni" />
-        <x-cna.create-modal :dni="$dni" />
+        <x-promesas.create-modal :dni="$dni" :titular="$titular" />
+        <x-cna.create-modal :dni="$dni" :titular="$titular" :auto-open="$cnaHasErrors" />
     </x-layout.page-shell>
 @endsection

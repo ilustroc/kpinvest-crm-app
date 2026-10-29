@@ -6,7 +6,7 @@ function highlight(text, query) {
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(${escapedQuery})`, 'ig');
 
-    return escapeHtml(text || '').replace(regex, '<span class="bg-kp-green-soft font-bold text-kp-green-dark">$1</span>');
+    return escapeHtml(text || '').replace(regex, '<span class="bg-kp-green-soft font-bold text-kp-primary-ink">$1</span>');
 }
 
 function setupQuickSearch(form) {

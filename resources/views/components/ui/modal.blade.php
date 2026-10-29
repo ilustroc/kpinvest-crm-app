@@ -2,10 +2,12 @@
     'id',
     'title' => null,
     'subtitle' => null,
+    'titleId' => null,
     'maxWidth' => 'md',
 ])
 
 @php
+    $headingId = $titleId ?: $id.'-title';
     $widths = [
         'sm' => 'sm:max-w-sm',
         'md' => 'sm:max-w-md',
@@ -21,11 +23,12 @@
 <div id="{{ $id }}"
      class="relative z-50 hidden"
      data-modal
-     aria-labelledby="modal-title"
+     aria-labelledby="{{ $headingId }}"
+     aria-hidden="true"
      role="dialog"
      aria-modal="true">
      
-    <div class="fixed inset-0 bg-slate-950/50 transition-opacity" aria-hidden="true"></div>
+    <div class="fixed inset-0 bg-slate-950/50 transition-opacity" data-modal-close aria-hidden="true"></div>
 
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
@@ -35,7 +38,7 @@
                 @if($title || $subtitle)
                     <div class="border-b border-kp-border px-5 py-4">
                         @if($title)
-                            <h3 class="text-base font-bold text-kp-ink" id="modal-title">{{ $title }}</h3>
+                            <h3 class="text-base font-bold text-kp-ink" id="{{ $headingId }}">{{ $title }}</h3>
                         @endif
                         @if($subtitle)
                             <p class="mt-1 text-sm text-kp-muted">{{ $subtitle }}</p>

@@ -10,6 +10,6 @@
     ][$align] ?? 'text-left';
 @endphp
 
-<td {{ $attributes->merge(['class' => 'whitespace-nowrap border-t border-kp-border px-4 py-3 text-sm text-kp-ink '.$alignClass]) }}>
+<td {{ $attributes->merge(['class' => 'whitespace-nowrap border-t border-kp-border px-4 py-2.5 text-[13px] text-kp-ink '.$alignClass]) }}>
     {{ $slot }}
 </td>

@@ -53,7 +53,7 @@
               type="file"
               name="archivo"
               id="csvFilePagos"
-              class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-kp-green-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-kp-green-dark kp-focus"
+              class="w-full rounded-md border border-kp-border bg-white px-3 py-2 text-sm text-kp-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-kp-green-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-kp-primary-ink kp-focus"
               accept=".csv,text/csv"
               required
             >
@@ -75,7 +75,7 @@
         <div id="precheckBoxPagos" class="hidden rounded-lg border border-dashed border-kp-border bg-slate-50 p-4">
           <div class="flex flex-wrap items-center gap-4 text-sm">
             <div class="flex items-center gap-2">
-              <span class="size-2 rounded-full bg-emerald-500"></span>
+              <span class="size-2 rounded-full bg-kp-success"></span>
               <span id="hdrMsgPagos" class="text-kp-muted" aria-live="polite">Validando encabezados...</span>
             </div>
             <div class="flex items-center gap-2">
@@ -140,7 +140,7 @@
                 <x-tables.td>{{ $p->operacion }}</x-tables.td>
                 <x-tables.td class="min-w-56">{{ $p->nombre_cliente }}</x-tables.td>
                 <x-tables.td>{{ $p->entidad }}</x-tables.td>
-                <x-tables.td align="right">{{ number_format((float) $p->monto_pagado, 2) }}</x-tables.td>
+                <x-tables.td align="right">{{ \App\Support\Money::format($p->monto_pagado, 'PEN') }}</x-tables.td>
                 <x-tables.td>{{ $p->gestor }}</x-tables.td>
                 <x-tables.td>{{ $p->cosecha }}</x-tables.td>
                 <x-tables.td>{{ $p->cuenta_recaudo }}</x-tables.td>

@@ -4,7 +4,7 @@
 ])
 
 <tr>
-    <td colspan="{{ $colspan }}" {{ $attributes->merge(['class' => 'border-t border-kp-border px-4 py-8 text-center text-sm text-kp-muted']) }}>
+    <td colspan="{{ $colspan }}" {{ $attributes->merge(['class' => 'border-t border-kp-border px-4 py-8 text-center text-[13px] text-kp-muted']) }}>
         @if(trim((string) $slot) === '')
             {{ $message }}
         @else

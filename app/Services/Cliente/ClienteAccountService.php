@@ -22,6 +22,7 @@ class ClienteAccountService
                 'entidad',
                 'producto',
                 'cosecha',
+                'moneda',
                 'deuda_capital',
                 'interes',
                 'deuda_total',

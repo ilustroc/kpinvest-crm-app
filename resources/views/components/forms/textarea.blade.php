@@ -5,7 +5,7 @@
     'rows' => 4,
 ])
 
-<x-forms.field :label="$label" :name="$name">
+<x-forms.field :label="$label" :name="$name" :for="$id ?? $name">
     <textarea
         @if($id || $name) id="{{ $id ?? $name }}" @endif
         @if($name) name="{{ $name }}" @endif
