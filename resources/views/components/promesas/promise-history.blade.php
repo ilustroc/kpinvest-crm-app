@@ -155,8 +155,7 @@
         </tbody>
     </x-tables.table>
 
-    <div class="flex items-center justify-between gap-3 border-t border-kp-border px-4 py-2.5 text-[10.5px] text-kp-muted">
-        <span>Consulta las cuotas y fechas de cada propuesta.</span>
-        <span class="sm:hidden">Desliza para ver más →</span>
+    <div class="border-t border-kp-border px-4 py-2 text-right text-[10.5px] text-kp-muted sm:hidden">
+        Desliza para ver más →
     </div>
 </x-clientes.action-panel>

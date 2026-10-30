@@ -95,9 +95,8 @@
             </tbody>
         </x-tables.table>
 
-        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-kp-border px-4 py-2.5 text-[10.5px] text-kp-muted">
-            <span>Los pagos se ordenan del más reciente al más antiguo. La cuenta de recaudo es el medio de destino del pago, no la cuenta de deuda.</span>
-            <span class="sm:hidden">Desliza para ver más →</span>
+        <div class="border-t border-kp-border px-4 py-2 text-right text-[10.5px] text-kp-muted sm:hidden">
+            Desliza para ver más →
         </div>
     </div>
 </x-clientes.action-panel>

@@ -51,7 +51,7 @@
         <div class="min-w-0 space-y-5">
             <x-clientes.action-panel
                 id="cuentas"
-                title="Cuentas y operaciones"
+                title="CUENTAS DEL CLIENTE"
                 subtitle="{{ $accountCount }} {{ $accountCount === 1 ? 'cuenta' : 'cuentas' }} · {{ $operationCount }} {{ $operationCount === 1 ? 'operación' : 'operaciones' }} · Selecciona una operación para generar una propuesta"
             >
                 <x-slot:actions>
@@ -70,21 +70,20 @@
                     </x-ui.button>
                 </x-slot:actions>
 
-                <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[1080px]" class="[&_th]:px-3 [&_td]:px-3">
+                <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[900px]" class="[&_th]:px-3 [&_td]:px-3">
                     <thead>
                         <tr>
                             <x-tables.th align="center" class="w-9">
                                 <input type="checkbox" id="chkAll" class="size-4 rounded border-kp-border accent-kp-primary kp-focus" aria-label="Seleccionar todas las operaciones">
                             </x-tables.th>
-                            <x-tables.th>Operación</x-tables.th>
-                            <x-tables.th>Cuenta de deuda</x-tables.th>
-                            <x-tables.th>Entidad / producto</x-tables.th>
-                            <x-tables.th>Cosecha / lote</x-tables.th>
-                            <x-tables.th>Asesor</x-tables.th>
-                            <x-tables.th align="right">Capital</x-tables.th>
-                            <x-tables.th align="right">Total</x-tables.th>
+                            <x-tables.th>OPERACIÓN / PRODUCTO</x-tables.th>
+                            <x-tables.th>ENTIDAD / COSECHA</x-tables.th>
+                            <x-tables.th>ASESOR</x-tables.th>
+                            <x-tables.th align="right">CAPITAL</x-tables.th>
+                            <x-tables.th align="right">INTERÉS</x-tables.th>
+                            <x-tables.th align="right">TOTAL</x-tables.th>
                             <x-tables.th align="center">CNA</x-tables.th>
-                            <x-tables.th>Pagos</x-tables.th>
+                            <x-tables.th>PAGOS</x-tables.th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,6 +95,7 @@
                                 $last = $cnas->sortByDesc(fn($x) => (string) ($x->created_at ?? ''))->first();
                                 $estado = strtolower((string) ($last->workflow_estado ?? ''));
                                 $capital = (float) ($c->deuda_capital ?? $c->saldo_capital ?? 0);
+                                $interes = $c->interes !== null && is_numeric($c->interes) ? (float) $c->interes : null;
                                 $total = (float) ($c->deuda_total ?? 0);
                                 $currency = strtoupper(trim((string) ($c->moneda ?? 'PEN'))) ?: 'PEN';
                                 $asesor = trim((string) ($c->asesor ?? ''));
@@ -110,6 +110,7 @@
                                 data-moneda="{{ $currency }}"
                                 data-asesor="{{ $asesor }}"
                                 data-capital="{{ $capital }}"
+                                data-interes="{{ $interes ?? '' }}"
                                 data-total="{{ $total }}"
                                 data-pagos-count="{{ $cnt }}"
                                 data-pagos-sum="{{ $sum }}"
@@ -133,16 +134,10 @@
                                     </div>
                                 </x-tables.td>
                                 <x-tables.td>
-                                    <div class="font-mono text-[11.5px] font-medium text-slate-600" title="{{ $c->cuenta }}">
-                                        {{ $c->cuenta ?: 'Sin cuenta' }}
+                                    <div class="max-w-[180px] truncate font-semibold text-kp-ink" title="{{ $c->entidad }}">{{ $c->entidad ?? 'Sin entidad' }}</div>
+                                    <div class="mt-0.5 max-w-[180px] truncate text-[10.5px] text-kp-muted" title="{{ $c->cosecha }}">
+                                        {{ $c->cosecha ?? 'Sin cosecha' }}
                                     </div>
-                                </x-tables.td>
-                                <x-tables.td>
-                                    <div class="max-w-[180px] truncate font-medium text-slate-700" title="{{ $c->entidad }}">{{ $c->entidad ?? 'Sin entidad' }}</div>
-                                </x-tables.td>
-                                <x-tables.td>
-                                    <div class="font-medium text-slate-700">{{ $c->cosecha ?? 'Sin cosecha' }}</div>
-                                    <div class="mt-0.5 text-[10px] text-kp-muted">Lote de cartera</div>
                                 </x-tables.td>
                                 <x-tables.td>
                                     @if(str_contains(mb_strtoupper($asesor), 'CANCEL'))
@@ -162,24 +157,53 @@
                                     <span class="tabular-nums text-slate-600">{{ \App\Support\Money::format($capital, $currency) }}</span>
                                 </x-tables.td>
                                 <x-tables.td align="right">
+                                    @if($interes !== null)
+                                        <span class="tabular-nums text-slate-600">{{ \App\Support\Money::format($interes, $currency) }}</span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+                                </x-tables.td>
+                                <x-tables.td align="right">
                                     <span class="font-semibold tabular-nums text-kp-ink">{{ \App\Support\Money::format($total, $currency) }}</span>
                                 </x-tables.td>
                                 <x-tables.td align="center">
                                     @if($last)
                                         @php
+                                            $isApproved = str_contains($estado, 'aprob') && ! str_contains($estado, 'pre');
                                             $cnaRejected = str_contains($estado, 'rechaz');
+                                            $isOnlyDocx = $isApproved && empty($last->pdf_path) && ! empty($last->docx_path);
                                         @endphp
-                                        <div class="flex flex-col items-center gap-1">
-                                            <x-clientes.status-badge :status="$last->workflow_estado">
-                                                @if($cnaRejected) Rechazada @endif
-                                            </x-clientes.status-badge>
-                                            <div class="flex flex-wrap items-center justify-center gap-1" title="Última CNA de la operación">
-                                                <span class="font-mono text-[10px] text-kp-muted">{{ $last->nro_carta ?: 'CNA' }}</span>
-                                                @if($cnas->count() > 1)
-                                                    <span class="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-semibold text-slate-500" title="{{ $cnas->count() }} solicitudes registradas">x{{ $cnas->count() }}</span>
-                                                @endif
-                                            </div>
-                                            @if($cnaRejected)
+                                        @if($isApproved && ! $isOnlyDocx)
+                                            <a
+                                                href="{{ route('cna.pdf', $last->id) }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center justify-center p-0.5 kp-focus focus:outline-none"
+                                                aria-label="CNA {{ $last->nro_carta ?: '#'.$last->id }} (Aprobada) - Abrir PDF"
+                                                title="CNA {{ $last->nro_carta ?: '#'.$last->id }} · Aprobada"
+                                                data-cna-download="PDF"
+                                            >
+                                                <x-ui.pdf-icon class="size-5 shrink-0 transition-transform hover:scale-110 drop-shadow-sm" />
+                                            </a>
+                                        @elseif($isOnlyDocx)
+                                            <a
+                                                href="{{ route('cna.docx', $last->id) }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center justify-center p-1 text-blue-600 transition-colors hover:text-blue-700 kp-focus focus:outline-none"
+                                                aria-label="CNA {{ $last->nro_carta ?: '#'.$last->id }} (Aprobada) - Descargar DOCX"
+                                                title="CNA {{ $last->nro_carta ?: '#'.$last->id }} · Aprobada (DOCX)"
+                                                data-cna-download="DOCX"
+                                            >
+                                                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false">
+                                                    <path d="M14 2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 19.5V8.25L14 2.25Z" stroke-linecap="round" stroke-linejoin="round" />
+                                                    <path d="M14 2.25v6h5.5" stroke-linecap="round" stroke-linejoin="round" />
+                                                    <path d="m8 14 1.5 4 2.5-4 2.5 4 1.5-4" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            </a>
+                                        @elseif($cnaRejected)
+                                            <div class="flex flex-col items-center gap-1">
+                                                <x-clientes.status-badge :status="$last->workflow_estado">Rechazada</x-clientes.status-badge>
                                                 <x-cna.request-button
                                                     :dni="$dni"
                                                     :cuenta="$c->cuenta"
@@ -193,10 +217,10 @@
                                                     label="Solicitar nueva"
                                                     title="Solicitar una nueva CNA para esta cuenta de deuda"
                                                 />
-                                            @else
-                                                <x-cna.document-state :cna="$last" mode="compact" />
-                                            @endif
-                                        </div>
+                                            </div>
+                                        @else
+                                            <x-clientes.status-badge :status="$last->workflow_estado" />
+                                        @endif
                                     @else
                                         <x-cna.request-button
                                             :dni="$dni"
@@ -223,22 +247,19 @@
                                 </x-tables.td>
                             </tr>
                         @empty
-                            <x-tables.empty-row colspan="10" message="Sin cuentas u operaciones registradas." />
+                            <x-tables.empty-row colspan="9" message="Sin cuentas u operaciones registradas." />
                         @endforelse
                     </tbody>
                 </x-tables.table>
 
-                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-kp-border px-4 py-2.5 text-[10.5px] text-kp-muted">
-                    <span>Importes según la moneda de cada operación. Asignación, pagos y CNA se muestran por operación.</span>
-                    <span class="sm:hidden">Desliza para ver más →</span>
+                <div class="border-t border-kp-border px-4 py-2 text-right text-[10.5px] text-kp-muted sm:hidden">
+                    Desliza para ver más →
                 </div>
             </x-clientes.action-panel>
 
             <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
 
             <x-promesas.promise-history :promesas="$promesas" />
-
-            <x-clientes.documents-panel :ccd-docs="$ccdDocs" />
         </div>
 
         <x-promesas.payment-schedule />
