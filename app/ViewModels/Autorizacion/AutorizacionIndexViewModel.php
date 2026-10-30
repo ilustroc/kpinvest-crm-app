@@ -14,6 +14,7 @@ class AutorizacionIndexViewModel
         public readonly string $q,
         public readonly ?string $status,
         public readonly bool $isSupervisor,
+        public readonly array $pagosByDni = [],
     ) {
     }
 
@@ -23,6 +24,7 @@ class AutorizacionIndexViewModel
             'rows' => $this->rows,
             'cnaRows' => $this->cnaRows,
             'prodByOp' => $this->prodByOp,
+            'pagosByDni' => $this->pagosByDni,
             'q' => $this->q,
             'status' => $this->status,
             'isSupervisor' => $this->isSupervisor,

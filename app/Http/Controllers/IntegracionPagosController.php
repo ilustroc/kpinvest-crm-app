@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Pago;
 use App\Models\PagoLote;
-use App\Models\PagoPropia;
 use App\Imports\PagosImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,17 +13,15 @@ class IntegracionPagosController extends Controller
 {
     public function index()
     {
-        $ultimoLotePropia = PagoLote::where('tipo', 'propia')->latest('id')->first();
-
-        $pagosPropia = collect();
-        if ($ultimoLotePropia) {
-            $pagosPropia = PagoPropia::where('lote_id', $ultimoLotePropia->id)
+        $ultimoLote = PagoLote::where('tipo', 'propia')->latest('id')->first();
+        $pagos = collect();
+        if ($ultimoLote) {
+            $pagos = Pago::where('lote_id', $ultimoLote->id)
                 ->latest('id')
                 ->take(25)
                 ->get();
         }
-
-        return view('placeholders.integracion-pagos', compact('ultimoLotePropia', 'pagosPropia'));
+        return view('placeholders.integracion-pagos', compact('ultimoLote', 'pagos'));
     }
 
     public function template()

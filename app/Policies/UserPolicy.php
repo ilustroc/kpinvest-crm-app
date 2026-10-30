@@ -22,6 +22,11 @@ class UserPolicy
         return Roles::canManageUser($user, $target);
     }
 
+    public function update(User $user, User $target): bool
+    {
+        return $this->manage($user, $target);
+    }
+
     public function toggleStatus(User $user, User $target): bool
     {
         return $user->id !== $target->id && $this->manage($user, $target);

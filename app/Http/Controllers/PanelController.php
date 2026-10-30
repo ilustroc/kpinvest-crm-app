@@ -29,15 +29,12 @@ class PanelController extends Controller
             ->whereDate('created_at', $hoy)
             ->count();
 
-        // Pagos de hoy -> tabla: pagos_propia (fecha, monto_pagado, gestor)
-        $kpiPagosHoy = 0.0;
-        if (Schema::hasTable('pagos_propia')) {
-            $q = DB::table('pagos_propia')->whereDate('fecha', $hoy);
-            if ($isAsesor) {
-                $q->where('gestor', $user->name);
-            }
-            $kpiPagosHoy = (float) $q->sum('monto_pagado');
+        // Pagos de hoy -> tabla: pagos (fecha, monto_pagado, gestor)
+        $q = DB::table('pagos')->whereDate('fecha', $hoy);
+        if ($isAsesor) {
+            $q->where('gestor', $user->name);
         }
+        $kpiPagosHoy = (float) $q->sum('monto_pagado');
 
         /* ======= Actividades por ROL ======= */
         // Supervisor/Admin: pendientes/preaprobadas para aprobar
@@ -138,22 +135,19 @@ class PanelController extends Controller
         $fin = (clone $ini)->endOfMonth();
 
         $chartLabels = []; $chartData = []; $sumMes = 0.0;
+        $rows = DB::table('pagos')
+            ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
+            ->when($isAsesor, fn ($q) => $q->where('gestor', $user->name))
+            ->selectRaw('DATE(fecha) as f, SUM(monto_pagado) as s')
+            ->groupBy('f')->orderBy('f')->get()->keyBy('f');
 
-        if (Schema::hasTable('pagos_propia')) {
-            $rows = DB::table('pagos_propia')
-                ->whereBetween('fecha', [$ini->toDateString(), $fin->toDateString()])
-                ->when($isAsesor, fn ($q) => $q->where('gestor', $user->name))
-                ->selectRaw('DATE(fecha) as f, SUM(monto_pagado) as s')
-                ->groupBy('f')->orderBy('f')->get()->keyBy('f');
-
-            $days = $ini->daysInMonth;
-            for ($d=1; $d <= $days; $d++) {
-                $date = $ini->copy()->day($d)->toDateString();
-                $chartLabels[] = str_pad($d,2,'0',STR_PAD_LEFT);
-                $val = (float) ($rows[$date]->s ?? 0);
-                $chartData[] = round($val, 2);
-                $sumMes += $val;
-            }
+        $days = $ini->daysInMonth;
+        for ($d=1; $d <= $days; $d++) {
+            $date = $ini->copy()->day($d)->toDateString();
+            $chartLabels[] = str_pad($d,2,'0',STR_PAD_LEFT);
+            $val = (float) ($rows[$date]->s ?? 0);
+            $chartData[] = round($val, 2);
+            $sumMes += $val;
         }
 
         return view('panel.resumen', compact(

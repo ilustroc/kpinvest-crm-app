@@ -235,12 +235,16 @@
                     <span class="text-[13px] font-semibold text-kp-ink">{{ $money($pdpMonto) }}</span>
                 </div>
                 <div class="flex items-center justify-between gap-4 py-3">
-                    <span class="text-xs text-kp-muted">Ticket promedio</span>
-                    <span class="text-[13px] font-semibold text-kp-ink">{{ $pagosNum > 0 ? $money($ticketPromedio) : '—' }}</span>
-                </div>
-                <div class="flex items-center justify-between gap-4 py-3">
                     <span class="text-xs text-kp-muted">Pagos registrados</span>
                     <span class="text-[13px] font-semibold text-kp-ink">{{ number_format($pagosNum, 0) }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-4 py-3">
+                    <span class="text-xs text-kp-muted">Monto ingresado</span>
+                    <span class="text-[13px] font-semibold text-kp-ink">{{ $money($pagosMonto) }}</span>
+                </div>
+                <div class="flex items-center justify-between gap-4 py-3">
+                    <span class="text-xs text-kp-muted">Ticket promedio</span>
+                    <span class="text-[13px] font-semibold text-kp-ink">{{ $pagosNum > 0 ? $money($ticketPromedio) : '—' }}</span>
                 </div>
             </div>
 
@@ -285,9 +289,6 @@
                         <x-tables.td class="text-[11px] font-semibold text-slate-400">{{ str_pad($loop->iteration, 2, '0', STR_PAD_LEFT) }}</x-tables.td>
                         <x-tables.td>
                             <div class="font-semibold text-kp-ink">{{ $fila['nombre'] }}</div>
-                            <div class="mt-1.5 h-1 w-full max-w-[190px] overflow-hidden rounded-full bg-slate-100">
-                                <div class="h-full rounded-full bg-kp-secondary/70" style="width: {{ $maxEntidad > 0 ? round(($fila['total'] / $maxEntidad) * 100) : 0 }}%"></div>
-                            </div>
                         </x-tables.td>
                         <x-tables.td align="right" class="tabular-nums text-kp-muted">{{ $money($fila['m2']) }}</x-tables.td>
                         <x-tables.td align="right" class="tabular-nums text-kp-muted">{{ $money($fila['m1']) }}</x-tables.td>
@@ -328,9 +329,6 @@
                             <x-tables.td class="text-[11px] font-semibold text-slate-400">{{ str_pad($loop->iteration, 2, '0', STR_PAD_LEFT) }}</x-tables.td>
                             <x-tables.td>
                                 <div class="font-semibold text-kp-ink">{{ $fila['nombre'] }}</div>
-                                <div class="mt-1.5 h-1 w-full max-w-[190px] overflow-hidden rounded-full bg-slate-100">
-                                    <div class="h-full rounded-full bg-kp-green/70" style="width: {{ $maxAsesor > 0 ? round(($fila['total'] / $maxAsesor) * 100) : 0 }}%"></div>
-                                </div>
                             </x-tables.td>
                             <x-tables.td align="right" class="tabular-nums text-kp-muted">{{ $money($fila['m2']) }}</x-tables.td>
                             <x-tables.td align="right" class="tabular-nums text-kp-muted">{{ $money($fila['m1']) }}</x-tables.td>

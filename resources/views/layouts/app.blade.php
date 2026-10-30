@@ -37,7 +37,7 @@
         @yield('content')
         <footer class="flex flex-col gap-1 border-t border-kp-border/70 pt-4 text-[11px] text-kp-muted sm:flex-row sm:items-center sm:justify-between">
           <span>&copy; {{ date('Y') }} KP INVEST</span>
-          <span>CRM interno · Meridian</span>
+          <span>CRM Interno - Kp Invest</span>
         </footer>
       </div>
     </main>

@@ -5,11 +5,6 @@
 @section('tailwind_only', true)
 
 @section('content')
-  @php
-    $ultimoLote = $ultimoLote ?? ($ultimoLotePropia ?? null);
-    $pagos = $pagos ?? ($pagosPropia ?? collect());
-  @endphp
-
   <x-layout.page-shell data-module="integracion-imports">
     <x-layout.page-header
       title="Subir pagos"

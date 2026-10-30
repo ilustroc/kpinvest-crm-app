@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Support\Migrations\BaselineMigrationGuard;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Console\Events\CommandStarting;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -25,7 +27,19 @@ class EventServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Event::listen(CommandStarting::class, function (CommandStarting $event) {
+            if (in_array($event->command, BaselineMigrationGuard::DESTRUCTIVE_COMMANDS, true)) {
+                $connection = null;
+                if ($event->input && $event->input->hasParameterOption('--database')) {
+                    $val = $event->input->getParameterOption('--database', null);
+                    if (is_string($val) && $val !== '') {
+                        $connection = $val;
+                    }
+                }
+
+                BaselineMigrationGuard::blockDestructiveCommandsWhenBaselineIsPresent($event->command, $connection);
+            }
+        });
     }
 
     /**

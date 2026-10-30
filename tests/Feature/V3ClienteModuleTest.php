@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CnaSolicitud;
-use App\Models\PagoPropia;
+use App\Models\Pago;
 use App\Models\PromesaPago;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -85,7 +85,7 @@ class V3ClienteModuleTest extends TestCase
             'name' => 'Asesor V3',
         ]);
 
-        $payment = PagoPropia::create([
+        $payment = Pago::create([
             'dni' => $dni,
             'operacion' => $operation,
             'entidad' => 'BBVA',
@@ -146,7 +146,7 @@ class V3ClienteModuleTest extends TestCase
     {
         [$dni, $operation] = $this->createClientAccount();
 
-        $payment = PagoPropia::create([
+        $payment = Pago::create([
             'dni' => $dni,
             'operacion' => $operation,
             'entidad' => 'BBVA',
@@ -158,12 +158,14 @@ class V3ClienteModuleTest extends TestCase
             'cuenta_recaudo' => 'CTA-V3-PAGO',
         ]);
 
+        $paymentTable = (new Pago)->getTable();
+
         $this->actingAs($this->makeUser('asesor'))
             ->from(route('clientes.show', $dni))
             ->post(route('clientes.pagos.delete', $dni), ['ids' => [$payment->id]])
             ->assertForbidden();
 
-        $this->assertDatabaseHas('pagos_propia', ['id' => $payment->id]);
+        $this->assertDatabaseHas($paymentTable, ['id' => $payment->id]);
 
         $this->actingAs($this->makeUser('administrador'))
             ->from(route('clientes.show', $dni))
@@ -171,7 +173,7 @@ class V3ClienteModuleTest extends TestCase
             ->assertRedirect(route('clientes.show', $dni))
             ->assertSessionHas('msg', 'Pagos eliminados: 1');
 
-        $this->assertDatabaseMissing('pagos_propia', ['id' => $payment->id]);
+        $this->assertDatabaseMissing($paymentTable, ['id' => $payment->id]);
     }
 
     private function makeUser(string $role): User

@@ -3,6 +3,7 @@
 namespace App\Services\Cna;
 
 use App\Models\CnaSolicitud;
+use App\Models\Pago;
 use App\Models\User;
 use App\Support\Authorization\Roles;
 use App\Support\Traits\HasTeamVisibility;
@@ -64,9 +65,51 @@ class CnaQueryService
                 ->all();
         }
 
+        $dnis = collect($cnaRows->items())
+            ->pluck('dni')
+            ->filter()
+            ->map(fn ($dni) => trim((string) $dni))
+            ->unique()
+            ->values()
+            ->all();
+
+        $pagosByDni = [];
+
+        if ($dnis !== []) {
+            $pagos = Pago::query()
+                ->whereIn('dni', $dnis)
+                ->orderByDesc('lote_id')
+                ->orderByDesc('fecha')
+                ->get([
+                    'dni',
+                    'operacion',
+                    'fecha',
+                    'monto_pagado',
+                    'gestor',
+                    'entidad',
+                    'cosecha',
+                    'cuenta_recaudo',
+                    'nombre_cliente',
+                ]);
+
+            $pagosByDni = $pagos->groupBy(fn ($row) => trim((string) $row->dni))
+                ->map(fn ($group) => $group->map(fn ($row) => [
+                    'operacion' => (string) ($row->operacion ?? ''),
+                    'fecha' => $row->fecha ? (string) $row->fecha : null,
+                    'monto_pagado' => (float) ($row->monto_pagado ?? 0),
+                    'gestor' => (string) ($row->gestor ?? ''),
+                    'entidad' => (string) ($row->entidad ?? ''),
+                    'cosecha' => (string) ($row->cosecha ?? ''),
+                    'cuenta_recaudo' => (string) ($row->cuenta_recaudo ?? ''),
+                    'nombre_cliente' => (string) ($row->nombre_cliente ?? ''),
+                ])->values()->all())
+                ->all();
+        }
+
         return [
             'cnaRows' => $cnaRows,
             'prodByOp' => $prodByOp,
+            'pagosByDni' => $pagosByDni,
         ];
     }
 }

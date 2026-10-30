@@ -2,7 +2,7 @@
 
 namespace App\Services\Dashboard;
 
-use App\Models\PagoPropia as Pago;
+use App\Models\Pago;
 use App\Models\PromesaPago;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;

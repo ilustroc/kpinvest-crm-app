@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use App\Services\Admin\UserStatusService;
 use App\Services\UserService;
@@ -58,6 +59,30 @@ class AdminUsersController extends Controller
         ]);
 
         return back()->with('ok', 'Usuario creado correctamente.');
+    }
+
+    public function update(UpdateUserRequest $r, User $user)
+    {
+        $data = $r->validated();
+
+        $supId = $this->userService->resolveSupervisorId(
+            $r->user(),
+            $data['role'],
+            $r->input('supervisor_id')
+        );
+
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+        $user->role = $data['role'];
+        $user->supervisor_id = $supId;
+
+        if (!empty($data['password'])) {
+            $user->password = Hash::make($data['password']);
+        }
+
+        $user->save();
+
+        return back()->with('ok', 'Usuario actualizado correctamente.');
     }
 
     public function toggle(User $user, Request $r)

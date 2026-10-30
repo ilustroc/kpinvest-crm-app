@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CnaSolicitud;
 use App\Models\PagoLote;
-use App\Models\PagoPropia;
+use App\Models\Pago;
 use App\Models\PromesaPago;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -206,7 +206,7 @@ class V3AutorizacionModuleTest extends TestCase
             'total_registros' => 1,
         ]);
 
-        PagoPropia::create([
+        Pago::create([
             'lote_id' => $lote->id,
             'dni' => $dni,
             'operacion' => $operation,

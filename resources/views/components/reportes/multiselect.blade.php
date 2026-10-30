@@ -63,7 +63,7 @@
                 <button type="button" class="rounded-md px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" data-ms-clear>
                     Limpiar
                 </button>
-                <button type="button" class="rounded-md bg-kp-primary-dark px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-kp-primary-darker" data-ms-apply>
+                <button type="button" class="rounded-md bg-kp-primary px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-kp-primary-hover shadow-sm" data-ms-apply>
                     Aplicar
                 </button>
             </div>

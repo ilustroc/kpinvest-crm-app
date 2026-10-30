@@ -33,6 +33,7 @@ class AutorizacionIndexService
             q: $query,
             status: $status,
             isSupervisor: Roles::normalize($user->role) === Roles::SUPERVISOR,
+            pagosByDni: $cnaData['pagosByDni'] ?? [],
         );
     }
 }

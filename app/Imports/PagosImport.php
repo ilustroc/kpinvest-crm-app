@@ -2,7 +2,7 @@
 
 namespace App\Imports;
 
-use App\Models\PagoPropia;
+use App\Models\Pago;
 use App\Traits\CsvImportTrait;
 
 class PagosImport
@@ -65,7 +65,7 @@ class PagosImport
             }
 
             try {
-                PagoPropia::create($data);
+                Pago::create($data);
                 $ok++;
             } catch (\Throwable $e) {
                 $skip++;

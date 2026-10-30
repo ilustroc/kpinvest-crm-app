@@ -59,6 +59,24 @@ class V3CnaModuleTest extends TestCase
             'user_id' => $asesor->id,
         ]);
 
+        $this->actingAs($supervisor)
+            ->post(route('clientes.cna.store', $dni), [
+                'titular' => 'Cliente CNA V3',
+                'fecha_pago_realizado' => now()->toDateString(),
+                'monto_pagado' => '180.00',
+                'operaciones' => [$operation],
+                'observacion' => 'CNA V3 supervisor preaprobada',
+            ])
+            ->assertRedirect(route('clientes.show', $dni))
+            ->assertSessionHasNoErrors();
+
+        $supervisorCna = CnaSolicitud::where('dni', $dni)
+            ->where('observacion', 'CNA V3 supervisor preaprobada')
+            ->firstOrFail();
+
+        $this->assertSame('preaprobada', $supervisorCna->workflow_estado);
+        $this->assertSame((int) $supervisor->id, (int) $supervisorCna->pre_aprobado_por);
+
         $this->actingAs($admin)
             ->post(route('clientes.cna.store', $dni), [
                 'titular' => 'Cliente CNA V3',

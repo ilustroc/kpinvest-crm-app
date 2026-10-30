@@ -38,40 +38,46 @@ function setupSearchShortcut() {
 }
 
 function setupSupervisorField() {
-    const form = document.querySelector('[data-create-user-form]');
-    if (!form) return;
+    const forms = document.querySelectorAll('[data-create-user-form], [data-edit-user-form]');
+    if (!forms.length) return;
 
-    const role = form.querySelector('select[name="role"]');
-    const row = form.querySelector('[data-supervisor-row]');
-    const select = form.querySelector('select[name="supervisor_id"]');
-    const hidden = form.querySelector('input[type="hidden"][name="supervisor_id"]');
-    const currentRole = form.getAttribute('data-current-role');
+    forms.forEach((form) => {
+        const role = form.querySelector('select[name="role"]');
+        const row = form.querySelector('[data-supervisor-row]');
+        const select = form.querySelector('select[name="supervisor_id"]');
+        const hidden = form.querySelector('input[type="hidden"][name="supervisor_id"]');
+        const currentRole = form.getAttribute('data-current-role');
 
-    if (!role || !row || (!select && !hidden)) return;
+        if (!role || !row || (!select && !hidden)) return;
 
-    function refresh() {
-        const needsSupervisor = ['asesor', 'soporte'].includes(role.value);
+        function refresh(isInit = false) {
+            const needsSupervisor = ['asesor', 'soporte'].includes(role.value);
 
-        if (!needsSupervisor) {
-            row.classList.add('hidden');
-            select?.removeAttribute('required');
-            if (select) select.value = '';
-            if (hidden) hidden.value = '';
-            return;
+            if (!needsSupervisor) {
+                row.classList.add('hidden');
+                select?.removeAttribute('required');
+                if (!isInit && select) select.value = '';
+                if (!isInit && hidden) hidden.value = '';
+                return;
+            }
+
+            if (currentRole === 'supervisor') {
+                row.classList.add('hidden');
+                select?.removeAttribute('required');
+                return;
+            }
+
+            row.classList.remove('hidden');
+            select?.setAttribute('required', 'required');
         }
 
-        if (currentRole === 'supervisor') {
-            row.classList.add('hidden');
-            select?.removeAttribute('required');
-            return;
+        role.addEventListener('change', () => refresh(false));
+        if (form.hasAttribute('data-create-user-form')) {
+            refresh(false);
+        } else {
+            refresh(true);
         }
-
-        row.classList.remove('hidden');
-        select?.setAttribute('required', 'required');
-    }
-
-    role.addEventListener('change', refresh);
-    refresh();
+    });
 }
 
 function initAdminUsers() {

@@ -124,6 +124,7 @@
                   data-titular="{{ $p->titular ?? '-' }}"
                   data-deuda="{{ number_format((float) ($p->deuda_total ?? 0), 2) }}"
                   data-capital-raw="{{ (float) ($p->saldo_capital ?? 0) }}"
+                  data-capital="{{ number_format((float) ($p->saldo_capital ?? 0), 2) }}"
                   data-negociado="{{ number_format($montoMostrar, 2) }}"
                   data-totalconvenio-raw="{{ (float) ($p->monto_convenio ?? 0) }}"
                   data-detalle="{{ $p->nota ?? '' }}"
@@ -260,6 +261,9 @@
             $cnaSolicitante = $cna->solicitante?->name ?: '—';
             $estadoCna = $cna->workflow_estado ?: ($isSupervisor ? 'pendiente' : 'preaprobada');
             $montoPagado = (float) ($cna->monto_pagado ?? 0);
+            $cnaDniKey = trim((string) ($cna->dni ?? ''));
+            $cnaPagosList = $pagosByDni[$cnaDniKey] ?? [];
+            $cnaPagosJson = json_encode($cnaPagosList, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
           @endphp
 
           <tr class="group transition-colors hover:bg-slate-50/80">
@@ -292,6 +296,7 @@
                   data-producto="{{ $productoTxt }}"
                   data-operaciones='@json($opsArray)'
                   data-operaciones-b64="{{ base64_encode($opsJson) }}"
+                  data-pagos-b64="{{ base64_encode($cnaPagosJson) }}"
                   data-fecha="{{ optional($cna->created_at)->format('Y-m-d') }}"
                   data-fecha-pago="{{ optional($cna->fecha_pago_realizado)->format('Y-m-d') }}"
                   data-monto-pagado="{{ $montoPagado }}"
@@ -423,22 +428,35 @@
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 sm:w-[320px]">
+          <div class="grid grid-cols-3 gap-3 sm:gap-5">
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Monto negociado</p>
-              <p id="t_neg" class="mt-1 text-lg font-semibold tabular-nums text-kp-ink">—</p>
+              <p id="t_neg" class="mt-1 text-base font-semibold tabular-nums text-kp-ink sm:text-lg">—</p>
+            </div>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Deuda capital</p>
+              <p id="t_capital" class="mt-1 text-base font-semibold tabular-nums text-kp-ink sm:text-lg">—</p>
             </div>
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Deuda total</p>
-              <p id="t_deuda" class="mt-1 text-lg font-semibold tabular-nums text-kp-ink">—</p>
+              <p id="t_deuda" class="mt-1 text-base font-semibold tabular-nums text-kp-ink sm:text-lg">—</p>
             </div>
           </div>
         </div>
 
-        <div class="mt-4 grid gap-2 sm:grid-cols-3">
-          <x-autorizacion.detail-field label="Fecha de la promesa" id="t_fecha" />
-          <x-autorizacion.detail-field label="Tipo" id="t_tipo" />
-          <x-autorizacion.detail-field label="Solicitante" id="t_asesor" />
+        <div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-kp-border/60 pt-3 sm:grid-cols-3">
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Fecha de la promesa</p>
+            <p id="t_fecha" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Tipo</p>
+            <p id="t_tipo" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Solicitante</p>
+            <p id="t_asesor" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
         </div>
       </div>
 
@@ -520,23 +538,41 @@
             </a>
           </div>
 
-          <div class="rounded-lg border border-kp-border bg-white px-4 py-3 sm:w-[220px]">
+          <div class="sm:w-[220px] sm:text-right">
             <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Pago informado</p>
             <p class="mt-1 text-xl font-semibold tabular-nums text-kp-ink"><span id="cna_monto_pagado">S/ 0.00</span></p>
+          </div>
+        </div>
+
+        <div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-kp-border/60 pt-3 sm:grid-cols-3">
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Fecha de solicitud</p>
+            <p id="cna_fecha" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Fecha de pago</p>
+            <p id="cna_fecha_pago" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Solicitante</p>
+            <p id="cna_solicitante" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Producto</p>
+            <p id="cna_producto" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Entidad / cosecha (según pagos)</p>
+            <p id="cna_entidad_cosecha" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Operación(es)</p>
+            <p id="cna_ops" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
           </div>
         </div>
       </div>
 
       <div class="space-y-5 p-5">
-        <div class="grid gap-2 sm:grid-cols-3">
-          <x-autorizacion.detail-field label="Fecha de solicitud" id="cna_fecha" />
-          <x-autorizacion.detail-field label="Fecha de pago" id="cna_fecha_pago" />
-          <x-autorizacion.detail-field label="Solicitante" id="cna_solicitante" />
-          <x-autorizacion.detail-field label="Producto" id="cna_producto" />
-          <x-autorizacion.detail-field label="Entidad / cosecha (según pagos)" id="cna_entidad_cosecha" />
-          <x-autorizacion.detail-field label="Operación(es)" id="cna_ops" />
-        </div>
-
         <section>
           <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Flujo de autorización</h4>
           <ol id="cna_flujo" class="mt-2 space-y-0"></ol>
@@ -571,7 +607,7 @@
             <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Pagos realizados</h4>
             <span id="cna_pagos_count" class="inline-flex items-center rounded-md border border-kp-border bg-kp-surface-muted px-2 py-1 text-[10.5px] font-semibold text-slate-600">—</span>
           </div>
-          <p id="cna_pagos_context" class="mt-1 text-[11px] text-kp-muted">Histórico de pagos asociado al DNI. Las operaciones marcadas con CNA pertenecen a esta solicitud.</p>
+          <p id="cna_pagos_context" class="mt-1 text-[11px] text-kp-muted">Histórico de pagos asociado al DNI.</p>
           <div class="mt-2">
             <x-tables.table :flush="true" min-width="min-w-[900px]">
               <thead>

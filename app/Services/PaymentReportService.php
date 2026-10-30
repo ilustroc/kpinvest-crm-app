@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\PagoPropia as Pago;
+use App\Models\Pago;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
 

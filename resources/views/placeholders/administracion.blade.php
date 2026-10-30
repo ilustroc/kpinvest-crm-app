@@ -127,7 +127,7 @@
               'soporte' => 'Soporte',
               default => $roleKey !== '' ? ucfirst($roleKey) : 'Sin rol',
             };
-            $hasActions = $vm->canUpdatePassword($u) || ($vm->canManage($u) && $vm->currentUser->id !== $u->id);
+            $hasActions = $vm->canManage($u) || $vm->canUpdatePassword($u);
           @endphp
 
           <tr data-user-id="{{ $u->id }}"
@@ -173,11 +173,21 @@
               @endif
             </x-tables.td>
 
-            <x-tables.td align="right" class="min-w-[170px]">
+            <x-tables.td align="right" class="min-w-[140px]">
               <div class="flex justify-end gap-1.5">
+                @if($vm->canManage($u))
+                  <x-ui.button type="button" variant="secondary" size="sm" data-modal-open="#edit-usr-{{ $u->id }}" title="Editar usuario" aria-label="Editar usuario">
+                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                    </svg>
+                  </x-ui.button>
+                @endif
+
                 @if($vm->canUpdatePassword($u))
-                  <x-ui.button type="button" variant="secondary" size="sm" data-modal-open="#pw-usr-{{ $u->id }}">
-                    Password
+                  <x-ui.button type="button" variant="secondary" size="sm" data-modal-open="#pw-usr-{{ $u->id }}" title="Cambiar password" aria-label="Cambiar password">
+                    <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+                    </svg>
                   </x-ui.button>
                 @endif
 
@@ -188,8 +198,16 @@
                         onsubmit="return confirm('Confirmas {{ $u->active ? 'desactivar' : 'activar' }} esta cuenta?')">
                     @csrf
                     @method('PATCH')
-                    <x-ui.button type="submit" variant="{{ $u->active ? 'danger' : 'success' }}" size="sm">
-                      {{ $u->active ? 'Desactivar' : 'Activar' }}
+                    <x-ui.button type="submit" variant="{{ $u->active ? 'danger' : 'success' }}" size="sm" title="{{ $u->active ? 'Desactivar usuario' : 'Activar usuario' }}" aria-label="{{ $u->active ? 'Desactivar usuario' : 'Activar usuario' }}">
+                      @if($u->active)
+                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                      @else
+                        <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                      @endif
                     </x-ui.button>
                   </form>
                 @endif
@@ -228,6 +246,58 @@
   </section>
 
   @foreach($vm->users as $u)
+    @if($vm->canManage($u))
+      <x-ui.modal id="edit-usr-{{ $u->id }}" title="Editar usuario" subtitle="{{ $u->name }}" max-width="lg">
+          <form method="POST"
+                action="{{ route('administracion.usuarios.update', $u) }}"
+                autocomplete="off"
+                data-edit-user-form
+                data-current-role="{{ $vm->currentUser->role }}">
+            @csrf
+            @method('PUT')
+
+            <div class="space-y-4 p-5">
+              <x-ui.input label="Nombre" name="name" value="{{ old('name', $u->name) }}" required placeholder="Ej: Carlos Lopez" />
+              <x-ui.input label="Email" name="email" type="email" value="{{ old('email', $u->email) }}" required placeholder="usuario@empresa.com" />
+
+              <x-ui.select label="Rol" name="role" required>
+                @foreach($vm->roleOptions() as $value => $label)
+                  <option value="{{ $value }}" @selected(old('role', $u->role) === $value)>{{ $label }}</option>
+                @endforeach
+              </x-ui.select>
+
+              @if($vm->currentUser->role === 'supervisor')
+                <input type="hidden" name="supervisor_id" value="{{ $vm->currentUser->id }}">
+                <div class="hidden" data-supervisor-row></div>
+              @else
+                <div class="@if(!in_array(old('role', $u->role), ['asesor', 'soporte'], true)) hidden @endif" data-supervisor-row>
+                  <x-ui.select label="Supervisor" name="supervisor_id">
+                    <option value="">— Sin supervisor —</option>
+                    @foreach($vm->supervisorOptions() as $supervisor)
+                      @if((int) $supervisor['id'] !== (int) $u->id)
+                        <option value="{{ $supervisor['id'] }}" @selected((int) old('supervisor_id', $u->supervisor_id) === (int) $supervisor['id'])>
+                          {{ $supervisor['label'] }}
+                        </option>
+                      @endif
+                    @endforeach
+                  </x-ui.select>
+                </div>
+              @endif
+
+              <div class="border-t border-kp-border/60 pt-3" data-password-field>
+                <x-ui.input label="Nueva contraseña (opcional)" name="password" type="password" minlength="6" placeholder="Dejar en blanco para mantener la actual" />
+                <button type="button" class="mt-1 text-xs font-semibold text-kp-secondary" data-password-toggle>Ver</button>
+              </div>
+            </div>
+
+            <div class="flex justify-between gap-2 border-t border-kp-border px-5 py-4">
+              <x-ui.button type="button" variant="secondary" data-modal-close>Cancelar</x-ui.button>
+              <x-ui.button type="submit">Guardar cambios</x-ui.button>
+            </div>
+          </form>
+      </x-ui.modal>
+    @endif
+
     @if($vm->canUpdatePassword($u))
       <x-ui.modal id="pw-usr-{{ $u->id }}" title="Cambiar password" subtitle="{{ $u->name }}">
           <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}">

@@ -6,6 +6,7 @@ use App\Http\Requests\StorePromesaRequest;
 use App\Models\PromesaCuota;
 use App\Models\PromesaOperacion;
 use App\Models\PromesaPago;
+use App\Support\Authorization\Roles;
 use App\Support\WorkflowNotifier;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -32,13 +33,40 @@ class PromesaCreationService
         DB::beginTransaction();
 
         try {
+            $user = $request->user() ?: Auth::user();
+            $role = Roles::normalize($user?->role);
+            $userId = $user?->id;
+            $now = now();
+
+            $workflowEstado = 'pendiente';
+            $preAprobadoPor = null;
+            $preAprobadoAt = null;
+            $aprobadoPor = null;
+            $aprobadoAt = null;
+
+            if ($role === Roles::ADMINISTRADOR) {
+                $workflowEstado = 'aprobada';
+                $preAprobadoPor = $userId;
+                $preAprobadoAt = $now;
+                $aprobadoPor = $userId;
+                $aprobadoAt = $now;
+            } elseif ($role === Roles::SUPERVISOR) {
+                $workflowEstado = 'preaprobada';
+                $preAprobadoPor = $userId;
+                $preAprobadoAt = $now;
+            }
+
             $base = [
                 'dni' => $dni,
                 'nota' => $request->input('nota'),
                 'tipo' => $type,
                 'telefono' => $request->input('telefono'),
-                'workflow_estado' => 'pendiente',
-                'user_id' => optional(Auth::user())->id,
+                'workflow_estado' => $workflowEstado,
+                'user_id' => $userId,
+                'pre_aprobado_por' => $preAprobadoPor,
+                'pre_aprobado_at' => $preAprobadoAt,
+                'aprobado_por' => $aprobadoPor,
+                'aprobado_at' => $aprobadoAt,
             ];
 
             $data = in_array($type, ['convenio', 'convenio_balon'], true)
@@ -51,9 +79,6 @@ class PromesaCreationService
 
             $this->createOperations($promesa, $operations);
             $this->createQuotas($promesa, $request, $dates, $amounts);
-
-            $role = strtolower((string) (optional(Auth::user())->role ?? ''));
-            $this->applyInitialWorkflowByRole($promesa, $role);
 
             DB::commit();
 
@@ -123,34 +148,12 @@ class PromesaCreationService
         }
     }
 
-    private function applyInitialWorkflowByRole(PromesaPago $promesa, string $role): void
-    {
-        $now = now();
-
-        if ($role === 'administrador') {
-            $promesa->workflow_estado = 'aprobada';
-            $promesa->pre_aprobado_por = Auth::id();
-            $promesa->pre_aprobado_at = $now;
-            $promesa->aprobado_por = Auth::id();
-            $promesa->aprobado_at = $now;
-            $promesa->save();
-            return;
-        }
-
-        if ($role === 'supervisor') {
-            $promesa->workflow_estado = 'preaprobada';
-            $promesa->pre_aprobado_por = Auth::id();
-            $promesa->pre_aprobado_at = $now;
-            $promesa->save();
-        }
-    }
-
     private function notifyCreation(PromesaPago $promesa, string $role): void
     {
         try {
-            if ($role === 'administrador') {
+            if ($role === Roles::ADMINISTRADOR) {
                 WorkflowNotifier::promesaResuelta($promesa, true);
-            } elseif ($role === 'supervisor') {
+            } elseif ($role === Roles::SUPERVISOR) {
                 WorkflowNotifier::promesaPreaprobada($promesa);
             } else {
                 WorkflowNotifier::promesaPendiente($promesa);
@@ -162,8 +165,8 @@ class PromesaCreationService
     private function messageForRole(string $role): string
     {
         return match ($role) {
-            'administrador' => 'Propuesta registrada y APROBADA.',
-            'supervisor' => 'Propuesta registrada y PRE-APROBADA.',
+            Roles::ADMINISTRADOR => 'Propuesta registrada y APROBADA.',
+            Roles::SUPERVISOR => 'Propuesta registrada y PRE-APROBADA.',
             default => 'Propuesta registrada y enviada para autorizacion.',
         };
     }

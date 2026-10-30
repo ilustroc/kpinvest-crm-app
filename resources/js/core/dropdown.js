@@ -3,6 +3,7 @@ import { $$ } from './dom';
 export function closeDropdown(dropdown) {
     dropdown?.querySelector('[data-dropdown-panel]')?.classList.add('hidden');
     dropdown?.querySelector('[data-dropdown-button]')?.setAttribute('aria-expanded', 'false');
+    dropdown?.classList.remove('z-30');
 }
 
 export function closeDropdowns(except = null) {
@@ -25,6 +26,11 @@ export function setupDropdowns(root = document) {
             closeDropdowns(dropdown);
             panel.classList.toggle('hidden', !isHidden);
             button.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+            if (isHidden) {
+                dropdown.classList.add('z-30');
+            } else {
+                dropdown.classList.remove('z-30');
+            }
             return;
         }
 

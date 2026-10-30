@@ -42,8 +42,8 @@
     </x-slot:actions>
   </x-layout.page-header>
 
-  <section class="overflow-hidden rounded-[10px] border border-kp-border bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-kp-border px-4 py-3">
+  <section class="rounded-[10px] border border-kp-border bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+    <header class="flex flex-wrap items-center justify-between gap-3 rounded-t-[10px] border-b border-kp-border px-4 py-3">
       <div class="flex min-w-0 items-center gap-2.5">
         <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-kp-primary-soft text-kp-primary-ink">
           <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">

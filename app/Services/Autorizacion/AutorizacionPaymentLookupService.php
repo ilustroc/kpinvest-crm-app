@@ -2,7 +2,7 @@
 
 namespace App\Services\Autorizacion;
 
-use App\Models\PagoPropia as Pago;
+use App\Models\Pago;
 use Illuminate\Support\Collection;
 
 class AutorizacionPaymentLookupService

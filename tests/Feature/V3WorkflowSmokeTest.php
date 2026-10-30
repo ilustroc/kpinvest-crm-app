@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CnaSolicitud;
 use App\Models\PagoLote;
-use App\Models\PagoPropia;
+use App\Models\Pago;
 use App\Models\PromesaPago;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -77,6 +77,25 @@ class V3WorkflowSmokeTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertTrue(Hash::check('new-secret-v3', $target->fresh()->password));
+
+        $supervisor = $this->makeUser('supervisor');
+
+        $this->actingAs($admin)
+            ->put(route('administracion.usuarios.update', $target), [
+                'name' => 'Target Updated Name',
+                'email' => $target->email,
+                'role' => 'asesor',
+                'supervisor_id' => $supervisor->id,
+                'password' => 'new-edited-pass',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $freshTarget = $target->fresh();
+        $this->assertSame('Target Updated Name', $freshTarget->name);
+        $this->assertSame('asesor', $freshTarget->role);
+        $this->assertSame((int) $supervisor->id, (int) $freshTarget->supervisor_id);
+        $this->assertTrue(Hash::check('new-edited-pass', $freshTarget->password));
     }
 
     public function test_promesa_creation_and_workflow_posts_work(): void
@@ -258,7 +277,7 @@ class V3WorkflowSmokeTest extends TestCase
             'archivo' => 'v3-smoke.csv',
             'usuario_id' => $admin->id,
             'total_registros' => 1,
-        ])->pagosPropia()->create([
+        ])->pagos()->create([
             'dni' => $dni,
             'operacion' => $operacion,
             'entidad' => 'BBVA',
@@ -346,7 +365,7 @@ class V3WorkflowSmokeTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('pagos_propia', [
+        $this->assertDatabaseHas((new Pago)->getTable(), [
             'dni' => $dni,
             'operacion' => $operacion,
             'monto_pagado' => 88.90,

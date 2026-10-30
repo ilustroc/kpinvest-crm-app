@@ -4,6 +4,7 @@ namespace App\Services\Promesa;
 
 use App\Models\PromesaPago;
 use App\Models\User;
+use App\Support\Authorization\Roles;
 use App\Support\Traits\HasTeamVisibility;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +36,7 @@ class PromesaQueryService
             });
         }
 
-        if (strtolower((string) $user->role) === 'supervisor') {
+        if (Roles::normalize($user->role) === Roles::SUPERVISOR) {
             $promesas->where('promesas_pago.workflow_estado', 'pendiente');
         } else {
             $promesas->where('promesas_pago.workflow_estado', 'preaprobada');
