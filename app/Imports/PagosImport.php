@@ -59,9 +59,14 @@ class PagosImport
             }
 
             // Si no hay data útil, omitir
-            if (empty($data['dni']) && empty($data['operacion']) && empty($data['nombre_cliente'])) {
+            $docVal = $data['numdoc'] ?? $data['dni'] ?? null;
+            if (empty($docVal) && empty($data['operacion']) && empty($data['nombre_cliente'])) {
                 $skip++;
                 continue;
+            }
+            if (!empty($docVal)) {
+                $data['numdoc'] = $docVal;
+                $data['dni'] = $docVal;
             }
 
             try {
@@ -74,6 +79,11 @@ class PagosImport
         }
 
         fclose($fh);
+
+        if ($ok > 0) {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        }
+
         return [$ok, $skip, $err];
     }
 
@@ -110,7 +120,10 @@ class PagosImport
     {
         return [
             'FECHA'              => 'fecha',
-            'DNI'                => 'dni',
+            'NUMDOC'             => 'numdoc',
+            'DOCUMENTO'          => 'numdoc',
+            'NRO_DOC'            => 'numdoc',
+            'DNI'                => 'numdoc',
             'NOMBRE'             => 'nombre_cliente',
             'OPERACION'          => 'operacion',
             'MONTO'              => 'monto_pagado',

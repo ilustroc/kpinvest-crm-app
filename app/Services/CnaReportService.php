@@ -18,7 +18,7 @@ class CnaReportService
 
         $qb = DB::table("{$this->tCna} as cna")
             ->leftJoin("{$this->tCli} as cc", function ($j) use ($opPrimariaSql) {
-                $j->on('cc.numdoc', '=', 'cna.dni');
+                $j->on('cc.numdoc', '=', 'cna.numdoc');
                 $j->whereRaw("cc.operacion = {$opPrimariaSql}");
             })
             ->leftJoin("{$this->tUsr} as u_crea", 'u_crea.id', '=', 'cna.user_id')
@@ -27,7 +27,7 @@ class CnaReportService
 
         $qb->selectRaw("
             cna.id,
-            cna.dni as documento,
+            cna.numdoc as documento,
             cna.titular as cliente,
             COALESCE(cc.entidad,'') as entidad,
             cna.nro_carta as cna_nro,

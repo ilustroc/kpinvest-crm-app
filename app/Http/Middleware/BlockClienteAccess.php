@@ -13,23 +13,22 @@ class BlockClienteAccess
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        $dni  = (string) $request->route('dni');
+        $numdoc = (string) ($request->route('numdoc') ?? $request->route('dni'));
 
         // Admin/Sistemas pueden saltarse (si quieres)
         if ($user && $user->role === 'administrador') {
             return $next($request);
         }
 
-        if ($user && $dni) {
+        if ($user && $numdoc !== '') {
+            $column = \Illuminate\Support\Facades\Schema::hasColumn('cliente_bloqueos', 'numdoc') ? 'numdoc' : 'dni';
             $blocked = DB::table('cliente_bloqueos')
                 ->where('user_id', $user->id)
-                ->where('dni', $dni)
+                ->where($column, $numdoc)
                 ->exists();
 
             if ($blocked) {
                 abort(403, 'No autorizado para ver este cliente.');
-                // o si prefieres “ocultar” el cliente:
-                // abort(404);
             }
         }
 

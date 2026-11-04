@@ -10,6 +10,7 @@ class Pago extends Model
 
     protected $fillable = [
         'lote_id',
+        'numdoc',
         'dni',
         'operacion',
         'entidad',
@@ -21,10 +22,31 @@ class Pago extends Model
         'cuenta_recaudo',
     ];
 
+    public function getDniAttribute(): ?string
+    {
+        return $this->attributes['numdoc'] ?? $this->attributes['dni'] ?? null;
+    }
+
+    public function setDniAttribute($value): void
+    {
+        $this->attributes['numdoc'] = $value;
+    }
+
     protected $casts = [
         'fecha'        => 'date',
         'monto_pagado' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        });
+
+        static::deleted(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        });
+    }
 
     public function lote()
     {

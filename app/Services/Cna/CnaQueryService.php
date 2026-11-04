@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\Authorization\Roles;
 use App\Support\Traits\HasTeamVisibility;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CnaQueryService
 {
@@ -22,9 +23,11 @@ class CnaQueryService
             $query->whereIn('user_id', $teamIds);
         }
 
+        $cnaDocCol = Schema::hasColumn('cna_solicitudes', 'numdoc') ? 'numdoc' : 'dni';
+
         if ($search !== '') {
-            $query->where(function ($where) use ($search) {
-                $where->where('dni', 'like', "%{$search}%")
+            $query->where(function ($where) use ($search, $cnaDocCol) {
+                $where->where($cnaDocCol, 'like', "%{$search}%")
                     ->orWhere('nro_carta', 'like', "%{$search}%")
                     ->orWhere('producto', 'like', "%{$search}%")
                     ->orWhere('observacion', 'like', "%{$search}%");
@@ -54,34 +57,40 @@ class CnaQueryService
             ->values()
             ->all();
 
-        $prodByOp = [];
-
-        if ($operations !== []) {
-            $prodByOp = DB::table('clientes_cuentas')
-                ->select('operacion', 'producto')
-                ->whereIn('operacion', $operations)
-                ->get()
-                ->mapWithKeys(fn ($row) => [(string) $row->operacion => (string) ($row->producto ?? '-')])
-                ->all();
-        }
-
         $dnis = collect($cnaRows->items())
-            ->pluck('dni')
+            ->map(fn ($cna) => $cna->numdoc ?? $cna->dni)
             ->filter()
             ->map(fn ($dni) => trim((string) $dni))
             ->unique()
             ->values()
             ->all();
 
+        $prodByOp = [];
+
+        if ($operations !== []) {
+            $prodByOp = DB::table('clientes_cuentas')
+                ->select('numdoc', 'operacion', 'producto')
+                ->whereIn('operacion', $operations)
+                ->when($dnis !== [], fn ($q) => $q->whereIn('numdoc', $dnis))
+                ->get()
+                ->flatMap(fn ($row) => [
+                    "{$row->numdoc}_{$row->operacion}" => (string) ($row->producto ?? '-'),
+                    (string) $row->operacion => (string) ($row->producto ?? '-'),
+                ])
+                ->all();
+        }
+
         $pagosByDni = [];
 
         if ($dnis !== []) {
+            $pagosCol = Schema::hasColumn('pagos', 'numdoc') ? 'numdoc' : 'dni';
             $pagos = Pago::query()
-                ->whereIn('dni', $dnis)
+                ->whereIn($pagosCol, $dnis)
                 ->orderByDesc('lote_id')
                 ->orderByDesc('fecha')
                 ->get([
-                    'dni',
+                    "{$pagosCol} as numdoc",
+                    "{$pagosCol} as dni",
                     'operacion',
                     'fecha',
                     'monto_pagado',
@@ -92,7 +101,7 @@ class CnaQueryService
                     'nombre_cliente',
                 ]);
 
-            $pagosByDni = $pagos->groupBy(fn ($row) => trim((string) $row->dni))
+            $pagosByDni = $pagos->groupBy(fn ($row) => trim((string) ($row->numdoc ?? $row->dni)))
                 ->map(fn ($group) => $group->map(fn ($row) => [
                     'operacion' => (string) ($row->operacion ?? ''),
                     'fecha' => $row->fecha ? (string) $row->fecha : null,

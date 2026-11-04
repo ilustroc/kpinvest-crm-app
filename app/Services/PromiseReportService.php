@@ -31,7 +31,7 @@ class PromiseReportService
         $qb->selectRaw("
             pp.id as pp_id,
             pp.tipo as tipo_neg,
-            pp.dni as nrodoc,
+            pp.numdoc as nrodoc,
             pp.created_at as pp_created_at,
             DATE_FORMAT(pp.created_at, '%Y-%m-%d %H:%i:%s') as fecha,
             COALESCE(pp.telefono, '') as telefono,
@@ -49,11 +49,11 @@ class PromiseReportService
             END as pago_ini,
             COALESCE(pp.nota, '') as glosa_neg,
             -- Subqueries escalares (son más rápidas que un JOIN agrupado en muchos casos)
-            (SELECT nombre FROM clientes_cuentas WHERE numdoc = pp.dni LIMIT 1) as cliente,
-            (SELECT GROUP_CONCAT(DISTINCT entidad SEPARATOR ', ') FROM clientes_cuentas WHERE numdoc = pp.dni) as entidad,
-            (SELECT COALESCE(GROUP_CONCAT(DISTINCT moneda SEPARATOR ', '), 'PEN') FROM clientes_cuentas WHERE numdoc = pp.dni) as moneda,
-            (SELECT SUM(deuda_total) FROM clientes_cuentas WHERE numdoc = pp.dni) as deuda_act,
-            (SELECT SUM(deuda_capital) FROM clientes_cuentas WHERE numdoc = pp.dni) as capital_act
+            (SELECT nombre FROM clientes_cuentas WHERE numdoc = pp.numdoc LIMIT 1) as cliente,
+            (SELECT GROUP_CONCAT(DISTINCT entidad SEPARATOR ', ') FROM clientes_cuentas WHERE numdoc = pp.numdoc) as entidad,
+            (SELECT COALESCE(GROUP_CONCAT(DISTINCT moneda SEPARATOR ', '), 'PEN') FROM clientes_cuentas WHERE numdoc = pp.numdoc) as moneda,
+            (SELECT SUM(deuda_total) FROM clientes_cuentas WHERE numdoc = pp.numdoc) as deuda_act,
+            (SELECT SUM(deuda_capital) FROM clientes_cuentas WHERE numdoc = pp.numdoc) as capital_act
         ");
 
         // 4. Filtros
@@ -73,7 +73,7 @@ class PromiseReportService
             $qb->whereExists(function ($query) use ($filters) {
                 $query->select(DB::raw(1))
                     ->from('clientes_cuentas')
-                    ->whereColumn('numdoc', 'pp.dni')
+                    ->whereColumn('numdoc', 'pp.numdoc')
                     ->whereIn('entidad', (array)$filters['entidad']);
             });
         }
@@ -81,7 +81,7 @@ class PromiseReportService
         if (!empty($filters['q'])) {
             $q = trim((string)$filters['q']);
             $qb->where(function ($w) use ($q) {
-                $w->where('pp.dni', 'like', "%{$q}%")
+                $w->where('pp.numdoc', 'like', "%{$q}%")
                   ->orWhere('pp.nota', 'like', "%{$q}%");
             });
         }

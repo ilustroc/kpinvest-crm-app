@@ -40,6 +40,12 @@ class PromesaPolicy
 
     public function generateAgreement(User $user, PromesaPago $promesa): bool
     {
-        return in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true);
+        if (! in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true)) {
+            return false;
+        }
+
+        $workflow = strtolower(trim((string) ($promesa->workflow_estado ?: $promesa->estado)));
+
+        return $workflow === 'aprobada';
     }
 }

@@ -21,7 +21,7 @@ class PromesaCreationService
     /**
      * Crea la promesa y retorna [PromesaPago $promesa, string $mensaje].
      */
-    public function createFromRequest(string $dni, StorePromesaRequest $request): array
+    public function createFromRequest(string $numdoc, StorePromesaRequest $request): array
     {
         $type = (string) $request->input('tipo');
         $operations = $this->schedule->selectedOperations($request);
@@ -29,6 +29,18 @@ class PromesaCreationService
         $amounts = $this->schedule->normalizedAmounts($request);
 
         $this->schedule->assertConventionSchedule($request, $amounts, $dates);
+
+        $accountRows = DB::table('clientes_cuentas')
+            ->where('numdoc', $numdoc)
+            ->whereIn('operacion', $operations)
+            ->pluck('operacion')
+            ->map('strval')
+            ->all();
+
+        $missing = array_diff($operations, $accountRows);
+        if (!empty($missing)) {
+            throw new \DomainException('Las operaciones seleccionadas no corresponden al cliente.');
+        }
 
         DB::beginTransaction();
 
@@ -57,7 +69,8 @@ class PromesaCreationService
             }
 
             $base = [
-                'dni' => $dni,
+                'numdoc' => $numdoc,
+                'dni' => $numdoc,
                 'nota' => $request->input('nota'),
                 'tipo' => $type,
                 'telefono' => $request->input('telefono'),
@@ -145,6 +158,7 @@ class PromesaCreationService
 
         if ($rows !== []) {
             PromesaCuota::query()->insert($rows);
+            \App\Services\Panel\PanelDashboardService::invalidate();
         }
     }
 

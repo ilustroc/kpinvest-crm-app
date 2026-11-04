@@ -266,11 +266,12 @@ final class ValidateV1V3Postflight extends Command
         ))->keyBy('column_name');
 
         foreach (self::EXPECTED_PAGOS_COLUMNS as $col => $expectedType) {
-            $actual = strtolower($columns->get($col)->column_type ?? '');
+            $colName = ($col === 'dni' && !$columns->has('dni') && $columns->has('numdoc')) ? 'numdoc' : $col;
+            $actual = strtolower($columns->get($colName)->column_type ?? '');
             if ($actual === '') {
                 $this->fail("pagos.{$col} no existe.");
             } elseif ($actual !== strtolower($expectedType)) {
-                $this->fail("pagos.{$col} es {$actual}; se esperaba {$expectedType}.");
+                $this->fail("pagos.{$colName} es {$actual}; se esperaba {$expectedType}.");
             }
         }
 

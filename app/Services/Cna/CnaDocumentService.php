@@ -24,8 +24,11 @@ class CnaDocumentService
 
         $operations = array_values(array_filter(array_map('strval', $operations)));
 
+        $docNum = (string) ($cna->numdoc ?? $cna->dni);
+
         $rows = DB::table('clientes_cuentas')
             ->select('operacion', 'cuenta', 'cosecha', 'entidad')
+            ->where('numdoc', $docNum)
             ->whereIn('operacion', $operations)
             ->get();
 
@@ -43,13 +46,13 @@ class CnaDocumentService
         Storage::makeDirectory($docxDir);
         Storage::makeDirectory($pdfDir);
 
-        $docxRel = $docxDir."/CNA {$cna->nro_carta} - {$cna->dni}.docx";
-        $pdfRel = $pdfDir."/CNA {$cna->nro_carta} - {$cna->dni}.pdf";
+        $docxRel = $docxDir."/CNA {$cna->nro_carta} - {$docNum}.docx";
+        $pdfRel = $pdfDir."/CNA {$cna->nro_carta} - {$docNum}.pdf";
 
         $processor = new TemplateProcessor($template);
 
         $titular = $cna->titular ?: DB::table('clientes_cuentas')
-            ->where('numdoc', $cna->dni)
+            ->where('numdoc', $docNum)
             ->value('nombre');
 
         Carbon::setLocale('es');
@@ -61,7 +64,7 @@ class CnaDocumentService
 
         $processor->setValue('nro_carta', $cna->nro_carta);
         $processor->setValue('nombre', (string) $titular);
-        $processor->setValue('numdoc', $cna->dni);
+        $processor->setValue('numdoc', $docNum);
         $processor->setValue('aprobado_at', $approvedAt);
 
         $rowsCount = max(count($operations), 1);
@@ -94,7 +97,7 @@ class CnaDocumentService
 
     public function download(CnaSolicitud $cna, string $primary)
     {
-        if ($cna->workflow_estado !== 'aprobada') {
+        if (strtolower(trim((string) $cna->workflow_estado)) !== 'aprobada') {
             abort(403, 'Solo disponible para CNA aprobadas.');
         }
 
@@ -107,12 +110,18 @@ class CnaDocumentService
         $first = $paths[$primary];
         $second = $paths[$primary === 'pdf' ? 'docx' : 'pdf'];
 
+        $headers = [
+            'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
         if (Storage::exists($first['rel'])) {
-            return Storage::download($first['rel'], $first['name']);
+            return Storage::download($first['rel'], $first['name'], $headers);
         }
 
         if (Storage::exists($second['rel'])) {
-            return Storage::download($second['rel'], $second['name']);
+            return Storage::download($second['rel'], $second['name'], $headers);
         }
 
         abort(404, 'Archivo no encontrado.');

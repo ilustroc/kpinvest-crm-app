@@ -11,7 +11,6 @@ class PromesaOperacion extends Model
     protected $fillable = [
         'promesa_id',
         'operacion',
-        'cartera',
     ];
 
     /* ============================

@@ -9,7 +9,7 @@ class CnaSolicitud extends Model
     protected $table = 'cna_solicitudes';
 
     protected $fillable = [
-    'correlativo','nro_carta','dni','titular','producto',
+    'correlativo','nro_carta','numdoc','dni','titular','producto',
     'operaciones','nota','observacion','fecha_pago_realizado','monto_pagado',
     'workflow_estado','user_id',
     'pre_aprobado_por','pre_aprobado_at',
@@ -17,6 +17,36 @@ class CnaSolicitud extends Model
     'rechazado_por','rechazado_at','motivo_rechazo',
     'docx_path','pdf_path',
     ];
+
+    private static ?bool $hasNumdocColumn = null;
+
+    public function getDniAttribute(): ?string
+    {
+        return $this->attributes['numdoc'] ?? $this->attributes['dni'] ?? null;
+    }
+
+    public function getNumdocAttribute(): ?string
+    {
+        return $this->attributes['numdoc'] ?? $this->attributes['dni'] ?? null;
+    }
+
+    public function setDniAttribute($value): void
+    {
+        if (self::$hasNumdocColumn === null) {
+            self::$hasNumdocColumn = \Illuminate\Support\Facades\Schema::hasColumn('cna_solicitudes', 'numdoc');
+        }
+        $col = self::$hasNumdocColumn ? 'numdoc' : 'dni';
+        $this->attributes[$col] = $value;
+    }
+
+    public function setNumdocAttribute($value): void
+    {
+        if (self::$hasNumdocColumn === null) {
+            self::$hasNumdocColumn = \Illuminate\Support\Facades\Schema::hasColumn('cna_solicitudes', 'numdoc');
+        }
+        $col = self::$hasNumdocColumn ? 'numdoc' : 'dni';
+        $this->attributes[$col] = $value;
+    }
 
     protected $casts = [
         'operaciones'          => 'array',
@@ -26,6 +56,17 @@ class CnaSolicitud extends Model
         'aprobado_at'          => 'datetime',
         'rechazado_at'         => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        });
+
+        static::deleted(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        });
+    }
 
     // Relaciones útiles
     public function solicitante()

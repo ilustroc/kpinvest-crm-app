@@ -12,10 +12,10 @@ class CreatePromesaAction
     {
     }
 
-    public function execute(string $dni, StorePromesaRequest $request): array
+    public function execute(string $numdoc, StorePromesaRequest $request): array
     {
         Gate::authorize('create-promesa');
 
-        return $this->promesas->createFromRequest($dni, $request);
+        return $this->promesas->createFromRequest($numdoc, $request);
     }
 }

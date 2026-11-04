@@ -38,6 +38,12 @@ class Roles
         self::SUPERVISOR,
     ];
 
+    public const ASIGNACION_REVIEW_ROLES = [
+        self::ADMINISTRADOR,
+        self::SUPERVISOR,
+        self::SOPORTE,
+    ];
+
     public const FINAL_ROLES = [
         self::ADMINISTRADOR,
         self::SUPERVISOR,
@@ -73,6 +79,11 @@ class Roles
     public static function canReviewWorkflow(User $user): bool
     {
         return self::has($user, self::WORKFLOW_REVIEW_ROLES);
+    }
+
+    public static function canReviewAsignaciones(User $user): bool
+    {
+        return self::has($user, self::ASIGNACION_REVIEW_ROLES);
     }
 
     public static function canDeleteClientPayments(User $user): bool

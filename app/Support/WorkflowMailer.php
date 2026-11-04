@@ -191,8 +191,9 @@ class WorkflowMailer
     {
         $promesa->loadMissing('operaciones', 'user');
 
+        $doc = (string) ($promesa->numdoc ?? $promesa->dni);
         $asesor = $promesa->user ?: User::find($promesa->user_id);
-        $cliente = self::nombreClientePorDni((string) $promesa->dni);
+        $cliente = self::nombreClientePorDni($doc);
         $operations = $promesa->operaciones->pluck('operacion')->filter()->implode(', ')
             ?: (string) ($promesa->operacion ?? '');
         $amount = $promesa->tipo === 'cancelacion'
@@ -201,7 +202,7 @@ class WorkflowMailer
 
         $fields = [
             'Cliente' => $cliente ?: '-',
-            'Documento' => (string) $promesa->dni,
+            'Documento' => $doc,
             'Operacion(es)' => $operations ?: '-',
             'Tipo de promesa' => $promesa->tipo === 'cancelacion' ? 'Cancelacion' : 'Convenio',
             'Monto' => 'S/ '.number_format($amount, 2),
@@ -219,7 +220,8 @@ class WorkflowMailer
 
         return [
             'asesor' => $asesor,
-            'dni' => (string) $promesa->dni,
+            'numdoc' => $doc,
+            'dni' => $doc,
             'cliente' => $cliente ?: '-',
             'fields' => $fields,
             'promesa_fields' => $fields,
@@ -228,8 +230,9 @@ class WorkflowMailer
 
     public static function cnaContext(CnaSolicitud $cna, ?string $note = null): array
     {
+        $doc = (string) ($cna->numdoc ?? $cna->dni);
         $asesor = User::find($cna->user_id);
-        $cliente = $cna->titular ?: self::nombreClientePorDni((string) $cna->dni);
+        $cliente = $cna->titular ?: self::nombreClientePorDni($doc);
         $operations = collect((array) ($cna->operaciones ?? []))
             ->map(fn ($operation) => trim((string) $operation))
             ->filter()
@@ -238,7 +241,7 @@ class WorkflowMailer
         $fields = [
             'Nro. carta' => (string) $cna->nro_carta,
             'Cliente' => $cliente ?: '-',
-            'Documento' => (string) $cna->dni,
+            'Documento' => $doc,
             'Operacion(es)' => $operations ?: '-',
             'Procede de / asesor' => $asesor?->name ?: '-',
         ];
@@ -253,6 +256,8 @@ class WorkflowMailer
 
         return [
             'asesor' => $asesor,
+            'numdoc' => $doc,
+            'dni' => $doc,
             'dni' => (string) $cna->dni,
             'cliente' => $cliente ?: '-',
             'fields' => $fields,

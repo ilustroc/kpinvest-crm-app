@@ -29,7 +29,7 @@ class PromesaQueryService
 
         if ($query !== '') {
             $promesas->where(function ($where) use ($query) {
-                $where->where('promesas_pago.dni', 'like', "%{$query}%")
+                $where->where('promesas_pago.numdoc', 'like', "%{$query}%")
                     ->orWhere('promesas_pago.nota', 'like', "%{$query}%")
                     ->orWhere('promesas_pago.operacion', 'like', "%{$query}%")
                     ->orWhereHas('operaciones', fn ($operation) => $operation->where('operacion', 'like', "%{$query}%"));
@@ -57,7 +57,7 @@ class PromesaQueryService
 
     private function addAccountData(Collection $rows): Collection
     {
-        $dnis = $rows->pluck('dni')
+        $dnis = $rows->map(fn ($row) => $row->numdoc ?? $row->dni)
             ->map(fn ($dni) => $this->normalizeValue($dni))
             ->filter()
             ->unique()
@@ -76,7 +76,7 @@ class PromesaQueryService
         $accountByDniOperation = $this->accountsByDniOperation($dnis, $operations);
 
         return $rows->map(function ($promesa) use ($opsByDni, $clientByDni, $allAccountsByDni, $accountByDniOperation) {
-            $dni = $this->normalizeValue($promesa->dni);
+            $dni = $this->normalizeValue($promesa->numdoc ?? $promesa->dni);
             $operations = $this->operationsForPromesa($promesa, $opsByDni);
 
             $promesa->operacion = $operations->implode(', ');
@@ -150,13 +150,14 @@ class PromesaQueryService
 
     private function operationsByDni(array $dnis): array
     {
-        if ($dnis === []) {
+        $cleanDnis = $this->cleanStringList($dnis);
+        if ($cleanDnis === []) {
             return [];
         }
 
         return DB::table('clientes_cuentas')
             ->select(['numdoc as dni', 'operacion'])
-            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
+            ->whereIn('numdoc', $cleanDnis)
             ->get()
             ->groupBy(fn ($row) => $this->normalizeValue($row->dni))
             ->map(fn ($group) => $this->normalizeList($group->pluck('operacion'))->all())
@@ -165,13 +166,14 @@ class PromesaQueryService
 
     private function clientByDni(array $dnis): array
     {
-        if ($dnis === []) {
+        $cleanDnis = $this->cleanStringList($dnis);
+        if ($cleanDnis === []) {
             return [];
         }
 
         return DB::table('clientes_cuentas')
             ->select(['numdoc as dni', DB::raw('MAX(nombre) as titular')])
-            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
+            ->whereIn('numdoc', $cleanDnis)
             ->groupBy('numdoc')
             ->get()
             ->mapWithKeys(fn ($row) => [$this->normalizeValue($row->dni) => $row->titular])
@@ -180,7 +182,8 @@ class PromesaQueryService
 
     private function allAccountsByDni(array $dnis): array
     {
-        if ($dnis === []) {
+        $cleanDnis = $this->cleanStringList($dnis);
+        if ($cleanDnis === []) {
             return [];
         }
 
@@ -195,7 +198,7 @@ class PromesaQueryService
                 'deuda_total',
                 'fecha_castigo',
             ])
-            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
+            ->whereIn('numdoc', $cleanDnis)
             ->orderBy('operacion')
             ->get()
             ->groupBy(fn ($row) => $this->normalizeValue($row->dni))
@@ -207,7 +210,10 @@ class PromesaQueryService
 
     private function accountsByDniOperation(array $dnis, array $operations): array
     {
-        if ($dnis === [] || $operations === []) {
+        $cleanDnis = $this->cleanStringList($dnis);
+        $cleanOps = $this->cleanStringList($operations);
+
+        if ($cleanDnis === [] || $cleanOps === []) {
             return [];
         }
 
@@ -223,8 +229,8 @@ class PromesaQueryService
                 'deuda_total',
                 'fecha_castigo',
             ])
-            ->whereIn(DB::raw('TRIM(operacion)'), $operations)
-            ->whereIn(DB::raw('TRIM(numdoc)'), $dnis)
+            ->whereIn('operacion', $cleanOps)
+            ->whereIn('numdoc', $cleanDnis)
             ->get()
             ->mapWithKeys(function ($row) {
                 return [$this->accountKey($row->dni, $row->operacion) => $row];
@@ -234,7 +240,7 @@ class PromesaQueryService
 
     private function operationsForPromesa(PromesaPago $promesa, array $opsByDni): Collection
     {
-        $dni = $this->normalizeValue($promesa->dni);
+        $dni = $this->normalizeValue($promesa->numdoc ?? $promesa->dni);
 
         if ($promesa->relationLoaded('operaciones') && $promesa->operaciones->count()) {
             return $this->normalizeList($promesa->operaciones->pluck('operacion'));
@@ -309,5 +315,13 @@ class PromesaQueryService
     private function accountKey(mixed $dni, mixed $operation): string
     {
         return $this->normalizeValue($dni).'|'.$this->normalizeValue($operation);
+    }
+
+    private function cleanStringList(array $values): array
+    {
+        return array_values(array_filter(
+            array_unique(array_map(fn ($item) => trim((string) $item), $values)),
+            fn ($item) => $item !== ''
+        ));
     }
 }

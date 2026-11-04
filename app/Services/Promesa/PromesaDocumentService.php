@@ -17,7 +17,37 @@ class PromesaDocumentService
 {
     public function agreementResponse(PromesaPago $promesa): Response|BinaryFileResponse
     {
+        $workflow = strtolower(trim((string) ($promesa->workflow_estado ?: $promesa->estado)));
+        if ($workflow !== 'aprobada') {
+            abort(403, 'Solo se puede generar y descargar el acuerdo oficial para promesas aprobadas.');
+        }
+
+        $pdfPrivateDir = storage_path('app/promesas/pdfs');
+        $docxPrivateDir = storage_path('app/promesas/docx');
+        if (! is_dir($pdfPrivateDir)) {
+            @mkdir($pdfPrivateDir, 0770, true);
+        }
+        if (! is_dir($docxPrivateDir)) {
+            @mkdir($docxPrivateDir, 0770, true);
+        }
+
+        $docNum = (string) ($promesa->numdoc ?? $promesa->dni);
+        $pdfPrivateFile = "{$pdfPrivateDir}/Acuerdo_{$promesa->id}_{$docNum}.pdf";
+        $docxPrivateFile = "{$docxPrivateDir}/Acuerdo_{$promesa->id}_{$docNum}.docx";
+
+        // Si el PDF oficial ya existe en almacenamiento privado, servirlo directamente sin reprocesar.
+        if (is_file($pdfPrivateFile) && filesize($pdfPrivateFile) > 0) {
+            return response()->file($pdfPrivateFile, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$docNum.'.pdf"',
+                'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
         $requestId = now()->format('YmdHis').'_'.bin2hex(random_bytes(3));
+        $isolatedTmpDir = storage_path('app/tmp/p_'.$promesa->id.'_'.bin2hex(random_bytes(6)));
         $docxOut = null;
         $pdfOut = null;
 
@@ -25,6 +55,10 @@ class PromesaDocumentService
             $template = storage_path('app/templates/Acuerdo_de_Pago_DNI_{dni}.docx');
             if (! is_file($template)) {
                 abort(404, 'No se encontro la plantilla: '.$template);
+            }
+
+            if (! is_dir($isolatedTmpDir)) {
+                @mkdir($isolatedTmpDir, 0770, true);
             }
 
             $promesa->loadMissing(['operaciones', 'cuotas']);
@@ -37,15 +71,9 @@ class PromesaDocumentService
             $document = new TemplateProcessor($template);
             $this->fillDocument($document, $promesa, $client, $operationRows, $scheduleRows);
 
-            $tmpDir = storage_path('app/tmp');
-            if (! is_dir($tmpDir)) {
-                @mkdir($tmpDir, 0775, true);
-            }
-
-            $docxOut = $tmpDir."/Conv_{$promesa->dni}.docx";
-            $pdfOut = $tmpDir."/Conv_{$promesa->dni}.pdf";
-
+            $docxOut = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$promesa->dni}.docx";
             $document->saveAs($docxOut);
+            @copy($docxOut, $docxPrivateFile);
 
             Log::info('PROMESA_DOCX_INSPECT', [
                 'req_id' => $requestId,
@@ -59,26 +87,44 @@ class PromesaDocumentService
             ]);
 
             try {
-                $pdfOut = $this->convertToPdf($docxOut, $tmpDir, $promesa);
+                $pdfTemp = $this->convertToPdf($docxOut, $isolatedTmpDir, $promesa);
+                @rename($pdfTemp, $pdfPrivateFile);
+                @unlink($docxOut);
+                @rmdir($isolatedTmpDir);
+
+                return response()->file($pdfPrivateFile, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$promesa->dni.'.pdf"',
+                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
             } catch (Throwable $e) {
                 Log::warning('iLovePDF fallo, entregando DOCX', [
                     'req_id' => $requestId,
                     'promesa_id' => $promesa->id,
                     'dni' => $promesa->dni,
-                    'step' => $step ?? 'unknown',
                     'msg' => $e->getMessage(),
                     'exception' => get_class($e),
-                    'docx' => $this->fileMeta($docxOut),
-                    'inspect' => $this->inspectDocx($docxOut),
                 ]);
 
-                return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
-            }
+                if (! is_file($docxPrivateFile) && is_file($docxOut)) {
+                    @copy($docxOut, $docxPrivateFile);
+                }
+                if (is_file($docxOut)) {
+                    @unlink($docxOut);
+                }
+                if (is_dir($isolatedTmpDir)) {
+                    @rmdir($isolatedTmpDir);
+                }
 
-            return response()->file($pdfOut, [
-                'Content-Type' => 'application/pdf',
-                'Cache-Control' => 'private, max-age=0, no-store, no-cache, must-revalidate',
-            ]);
+                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$promesa->dni}.docx", [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+            }
         } catch (Throwable $e) {
             Log::error('Error generando Conv PDF', [
                 'req_id' => $requestId,
@@ -88,11 +134,15 @@ class PromesaDocumentService
                 'exception' => get_class($e),
             ]);
 
-            if (! empty($docxOut) && is_file($docxOut)) {
-                return response()->download($docxOut, "Conv_{$promesa->dni}.docx");
+            if (is_file($docxPrivateFile)) {
+                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$promesa->dni}.docx", [
+                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
             }
 
-            abort(500, 'No se pudo generar el PDF del acuerdo.');
+            abort(500, 'No se pudo generar el documento del acuerdo.');
         }
     }
 
@@ -106,8 +156,10 @@ class PromesaDocumentService
             return array_filter(array_map('trim', explode(',', (string) $promesa->operacion)));
         }
 
+        $docNum = (string) ($promesa->numdoc ?? $promesa->dni);
+
         return DB::table('clientes_cuentas')
-            ->where('numdoc', $promesa->dni)
+            ->where('numdoc', $docNum)
             ->pluck('operacion')
             ->filter()
             ->all();
@@ -115,13 +167,15 @@ class PromesaDocumentService
 
     private function clientFor(PromesaPago $promesa): object
     {
+        $docNum = (string) ($promesa->numdoc ?? $promesa->dni);
+
         $client = DB::table('clientes_cuentas')
-            ->where('numdoc', $promesa->dni)
+            ->where('numdoc', $docNum)
             ->orderByDesc('updated_at')
             ->first(['numdoc', 'nombre', 'direccion']);
 
         return (object) [
-            'numdoc' => (string) ($client->numdoc ?? $promesa->dni),
+            'numdoc' => (string) ($client->numdoc ?? $docNum),
             'nombre' => (string) ($client->nombre ?? ''),
             'direccion' => (string) ($client->direccion ?? ''),
         ];
@@ -129,14 +183,17 @@ class PromesaDocumentService
 
     private function operationRows(array $operations, PromesaPago $promesa): object
     {
+        $docNum = (string) ($promesa->numdoc ?? $promesa->dni);
+
         $rows = DB::table('clientes_cuentas')
             ->select('operacion', 'deuda_total', 'entidad')
+            ->where('numdoc', $docNum)
             ->whereIn('operacion', $operations)
             ->get();
 
         $byOperation = $rows->keyBy('operacion');
         $entity = (string) ($rows->pluck('entidad')->filter()->countBy()->sortDesc()->keys()->first()
-            ?? DB::table('clientes_cuentas')->where('numdoc', $promesa->dni)->value('entidad') ?? '');
+            ?? DB::table('clientes_cuentas')->where('numdoc', $docNum)->value('entidad') ?? '');
 
         $amount = $promesa->tipo === 'convenio'
             ? (float) ($promesa->monto_convenio ?? 0)
@@ -283,7 +340,7 @@ class PromesaDocumentService
         }
     }
 
-    private function convertToPdf(string $docxOut, string $tmpDir, PromesaPago $promesa): string
+    private function convertToPdf(string $docxOut, string $isolatedTmpDir, PromesaPago $promesa): string
     {
         $public = config('services.ilovepdf.public');
         $secret = config('services.ilovepdf.secret');
@@ -294,18 +351,34 @@ class PromesaDocumentService
 
         $ilovepdf = new Ilovepdf($public, $secret);
         $task = $ilovepdf->newTask('officepdf');
-        $task->setOutputFilename("Conv_{$promesa->dni}");
+        $task->setOutputFilename("Acuerdo_{$promesa->id}_{$promesa->dni}");
         $task->addFile($docxOut);
         $task->execute();
-        $task->download($tmpDir);
+        $task->download($isolatedTmpDir);
 
-        $candidates = glob($tmpDir."/Conv_{$promesa->dni}*.pdf");
-
-        if (! $candidates) {
-            throw new \RuntimeException('iLovePDF no devolvio un PDF en el directorio de salida');
+        $expectedPdf = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$promesa->dni}.pdf";
+        if (is_file($expectedPdf)) {
+            return $expectedPdf;
         }
 
-        return $candidates[0];
+        $fallbackPdf = $isolatedTmpDir.'/'.pathinfo($docxOut, PATHINFO_FILENAME).'.pdf';
+        if (is_file($fallbackPdf)) {
+            return $fallbackPdf;
+        }
+
+        $files = @scandir($isolatedTmpDir);
+        if ($files !== false) {
+            foreach ($files as $file) {
+                if ($file !== '.' && $file !== '..' && str_ends_with(strtolower($file), '.pdf')) {
+                    $candidate = $isolatedTmpDir.'/'.$file;
+                    if (is_file($candidate)) {
+                        return $candidate;
+                    }
+                }
+            }
+        }
+
+        throw new \RuntimeException('iLovePDF no devolvio un PDF en el directorio de salida');
     }
 
     private function fileMeta(string $path): array

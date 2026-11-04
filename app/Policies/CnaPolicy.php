@@ -45,6 +45,10 @@ class CnaPolicy
 
     public function downloadDocument(User $user, CnaSolicitud $cna): bool
     {
-        return in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true);
+        if (! in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true)) {
+            return false;
+        }
+
+        return strtolower(trim((string) $cna->workflow_estado)) === 'aprobada';
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Cliente;
 
 use App\Models\CcdCliente;
 use App\Models\PromesaPago;
+use App\Services\Asignacion\ClienteAssignmentService;
 use App\ViewModels\Cliente\ClienteShowViewModel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ class ClienteProfileService
     public function __construct(
         private readonly ClienteAccountService $accounts,
         private readonly ClientePaymentService $payments,
+        private readonly ClienteAssignmentService $assignments,
     ) {
     }
 
@@ -26,18 +28,29 @@ class ClienteProfileService
         $pagosGrouped = $this->payments->groupedByOperation($pagos);
         $accountByOperation = $this->payments->accountByOperation($pagos);
 
+        $resolvedAssignments = Schema::hasTable('asignar_clientes')
+            ? $this->assignments->resolveActiveAssignmentsForAccounts($cuentas)
+            : [];
+
+        $advisorByOperation = collect($resolvedAssignments['advisor_name_by_operation'] ?? []);
+
         $cuentas = $this->accounts->addPaymentAndAdvisorData(
             $cuentas,
             $pagosGrouped,
             $accountByOperation,
-            $this->accounts->advisorsByOperation($dni),
+            $advisorByOperation,
+            $resolvedAssignments,
         );
+
+        $asignacionesHistorial = Schema::hasTable('asignar_clientes')
+            ? $this->assignments->historyForClient($dni, 50)
+            : collect();
 
         [$ccdDocs, $ccdByDni, $ccdByCodigo, $ccdByCosecha, $ccdCosechaKeys] = $this->ccdData($dni, $cuentas);
         [$cnasByCuenta, $cnasByOperacion] = $this->cnaData($dni, $cuentas, $accountByOperation);
 
         return new ClienteShowViewModel(
-            dni: $dni,
+            numdoc: $dni,
             titular: $cuentas->first()->nombre ?? '-',
             cuentas: $cuentas,
             pagos: $pagos,
@@ -52,13 +65,17 @@ class ClienteProfileService
             pagosGrouped: $pagosGrouped,
             nextNroCarta: $this->nextNroCarta(),
             totPagos: $this->payments->total($pagos),
+            dni: $dni,
+            asignacionesHistorial: $asignacionesHistorial,
         );
     }
 
     private function promesasForDni(string $dni): Collection
     {
+        $col = Schema::hasColumn('promesas_pago', 'numdoc') ? 'numdoc' : 'dni';
+
         return PromesaPago::query()
-            ->where('dni', $dni)
+            ->where($col, $dni)
             ->with(['operaciones', 'cuotas' => fn ($query) => $query->orderBy('nro')])
             ->orderByDesc('fecha_promesa')
             ->get();
@@ -112,9 +129,10 @@ class ClienteProfileService
         }
 
         $columns = DB::getSchemaBuilder()->getColumnListing('cna_solicitudes');
+        $docCol = in_array('numdoc', $columns, true) ? 'numdoc' : 'dni';
         $selected = collect([
             'id',
-            'dni',
+            $docCol,
             'nro_carta',
             'operaciones',
             'workflow_estado',
@@ -125,7 +143,7 @@ class ClienteProfileService
 
         $cnas = DB::table('cna_solicitudes')
             ->select($selected)
-            ->where('dni', $dni)
+            ->where($docCol, $dni)
             ->orderByDesc('created_at')
             ->get();
 

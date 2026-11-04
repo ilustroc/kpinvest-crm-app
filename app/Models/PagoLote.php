@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class PagoLote extends Model
 {
     protected $table = 'pagos_lotes';
-    protected $fillable = ['tipo', 'archivo', 'usuario_id', 'total_registros'];
+    protected $fillable = ['archivo', 'usuario_id', 'total_registros'];
+
+    public function getTipoAttribute(): ?string
+    {
+        return $this->attributes['tipo'] ?? 'propia';
+    }
 
     public function pagos()
     {

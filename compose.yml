@@ -1,0 +1,70 @@
+name: kpcrm-meridian-ui
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/crm/Dockerfile
+    ports:
+      - '127.0.0.1:8091:80'
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - kpcrm_meridian_ui_revision_storage:/var/www/html/storage
+      - C:/Backups/KPInvest/CCD/BBVA/BBVA_5:/mnt/ccd-import/BBVA_5:ro
+    environment:
+      APP_ENV: local
+      APP_DEBUG: 'false'
+      APP_URL: http://localhost:8091
+      APP_KEY: ${UI_APP_KEY:-base64:0FhBM0Ifi0S+7BFP+L5BSX9uYYuudV+6cr5N/lUavr0=}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: '3306'
+      DB_DATABASE: ${UI_DB_DATABASE:-kp_crm_revision_v3}
+      DB_USERNAME: ${UI_DB_USERNAME:-kprev}
+      DB_PASSWORD: ${UI_DB_PASSWORD:-mlhOQ0GBYtmcuQCD60jfCUppYuMN5}
+      SESSION_DRIVER: file
+      CACHE_DRIVER: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      BROADCAST_CONNECTION: 'null'
+      BROADCAST_DRIVER: 'null'
+      FILESYSTEM_DISK: local
+      CCD_PRIVATE_DISK: ccd-private
+      CCD_IMPORT_ROOT: /mnt/ccd-import/BBVA_5
+      CCD_MAX_FILE_BYTES: '52428800'
+      ILOVEPDF_PUBLIC_KEY: ''
+      ILOVEPDF_SECRET_KEY: ''
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: error
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [crm_ui_net]
+
+  db:
+    image: mariadb:11.8.9
+    environment:
+      MARIADB_ROOT_PASSWORD: ${UI_DB_ROOT_PASSWORD:-rootsecret}
+      MARIADB_DATABASE: ${UI_DB_DATABASE:-kp_crm_revision_v3}
+      MARIADB_USER: ${UI_DB_USERNAME:-kprev}
+      MARIADB_PASSWORD: ${UI_DB_PASSWORD:-mlhOQ0GBYtmcuQCD60jfCUppYuMN5}
+    volumes:
+      - kpcrm_meridian_ui_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [crm_ui_net]
+
+volumes:
+  kpcrm_meridian_ui_mariadb_data:
+    name: kpcrm_meridian_ui_mariadb_data
+  kpcrm_meridian_ui_revision_storage:
+    name: kpcrm_meridian_ui_revision_storage
+
+networks:
+  crm_ui_net:
+    name: crm_ui_net

@@ -19,6 +19,10 @@ class DownloadCnaDocumentAction
 
         Gate::forUser($user)->authorize('download-cna-document', $cna);
 
+        if (strtolower(trim((string) $cna->workflow_estado)) !== 'aprobada') {
+            abort(403, 'Solo se pueden descargar documentos para CNA aprobadas.');
+        }
+
         return $this->documents->download($cna, $primary);
     }
 }

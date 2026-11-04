@@ -36,6 +36,24 @@ return [
             'throw' => false,
         ],
 
+        'ccd-private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/ccd'),
+            'visibility' => 'private',
+            'directory_visibility' => 'private',
+            'permissions' => [
+                'file' => [
+                    'public' => 0660,
+                    'private' => 0660,
+                ],
+                'dir' => [
+                    'public' => 0770,
+                    'private' => 0770,
+                ],
+            ],
+            'throw' => true,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\AsignarCliente;
 use App\Models\User;
+use App\Policies\AsignacionPolicy;
 use App\Policies\ClientePolicy;
 use App\Policies\CnaPolicy;
 use App\Policies\PromesaPolicy;
@@ -20,6 +22,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         User::class => UserPolicy::class,
+        AsignarCliente::class => AsignacionPolicy::class,
     ];
 
     /**
@@ -33,11 +36,15 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('access-integracion', fn (User $user) => Roles::canAccessIntegrations($user));
         Gate::define('review-promesas', [PromesaPolicy::class, 'viewWorkflow']);
         Gate::define('review-cna', [CnaPolicy::class, 'viewWorkflow']);
+        Gate::define('review-asignaciones', [AsignacionPolicy::class, 'viewWorkflow']);
         Gate::define('view-cliente', [ClientePolicy::class, 'view']);
         Gate::define('search-clientes', [ClientePolicy::class, 'search']);
         Gate::define('delete-client-payments', [ClientePolicy::class, 'deletePayment']);
         Gate::define('create-cliente-promesa', [ClientePolicy::class, 'createPromesa']);
         Gate::define('create-cliente-cna', [ClientePolicy::class, 'createCna']);
+        Gate::define('create-cliente-asignacion', [AsignacionPolicy::class, 'create']);
+        Gate::define('approve-asignacion', [AsignacionPolicy::class, 'approve']);
+        Gate::define('reject-asignacion', [AsignacionPolicy::class, 'reject']);
         Gate::define('create-promesa', [PromesaPolicy::class, 'create']);
         Gate::define('preapprove-promesa', [PromesaPolicy::class, 'preapprove']);
         Gate::define('approve-promesa', [PromesaPolicy::class, 'approve']);

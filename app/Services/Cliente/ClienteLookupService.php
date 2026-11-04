@@ -20,15 +20,15 @@ class ClienteLookupService
 
         $base = DB::table('clientes_cuentas');
 
-        if (preg_match('/^\d{6,}$/', $query)) {
-            $dni = (clone $base)->where('numdoc', $query)->value('numdoc');
-            if ($dni) {
-                return ['type' => 'redirect', 'dni' => $dni];
+        if (preg_match('/^[A-Za-z0-9\-]{5,}$/', $query)) {
+            $numdoc = (clone $base)->where('numdoc', $query)->value('numdoc');
+            if ($numdoc) {
+                return ['type' => 'redirect', 'numdoc' => $numdoc, 'dni' => $numdoc];
             }
 
-            $dniByOperation = (clone $base)->where('operacion', $query)->value('numdoc');
-            if ($dniByOperation) {
-                return ['type' => 'redirect', 'dni' => $dniByOperation];
+            $numdocByOperation = (clone $base)->where('operacion', $query)->value('numdoc');
+            if ($numdocByOperation) {
+                return ['type' => 'redirect', 'numdoc' => $numdocByOperation, 'dni' => $numdocByOperation];
             }
         }
 
@@ -42,9 +42,11 @@ class ClienteLookupService
         }
 
         if ($candidates->count() === 1) {
+            $first = $candidates->first();
             return [
                 'type' => 'redirect',
-                'dni' => $candidates->first(),
+                'numdoc' => $first,
+                'dni' => $first,
             ];
         }
 
@@ -64,11 +66,12 @@ class ClienteLookupService
 
         return $this->candidateRows($this->candidateDnis($query, 8))
             ->map(fn ($row) => [
-                'dni' => $row->dni,
+                'numdoc' => $row->numdoc ?? $row->dni,
+                'dni' => $row->numdoc ?? $row->dni,
                 'nombre' => $row->nombre,
                 'operacion' => $row->operacion,
                 'cosecha' => $row->cosecha,
-                'url' => route('clientes.show', $row->dni),
+                'url' => route('clientes.show', $row->numdoc ?? $row->dni),
             ]);
     }
 
@@ -92,7 +95,7 @@ class ClienteLookupService
         return DB::table('clientes_cuentas')
             ->whereIn('numdoc', $dnis)
             ->orderByDesc('updated_at')
-            ->get(['numdoc as dni', 'nombre', 'operacion', 'cosecha', 'updated_at'])
+            ->get(['numdoc', 'numdoc as dni', 'nombre', 'operacion', 'cosecha', 'updated_at'])
             ->unique('dni')
             ->values();
     }

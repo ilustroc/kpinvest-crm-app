@@ -6,15 +6,14 @@
 /storage/*.key
 /vendor
 .env
-.env.backup
-.env.production
+.env.*
+!.env.example
 .phpunit.result.cache
 *.log
 *.tmp
 *.bak
 *.old
 error_log
-estructura_generada_v3.sql
 Homestead.json
 Homestead.yaml
 auth.json
@@ -23,3 +22,27 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Database backups, dumps, and drafts
+*.sql
+database/*.sql
+database/backup_*.sql
+database/migrations_draft/
+database/backup/
+
+# Sensitive or generated attachments, documents and exports
+*.docx
+*.pdf
+*.xlsx
+*.csv
+storage/app/*
+!storage/app/.gitignore
+storage/logs/*
+!storage/logs/.gitignore
+storage/framework/cache/*
+!storage/framework/cache/.gitignore
+storage/framework/sessions/*
+!storage/framework/sessions/.gitignore
+storage/framework/views/*
+!storage/framework/views/.gitignore
+

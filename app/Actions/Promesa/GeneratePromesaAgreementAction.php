@@ -19,6 +19,11 @@ class GeneratePromesaAgreementAction
     {
         Gate::forUser($user)->authorize('generate-promesa-agreement', $promesa);
 
+        $workflow = strtolower(trim((string) ($promesa->workflow_estado ?: $promesa->estado)));
+        if ($workflow !== 'aprobada') {
+            abort(403, 'Solo se puede generar el acuerdo de pago para promesas aprobadas.');
+        }
+
         return $this->documents->agreementResponse($promesa);
     }
 }

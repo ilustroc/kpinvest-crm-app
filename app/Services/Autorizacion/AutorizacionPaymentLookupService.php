@@ -10,9 +10,10 @@ class AutorizacionPaymentLookupService
     public function pagosByDni(string $dni): Collection
     {
         $dni = trim($dni);
+        $col = \Illuminate\Support\Facades\Schema::hasColumn('pagos', 'numdoc') ? 'numdoc' : 'dni';
 
         return Pago::query()
-            ->where('dni', $dni)
+            ->where($col, $dni)
             ->orderByDesc('lote_id')
             ->orderByDesc('fecha')
             ->get([

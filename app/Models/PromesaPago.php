@@ -17,7 +17,7 @@ class PromesaPago extends Model
     protected $table = 'promesas_pago';
 
     protected $fillable = [
-        'dni','operacion','fecha_promesa','monto','nota','user_id','telefono',
+        'numdoc','dni','operacion','fecha_promesa','monto','nota','user_id','telefono',
         // Estados
         'workflow_estado',        // pendiente|preaprobada|aprobada|rechazada|rechazada_sup
         'estado',                 // legacy (espejo de workflow_estado)
@@ -36,6 +36,36 @@ class PromesaPago extends Model
         // Notas positivas
         'nota_preaprobacion','nota_aprobacion',
     ];
+
+    private static ?bool $hasNumdocColumn = null;
+
+    public function getDniAttribute(): ?string
+    {
+        return $this->attributes['numdoc'] ?? $this->attributes['dni'] ?? null;
+    }
+
+    public function getNumdocAttribute(): ?string
+    {
+        return $this->attributes['numdoc'] ?? $this->attributes['dni'] ?? null;
+    }
+
+    public function setDniAttribute($value): void
+    {
+        if (self::$hasNumdocColumn === null) {
+            self::$hasNumdocColumn = \Illuminate\Support\Facades\Schema::hasColumn('promesas_pago', 'numdoc');
+        }
+        $col = self::$hasNumdocColumn ? 'numdoc' : 'dni';
+        $this->attributes[$col] = $value;
+    }
+
+    public function setNumdocAttribute($value): void
+    {
+        if (self::$hasNumdocColumn === null) {
+            self::$hasNumdocColumn = \Illuminate\Support\Facades\Schema::hasColumn('promesas_pago', 'numdoc');
+        }
+        $col = self::$hasNumdocColumn ? 'numdoc' : 'dni';
+        $this->attributes[$col] = $value;
+    }
 
     protected $casts = [
         'fecha_promesa'   => 'date',
@@ -77,6 +107,14 @@ class PromesaPago extends Model
             if (!in_array($m->tipo, ['convenio','cancelacion'], true)) {
                 $m->tipo = 'convenio';
             }
+        });
+
+        static::saved(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
+        });
+
+        static::deleted(function () {
+            \App\Services\Panel\PanelDashboardService::invalidate();
         });
     }
 

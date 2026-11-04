@@ -17,7 +17,7 @@ class CnaCreationService
     ) {
     }
 
-    public function createFromData(string $dni, array $data, User $user): array
+    public function createFromData(string $numdoc, array $data, User $user): array
     {
         $operations = array_values(array_filter(array_map('strval', $data['operaciones'] ?? [])));
 
@@ -26,12 +26,12 @@ class CnaCreationService
         }
 
         $titular = $data['titular'] ?? DB::table('clientes_cuentas')
-            ->where('numdoc', $dni)
+            ->where('numdoc', $numdoc)
             ->value('nombre');
 
         $accountRows = DB::table('clientes_cuentas')
             ->select('operacion', 'cosecha', 'entidad', 'producto')
-            ->where('numdoc', $dni)
+            ->where('numdoc', $numdoc)
             ->whereIn('operacion', $operations)
             ->get();
 
@@ -40,7 +40,7 @@ class CnaCreationService
 
         if ($missing->isNotEmpty()) {
             throw new DomainException(
-                'Las operaciones ('.implode(', ', $missing->all()).') no pertenecen al DNI '.$dni.'.'
+                'Las operaciones ('.implode(', ', $missing->all()).') no pertenecen al documento '.$numdoc.'.'
             );
         }
 
@@ -59,7 +59,7 @@ class CnaCreationService
         $now = now();
 
         $solicitud = DB::transaction(function () use (
-            $dni,
+            $numdoc,
             $data,
             $operations,
             $titular,
@@ -76,7 +76,8 @@ class CnaCreationService
             $payload = [
                 'correlativo' => $next['corr'],
                 'nro_carta' => $next['nro'],
-                'dni' => $dni,
+                'numdoc' => $numdoc,
+                'dni' => $numdoc,
                 'titular' => $titular,
                 'producto' => $product,
                 'operaciones' => $operations,

@@ -2,19 +2,30 @@
 
 namespace App\Services\Cliente;
 
-use App\Models\AsignarCliente;
 use App\Models\ClienteCuenta;
+use App\Services\Asignacion\ClienteAssignmentService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class ClienteAccountService
 {
+    public function __construct(
+        private readonly ClienteAssignmentService $assignments,
+    ) {
+    }
+
     public function accountsForDni(string $dni): Collection
     {
+        return $this->accountsForNumdoc($dni);
+    }
+
+    public function accountsForNumdoc(string $numdoc): Collection
+    {
         return ClienteCuenta::query()
-            ->where('numdoc', $dni)
+            ->where('numdoc', $numdoc)
             ->orderByDesc('updated_at')
             ->get([
+                'id',
                 'numdoc',
                 'nombre',
                 'cuenta',
@@ -29,27 +40,34 @@ class ClienteAccountService
             ]);
     }
 
-    public function advisorsByOperation(string $dni): Collection
+    public function advisorsByOperation(string $dni, ?Collection $cuentas = null): Collection
     {
         if (! Schema::hasTable('asignar_clientes')) {
             return collect();
         }
 
-        return AsignarCliente::query()
-            ->where('numdoc', $dni)
-            ->orderByDesc('id')
-            ->get(['numdoc', 'operacion', 'name'])
-            ->groupBy('operacion')
-            ->map(fn (Collection $group) => optional($group->first())->name);
+        return $this->assignments->advisorsByOperation($dni, $cuentas);
     }
 
     public function addPaymentAndAdvisorData(
         Collection $cuentas,
         Collection $pagosGrouped,
         Collection $accountByOperation,
-        Collection $advisorByOperation
+        Collection $advisorByOperation,
+        array $resolvedAssignments = []
     ): Collection {
-        return $cuentas->map(function ($account) use ($pagosGrouped, $accountByOperation, $advisorByOperation) {
+        $byCuentaId = $resolvedAssignments['by_cuenta_id'] ?? [];
+        $byOperation = $resolvedAssignments['by_operation'] ?? [];
+        $advisorByCuentaId = $resolvedAssignments['advisor_name_by_cuenta_id'] ?? [];
+
+        return $cuentas->map(function ($account) use (
+            $pagosGrouped,
+            $accountByOperation,
+            $advisorByOperation,
+            $byCuentaId,
+            $byOperation,
+            $advisorByCuentaId
+        ) {
             $group = $pagosGrouped->get($account->operacion) ?? collect();
             $account->pagos_count = $group->count();
             $account->pagos_sum = (float) $group->sum('monto_pagado');
@@ -60,7 +78,16 @@ class ClienteAccountService
                 ? $currentAccount
                 : ($mappedAccount !== '' ? $mappedAccount : $account->operacion);
 
-            $account->asesor = $advisorByOperation->get($account->operacion) ?? null;
+            $cid = isset($account->id) ? (int) $account->id : 0;
+            if ($cid > 0 && array_key_exists($cid, $advisorByCuentaId)) {
+                $account->asesor = $advisorByCuentaId[$cid];
+            } else {
+                $account->asesor = $advisorByOperation->get($account->operacion) ?? null;
+            }
+
+            $account->asignacion_vigente = ($cid > 0 && isset($byCuentaId[$cid]))
+                ? $byCuentaId[$cid]
+                : ($byOperation[$account->operacion] ?? null);
 
             return $account;
         });

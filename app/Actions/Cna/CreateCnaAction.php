@@ -12,10 +12,10 @@ class CreateCnaAction
     {
     }
 
-    public function execute(User $user, string $dni, array $data): array
+    public function execute(User $user, string $numdoc, array $data): array
     {
         Gate::forUser($user)->authorize('create-cna');
 
-        return $this->cnas->createFromData($dni, $data, $user);
+        return $this->cnas->createFromData($numdoc, $data, $user);
     }
 }

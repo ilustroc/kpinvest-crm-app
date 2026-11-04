@@ -12,10 +12,10 @@ class DeleteClientePaymentAction
     {
     }
 
-    public function execute(?User $user, string $dni, mixed $ids): ?int
+    public function execute(?User $user, string $numdoc, mixed $ids, ?string $motivo = null): ?int
     {
         if (! $user || ! Gate::forUser($user)->allows('delete-client-payments')) {
-            abort(403, 'No autorizado');
+            abort(403, 'No autorizado para eliminar pagos');
         }
 
         $ids = $this->payments->normalizePaymentIds($ids);
@@ -24,6 +24,6 @@ class DeleteClientePaymentAction
             return null;
         }
 
-        return $this->payments->deleteForDni($dni, $ids);
+        return $this->payments->deleteForNumdoc($user, $numdoc, $ids, $motivo);
     }
 }
