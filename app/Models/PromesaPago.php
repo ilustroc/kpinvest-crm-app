@@ -159,6 +159,30 @@ class PromesaPago extends Model
     public function esConvenio(): bool    { return $this->tipo === 'convenio'; }
     public function esCancelacion(): bool { return $this->tipo === 'cancelacion'; }
 
+    /**
+     * Total negociado que se presenta en Ficha 360°. El cronograma es la
+     * fuente de verdad cuando existe; los campos de cabecera se conservan
+     * como fallback para promesas históricas sin cuotas registradas.
+     */
+    public function montoNegociado(): string
+    {
+        if ($this->relationLoaded('cuotas') && $this->cuotas->isNotEmpty()) {
+            return $this->cuotas->reduce(
+                fn (string $total, PromesaCuota $cuota) => bcadd($total, (string) ($cuota->monto ?? '0'), 2),
+                '0.00',
+            );
+        }
+
+        foreach (['monto_convenio', 'monto', 'monto_cuota'] as $field) {
+            $amount = $this->getAttribute($field);
+            if ($amount !== null && is_numeric($amount) && bccomp((string) $amount, '0', 2) > 0) {
+                return bcadd((string) $amount, '0', 2);
+            }
+        }
+
+        return '0.00';
+    }
+
     /* ----------------- Compatibilidad legacy (estado) ---------------------- */
 
     // leer siempre desde workflow_estado

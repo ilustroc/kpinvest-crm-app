@@ -41,6 +41,7 @@ class ClienteProfileService
             $advisorByOperation,
             $resolvedAssignments,
         );
+        $financialTotals = $this->accounts->financialTotals($cuentas);
 
         [$ccdDocs, $ccdByDni, $ccdByCodigo, $ccdByCosecha, $ccdCosechaKeys] = $this->ccdData($dni, $cuentas);
         [$cnasByCuenta, $cnasByOperacion] = $this->cnaData($dni, $cuentas, $accountByOperation);
@@ -61,6 +62,8 @@ class ClienteProfileService
             pagosGrouped: $pagosGrouped,
             nextNroCarta: $this->nextNroCarta(),
             totPagos: $this->payments->total($pagos),
+            totCapital: $financialTotals['capital'],
+            totDeuda: $financialTotals['deuda'],
             dni: $dni,
         );
     }
@@ -71,7 +74,11 @@ class ClienteProfileService
 
         return PromesaPago::query()
             ->where($col, $dni)
-            ->with(['operaciones', 'cuotas' => fn ($query) => $query->orderBy('nro')])
+            ->with([
+                'user:id,name',
+                'operaciones',
+                'cuotas' => fn ($query) => $query->orderBy('nro'),
+            ])
             ->orderByDesc('fecha_promesa')
             ->get();
     }

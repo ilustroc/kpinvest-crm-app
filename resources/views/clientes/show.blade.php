@@ -6,8 +6,6 @@
 
 @section('content')
     @php
-        $totCapital = (float) $cuentas->sum(fn($x) => (float) ($x->deuda_capital ?? $x->saldo_capital ?? 0));
-        $totDeuda = (float) $cuentas->sum(fn($x) => (float) ($x->deuda_total ?? 0));
         $totPagos = (float) $pagos->sum(fn($p) => (float) ($p->monto_pagado ?? $p->monto ?? 0));
         $ccdDocs = collect($ccdByDni[$dni] ?? []);
         $canDeletePagos = \Illuminate\Support\Facades\Gate::allows('delete-client-payments');
@@ -156,7 +154,7 @@
                                     </div>
                                 </x-tables.td>
                                 <x-tables.td>
-                                    @if(str_contains(mb_strtoupper($asesor), 'CANCEL'))
+                                    @if($c->is_operationally_cancelled ?? false)
                                         <div class="flex max-w-[150px] items-center" title="Operación en CANCELADOS; no implica que la deuda esté pagada">
                                             <x-ui.badge variant="warning">CANCELADOS</x-ui.badge>
                                         </div>

@@ -50,10 +50,8 @@
                         ? $pp->operaciones->pluck('operacion')->all()
                         : array_filter(array_map('trim', explode(',', (string) ($pp->operacion ?? ''))));
 
-                    $montoNeg = (float) ($pp->monto ?? 0);
-                    if ($montoNeg <= 0) {
-                        $montoNeg = (float) ($pp->cuotas->first()->monto ?? 0);
-                    }
+                    $montoNeg = (float) $pp->montoNegociado();
+                    $hasRegisteredQuotas = $pp->relationLoaded('cuotas') && $pp->cuotas->isNotEmpty();
 
                     $nota = trim((string) ($pp->nota ?? ''));
                     $status = strtolower((string) ($pp->workflow_estado ?? 'pendiente'));
@@ -70,13 +68,16 @@
                     };
                     $ds = [
                         'tipo' => (string) $pp->tipo,
-                        'cuotas' => in_array($pp->tipo, ['cancelacion', 'parcial'], true)
+                        // Las promesas históricas sin cronograma muestran una única
+                        // referencia con el mismo fallback seguro de la tabla. No se
+                        // persiste ni se inventa una cuota nueva.
+                        'cuotas' => in_array($pp->tipo, ['cancelacion', 'parcial'], true) || ! $hasRegisteredQuotas
                             ? [[
                                 'nro' => 1,
                                 'fecha' => $pp->fecha_promesa || $pp->fecha_pago
                                     ? \Carbon\Carbon::parse($pp->fecha_promesa ?: $pp->fecha_pago)->format('Y-m-d')
                                     : null,
-                                'monto' => (float) ($pp->monto ?? 0),
+                                'monto' => $montoNeg,
                                 'es_balon' => 0,
                             ]]
                             : $pp->cuotas->map(fn($c) => [

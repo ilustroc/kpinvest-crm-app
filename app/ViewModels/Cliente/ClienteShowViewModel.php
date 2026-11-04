@@ -24,6 +24,8 @@ class ClienteShowViewModel
         public readonly Collection $pagosGrouped,
         public readonly ?string $nextNroCarta,
         public readonly float $totPagos,
+        public readonly float $totCapital,
+        public readonly float $totDeuda,
         ?string $dni = null,
     ) {
         $this->numdoc = $numdoc ?: (string) $dni;
@@ -49,6 +51,8 @@ class ClienteShowViewModel
             'pagosGrouped' => $this->pagosGrouped,
             'nextNroCarta' => $this->nextNroCarta,
             'totPagos' => $this->totPagos,
+            'totCapital' => $this->totCapital,
+            'totDeuda' => $this->totDeuda,
         ];
     }
 }

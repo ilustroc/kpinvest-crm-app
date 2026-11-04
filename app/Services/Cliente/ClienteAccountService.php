@@ -85,12 +85,50 @@ class ClienteAccountService
                 $account->asesor = $advisorByOperation->get($account->operacion) ?? null;
             }
 
+            $account->is_operationally_cancelled = $this->isOperationallyCancelled($account->asesor);
+
             $account->asignacion_vigente = ($cid > 0 && isset($byCuentaId[$cid]))
                 ? $byCuentaId[$cid]
                 : ($byOperation[$account->operacion] ?? null);
 
             return $account;
         });
+    }
+
+    /**
+     * Totales exclusivos de la Ficha 360°. Se calculan después de resolver
+     * la asignación vigente por cuenta, por lo que no confunden operaciones
+     * repetidas de entidades distintas ni solicitudes pendientes/rechazadas.
+     *
+     * @return array{capital: float, deuda: float}
+     */
+    public function financialTotals(Collection $accounts): array
+    {
+        $activeAccounts = $accounts->reject(
+            fn ($account) => (bool) ($account->is_operationally_cancelled
+                ?? $this->isOperationallyCancelled($account->asesor ?? null))
+        );
+
+        return [
+            'capital' => (float) $activeAccounts->sum(
+                fn ($account) => (float) ($account->deuda_capital ?? $account->saldo_capital ?? 0)
+            ),
+            'deuda' => (float) $activeAccounts->sum(
+                fn ($account) => (float) ($account->deuda_total ?? 0)
+            ),
+        ];
+    }
+
+    /**
+     * La nomenclatura histórica usa ambas etiquetas. La comparación es
+     * deliberadamente exacta: no excluye etiquetas que sólo contengan el
+     * texto como parte de otro nombre operativo.
+     */
+    public function isOperationallyCancelled(?string $advisor): bool
+    {
+        $normalized = preg_replace('/\s+/u', ' ', strtoupper(trim(str_replace("\xC2\xA0", ' ', (string) $advisor))));
+
+        return in_array($normalized, ['CANCELADO', 'CANCELADOS'], true);
     }
 
     public function mapCosechaClientesToCcd(?string $cosecha): ?string
