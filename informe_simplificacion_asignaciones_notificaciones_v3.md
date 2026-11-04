@@ -69,7 +69,8 @@ Las pruebas de asignaciones cubren solicitud, duplicados, roles autorizados/inac
 
 ## Git y reconstrucción
 
-Los hashes de los commits publicados y la sincronización `feature/meridian-ui-v3` / `main` se registran en la entrega final tras el commit y el fast-forward seguro.
+Commit funcional: `f45b4bc feat(asignaciones): simplifica autorizacion y reportes`.
+La sincronización publicada de `feature/meridian-ui-v3` y `main` se verifica tras el fast-forward seguro.
 
 Para reconstruir el entorno local:
 
