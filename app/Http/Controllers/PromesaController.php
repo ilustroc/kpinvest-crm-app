@@ -12,9 +12,9 @@ class PromesaController extends Controller
     {
     }
 
-    public function store(string $dni, StorePromesaRequest $request): RedirectResponse
+    public function store(string $numdoc, StorePromesaRequest $request): RedirectResponse
     {
-        [, $message] = $this->createPromesa->execute($dni, $request);
+        [, $message] = $this->createPromesa->execute($numdoc, $request);
 
         return back()->with('ok', $message);
     }

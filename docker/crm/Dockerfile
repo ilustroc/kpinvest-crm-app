@@ -1,7 +1,7 @@
 # Entorno dev compatible con la version PHP CLI del hosting IMPULSE.
 # La familia de SO/servidor web no reproduce CloudLinux/LiteSpeed exactamente.
 FROM composer:2.9.8 AS composer_bin
-FROM php:8.3.35-apache
+FROM php:8.3.36-apache
 
 # Instalar bibliotecas requeridas por Laravel, Excel y generación de PDF.
 RUN apt-get update \

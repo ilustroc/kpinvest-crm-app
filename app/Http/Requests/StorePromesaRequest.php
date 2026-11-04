@@ -12,8 +12,8 @@ class StorePromesaRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // DNI desde la ruta
-        $dni = (string) $this->route('dni');
+        // Documento (numdoc o dni) desde la ruta o input
+        $numdoc = (string) ($this->route('numdoc') ?? $this->route('dni') ?? $this->input('numdoc') ?? $this->input('dni') ?? '');
 
         // Teléfono limpio
         $tel = preg_replace('/[^0-9\+]/', '', (string) $this->input('telefono',''));
@@ -37,7 +37,8 @@ class StorePromesaRequest extends FormRequest
         $cM    = array_values((array) $this->input('cron_monto', []));
 
         $this->merge([
-            'dni'         => $dni,
+            'numdoc'      => $numdoc,
+            'dni'         => $numdoc,
             'telefono'    => $tel,
             'fecha_pago'  => $fecha,
             'operaciones' => $ops,
@@ -49,7 +50,8 @@ class StorePromesaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'dni'           => 'required|string|max:30',
+            'numdoc'        => 'required|string|max:30',
+            'dni'           => 'nullable|string|max:30',
             'tipo'          => 'required|in:convenio,convenio_balon,cancelacion',
             'nota'          => 'nullable|string|max:500',
             'telefono'      => 'required|string|max:30',
@@ -81,6 +83,23 @@ class StorePromesaRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($v) {
+
+            $dni = (string) $this->input('dni');
+            $operations = array_values(array_filter(array_map('strval', (array) $this->input('operaciones', []))));
+
+            if (!empty($operations) && !empty($dni)) {
+                $found = \Illuminate\Support\Facades\DB::table('clientes_cuentas')
+                    ->where('numdoc', $dni)
+                    ->whereIn('operacion', $operations)
+                    ->pluck('operacion')
+                    ->map('strval')
+                    ->all();
+
+                $missing = array_diff($operations, $found);
+                if (!empty($missing)) {
+                    $v->errors()->add('operaciones', 'Las operaciones seleccionadas no corresponden al cliente.');
+                }
+            }
 
             $tipo = (string) $this->input('tipo');
 

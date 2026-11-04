@@ -31,10 +31,10 @@
         <ul class="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
             @foreach($ccdDocs as $document)
                 @php
-                    $href = $document->link
-                        ?: (preg_match('#^https?://#', (string) $document->pdf)
-                            ? $document->pdf
-                            : (filled($document->pdf) ? asset('storage/ccd/'.ltrim((string) $document->pdf, '/')) : null));
+                    $href = route('clientes.ccd.show', [
+                        'numdoc' => $document->numdoc ?? $dni ?? '',
+                        'ccdCliente' => $document->id,
+                    ]);
                     $name = filled($document->pdf)
                         ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
                         : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);

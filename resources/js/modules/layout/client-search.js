@@ -1,12 +1,28 @@
 import { $, $$, escapeHtml, ready } from '../../core/dom';
+import { checkAuthResponse, toSafeInternalUrl } from '../../core/http';
 
 function highlight(text, query) {
-    if (!query) return escapeHtml(text || '');
+    const raw = String(text ?? '');
+    if (!query || !raw) return escapeHtml(raw);
 
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escapedQuery})`, 'ig');
+    const q = String(query).trim();
+    if (!q) return escapeHtml(raw);
 
-    return escapeHtml(text || '').replace(regex, '<span class="bg-kp-green-soft font-bold text-kp-primary-ink">$1</span>');
+    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQuery, 'ig');
+
+    let result = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(raw)) !== null) {
+        result += escapeHtml(raw.slice(lastIndex, match.index));
+        result += `<span class="bg-kp-green-soft font-bold text-kp-primary-ink">${escapeHtml(match[0])}</span>`;
+        lastIndex = regex.lastIndex;
+    }
+
+    result += escapeHtml(raw.slice(lastIndex));
+    return result;
 }
 
 function setupQuickSearch(form) {
@@ -36,26 +52,31 @@ function setupQuickSearch(form) {
         activeIndex = index;
     };
 
+    let searchAbortController = null;
+
     const render = (items, query) => {
         if (!items.length) {
             hide();
             return;
         }
 
-        suggestions.innerHTML = items.map((item, index) => `
+        suggestions.innerHTML = items.map((item, index) => {
+            const safeUrl = toSafeInternalUrl(item.url);
+            return `
             <a
-                href="${escapeHtml(item.url)}"
+                href="${escapeHtml(safeUrl)}"
                 class="quick-item flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-kp-ink hover:bg-slate-50 ${index === 0 ? 'bg-slate-50' : ''}"
                 data-idx="${index}"
             >
                 <span class="min-w-0 flex items-center gap-2">
-                    <span class="font-mono font-bold">${highlight(item.dni, query)}</span>
+                    <span class="font-mono font-bold">${highlight(item.numdoc || item.dni, query)}</span>
                     <span class="text-kp-muted">/</span>
                     <span class="truncate">${highlight(item.nombre, query)}</span>
                 </span>
                 <span class="shrink-0 text-xs text-kp-muted">${highlight(item.operacion || '-', query)} - ${escapeHtml(item.cosecha || '-')}</span>
             </a>
-        `).join('');
+        `;
+        }).join('');
 
         $$('.quick-item', suggestions).forEach((item, index) => {
             item.addEventListener('mouseenter', () => setActive(index));
@@ -74,12 +95,28 @@ function setupQuickSearch(form) {
             return;
         }
 
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+        searchAbortController = new AbortController();
+        const signal = searchAbortController.signal;
+
         fetch(`${url}?q=${encodeURIComponent(value)}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal,
         })
-            .then((response) => response.json())
-            .then((data) => render(data || [], value))
-            .catch(hide);
+            .then((response) => {
+                if (!checkAuthResponse(response)) return null;
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then((data) => {
+                if (data) render(data || [], value);
+            })
+            .catch((err) => {
+                if (err.name === 'AbortError') return;
+                hide();
+            });
     };
 
     input.addEventListener('input', () => {

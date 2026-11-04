@@ -1,4 +1,5 @@
 import { setupModals } from '../../core/modal';
+import { ready } from '../../core/dom';
 
 function setupPasswordToggles() {
     document.addEventListener('click', (event) => {
@@ -11,7 +12,17 @@ function setupPasswordToggles() {
 
         const show = input.type === 'password';
         input.type = show ? 'text' : 'password';
-        button.textContent = show ? 'Ocultar' : 'Ver';
+
+        const eyeIcon = button.querySelector('.eye-icon');
+        const eyeOffIcon = button.querySelector('.eye-off-icon');
+        if (eyeIcon && eyeOffIcon) {
+            eyeIcon.classList.toggle('hidden', show);
+            eyeOffIcon.classList.toggle('hidden', !show);
+            button.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            button.setAttribute('title', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        } else {
+            button.textContent = show ? 'Ocultar' : 'Ver';
+        }
     });
 }
 
@@ -90,4 +101,4 @@ function initAdminUsers() {
     setupSupervisorField();
 }
 
-document.addEventListener('DOMContentLoaded', initAdminUsers);
+ready(initAdminUsers);

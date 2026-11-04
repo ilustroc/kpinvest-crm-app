@@ -24,7 +24,7 @@ class CnaController extends Controller
     ) {
     }
 
-    public function store(Request $request, string $dni)
+    public function store(Request $request, string $numdoc)
     {
         try {
             $data = $request->validate([
@@ -42,9 +42,9 @@ class CnaController extends Controller
                 'operaciones' => 'operaciones',
             ]);
 
-            [, $message] = $this->createCna->execute($request->user(), $dni, $data);
+            [, $message] = $this->createCna->execute($request->user(), $numdoc, $data);
 
-            return redirect()->route('clientes.show', $dni)->with('ok', $message);
+            return redirect()->route('clientes.show', $numdoc)->with('ok', $message);
         } catch (DomainException $e) {
             return back()->withErrors($e->getMessage())->withInput();
         } catch (\Throwable $e) {
@@ -53,13 +53,14 @@ class CnaController extends Controller
             }
 
             Log::error('CNA store error', [
-                'dni' => $dni,
+                'numdoc' => $numdoc,
+                'dni' => $numdoc,
                 'msg' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
 
-            return redirect()->route('clientes.show', $dni)
+            return redirect()->route('clientes.show', $numdoc)
                 ->withErrors('No se pudo guardar la CNA: '.$e->getMessage())
                 ->withInput();
         }

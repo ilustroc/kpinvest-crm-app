@@ -1,6 +1,7 @@
 import { $, $$, escapeHtml, ready } from "../../core/dom";
 import { setupModals } from "../../core/modal";
 import { formatMoney } from "../../core/money";
+import { checkAuthResponse, toSafeInternalUrl } from "../../core/http";
 
 function money(value) {
     return formatMoney(value, "PEN");
@@ -19,24 +20,6 @@ function parseJsonAttribute(element, name, fallback = []) {
         return JSON.parse(
             element.getAttribute(name) || JSON.stringify(fallback),
         );
-    } catch (_) {
-        return fallback;
-    }
-}
-
-function parseBase64JsonAttribute(element, name, fallback = []) {
-    const encoded = element.getAttribute(name);
-
-    if (!encoded) {
-        return fallback;
-    }
-
-    try {
-        const binary = atob(encoded);
-        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-        const decoded = new TextDecoder().decode(bytes);
-
-        return JSON.parse(decoded);
     } catch (_) {
         return fallback;
     }
@@ -63,11 +46,16 @@ function setupDecisionModals(root) {
             const form = $("#formNotaEstado");
             const title = $("#modalNotaEstadoTitulo");
             const textarea = $("#notaEstadoTxt");
+            const confirmBtn = form?.querySelector("[data-decision-confirm]");
 
             form?.setAttribute("action", button.dataset.action || "#");
 
             if (title) {
                 title.textContent = button.dataset.title || "Aprobar solicitud";
+            }
+
+            if (confirmBtn && button.dataset.confirmText) {
+                confirmBtn.textContent = button.dataset.confirmText;
             }
 
             if (textarea) {
@@ -183,11 +171,7 @@ function renderSchedule(button, type) {
 
     if (!wrapper || !body || !total || !title) return;
 
-    const schedule = parseBase64JsonAttribute(
-        button,
-        "data-crono-b64",
-        parseJsonAttribute(button, "data-crono", []),
-    );
+    const schedule = parseJsonAttribute(button, "data-crono", []);
 
     if (type === "cancelacion") {
         wrapper.classList.add("hidden");
@@ -241,7 +225,7 @@ function setupPromiseDetail(root) {
         button.addEventListener("click", () => {
             const type = (button.dataset.tipo || "").toLowerCase();
 
-            setText("f_dni", button.dataset.dni || "-");
+            setText("f_dni", button.dataset.numdoc || button.dataset.dni || "-");
             setText("f_op", button.dataset.operacion || "-");
             setText("t_fecha", button.dataset.fecha || "-");
             setText(
@@ -296,11 +280,7 @@ function setupPromiseDetail(root) {
                 );
             }
 
-            const accounts = parseBase64JsonAttribute(
-                button,
-                "data-cuentas-b64",
-                parseJsonAttribute(button, "data-cuentas", []),
-            );
+            const accounts = parseJsonAttribute(button, "data-cuentas", []);
 
             renderAccounts(accounts, button.dataset.operacion || "");
             renderSchedule(button, type);
@@ -602,9 +582,11 @@ function renderCnaPayments(payments, operations, body) {
 }
 
 function setupCnaDetail(root) {
+    let cnaPaymentsAbortController = null;
+
     $$(".js-ver-cna", root).forEach((button) => {
         button.addEventListener("click", async () => {
-            const dni = (button.dataset.dni || "").trim();
+            const dni = (button.dataset.numdoc || button.dataset.dni || "").trim();
             const body = $("#cna_pagos_tbody");
             const routeTemplate = root.dataset.pagosUrlTemplate || "";
             const observation = (button.dataset.observacion || "").trim();
@@ -631,36 +613,20 @@ function setupCnaDetail(root) {
             setText("cna_nota", note || "");
 
             if (clientLink) {
-                const url = (button.dataset.clienteUrl || "").trim();
-                clientLink.href = url || "#";
-                clientLink.classList.toggle("hidden", !url);
+                const rawUrl = (button.dataset.clienteUrl || "").trim();
+                const safeUrl = toSafeInternalUrl(rawUrl);
+                const hasValidUrl = safeUrl && safeUrl !== "#";
+                clientLink.href = hasValidUrl ? safeUrl : "#";
+                clientLink.classList.toggle("hidden", !hasValidUrl);
             }
 
             renderCnaTimeline(button);
             renderCnaDocument(button);
 
             let operations = uniqueOperations(
-                parseBase64JsonAttribute(
-                    button,
-                    "data-operaciones-b64",
-                    parseJsonAttribute(button, "data-operaciones", []),
-                ),
+                parseJsonAttribute(button, "data-operaciones", []),
             );
             setText("cna_ops", operations.length ? operations.join(", ") : "-");
-
-            const preloadedPayments = parseBase64JsonAttribute(
-                button,
-                "data-pagos-b64",
-                null,
-            );
-
-            if (
-                preloadedPayments !== null &&
-                Array.isArray(preloadedPayments)
-            ) {
-                renderCnaPayments(preloadedPayments, operations, body);
-                return;
-            }
 
             setText("cna_entidad_cosecha", "Cargando...");
 
@@ -676,6 +642,12 @@ function setupCnaDetail(root) {
             if (count) count.textContent = "Cargando...";
             if (context) context.textContent = "Cargando pagos del DNI...";
 
+            if (cnaPaymentsAbortController) {
+                cnaPaymentsAbortController.abort();
+            }
+            cnaPaymentsAbortController = new AbortController();
+            const signal = cnaPaymentsAbortController.signal;
+
             try {
                 const url = routeTemplate.replace(
                     "__DNI__",
@@ -683,18 +655,87 @@ function setupCnaDetail(root) {
                 );
                 const response = await fetch(url, {
                     headers: { Accept: "application/json" },
+                    signal,
                 });
 
+                if (!checkAuthResponse(response)) return;
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
                 const json = await response.json();
                 const payments = Array.isArray(json.pagos) ? json.pagos : [];
                 renderCnaPayments(payments, operations, body);
             } catch (error) {
+                if (error.name === "AbortError") return;
                 console.error("CNA pagos fetch error:", error);
                 setCnaPaymentContextError();
                 renderEmptyPayments("Error al cargar los pagos.", "danger");
                 setText("cna_total_pagos", money(0));
+            }
+        });
+    });
+}
+
+function setupAsignacionDetail(root) {
+    $$(".js-ver-asignacion", root).forEach((button) => {
+        button.addEventListener("click", () => {
+            const d = button.dataset;
+            setText("asig_det_titular", d.titular || "-");
+            setText("asig_det_numdoc", d.numdoc || "-");
+            setText("asig_det_operacion", d.operacion || "-");
+            setText("asig_det_capital", money(d.capital || 0));
+            setText("asig_det_deuda", money(d.deuda || 0));
+            setText("asig_det_solicitante", d.solicitante || "-");
+            setText("asig_det_asesor_destino", d.asesorDestino || "-");
+            setText("asig_det_asesor_vigente", d.asesorVigente || "-");
+            setText("asig_det_fecha", d.fechaSolicitud || "-");
+            setText("asig_det_entidad_prod", `${d.entidad || "-"} · ${d.producto || "-"}`);
+            setText("asig_det_cosecha_cuenta", `${d.cosecha || "-"} · ${d.cuenta || "-"}`);
+            setText("asig_det_origen", d.origen || "-");
+            setText(
+                "asig_det_resolucion",
+                d.resueltoPor
+                    ? `${d.resueltoPor}${d.fechaResolucion ? ` (${d.fechaResolucion})` : ""}`
+                    : "Pendiente de resolución",
+            );
+            setText("asig_det_motivo", d.motivo || "-");
+
+            const estadoEl = $("#asig_det_estado");
+            setText("asig_det_estado", d.estado || "Pendiente");
+            setBadgeVariant(estadoEl, badgeVariantForStatus(d.estado));
+
+            const obsWrap = $("#asig_det_obs_wrap");
+            const obsText = (d.observacionResolucion || "").trim();
+            if (obsWrap) obsWrap.classList.toggle("hidden", !obsText);
+            setText("asig_det_obs", obsText || "—");
+
+            const fichaLink = $("#asig_det_ficha_link");
+            if (fichaLink) {
+                const safeUrl = toSafeInternalUrl((d.clienteUrl || "").trim());
+                fichaLink.href = safeUrl && safeUrl !== "#" ? safeUrl : "#";
+            }
+
+            const history = parseJsonAttribute(button, "data-historial", []);
+            const countBadge = $("#asig_det_hist_count");
+            if (countBadge) {
+                countBadge.textContent = `${history.length} ${history.length === 1 ? "registro" : "registros"}`;
+            }
+
+            const tbody = $("#asig_det_hist_tbody");
+            if (tbody) {
+                if (!history.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="border-t border-kp-border px-4 py-4 text-center text-[12px] text-kp-muted">Sin historial registrado.</td></tr>';
+                } else {
+                    tbody.innerHTML = history.map((h) => `
+                        <tr class="transition-colors hover:bg-slate-50/70">
+                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] tabular-nums text-slate-600">${escapeHtml(h.fecha_solicitud || "Histórico")}</td>
+                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.solicitante || "-")}</td>
+                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] font-semibold text-kp-ink">${escapeHtml(h.asesor || "-")}</td>
+                            <td class="border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.motivo || "-")}</td>
+                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11px] font-semibold uppercase text-slate-600">${escapeHtml(h.estado || "-")}</td>
+                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.aprobado_por ? `${h.aprobado_por} (${h.fecha_aprobacion || ""})` : "En revisión")}</td>
+                        </tr>
+                    `).join("");
+                }
             }
         });
     });
@@ -708,5 +749,6 @@ ready(() => {
     setupDecisionModals(root);
     setupPromiseDetail(root);
     setupCnaDetail(root);
+    setupAsignacionDetail(root);
     setupModals(root);
 });

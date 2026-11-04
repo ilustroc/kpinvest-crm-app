@@ -37,6 +37,18 @@ function setupLogin(root) {
         field.addEventListener('blur', () => validateField(field));
     });
 
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            if (button) {
+                button.disabled = false;
+            }
+            spinner?.classList.add('hidden');
+            if (buttonText) {
+                buttonText.textContent = 'Iniciar sesión';
+            }
+        }
+    });
+
     form.addEventListener('submit', (event) => {
         const fields = $$('input[required]', form);
         const valid = fields.every((field) => validateField(field));
@@ -63,12 +75,22 @@ function setupLogin(root) {
         if (!password) return;
 
         const show = password.type === 'password';
-        const showLabel = togglePassword.dataset.showLabel || 'Mostrar';
-        const hideLabel = togglePassword.dataset.hideLabel || 'Ocultar';
-
         password.type = show ? 'text' : 'password';
-        togglePassword.textContent = show ? hideLabel : showLabel;
-        togglePassword.setAttribute('aria-label', show ? 'Ocultar contrasena' : 'Mostrar contrasena');
+
+        const eyeIcon = togglePassword.querySelector('.eye-icon');
+        const eyeOffIcon = togglePassword.querySelector('.eye-off-icon');
+
+        if (eyeIcon && eyeOffIcon) {
+            eyeIcon.classList.toggle('hidden', show);
+            eyeOffIcon.classList.toggle('hidden', !show);
+        } else {
+            const showLabel = togglePassword.dataset.showLabel || 'Mostrar';
+            const hideLabel = togglePassword.dataset.hideLabel || 'Ocultar';
+            togglePassword.textContent = show ? hideLabel : showLabel;
+        }
+
+        togglePassword.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        togglePassword.setAttribute('title', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
         password.focus();
     });
 

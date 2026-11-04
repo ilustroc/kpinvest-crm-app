@@ -13,7 +13,7 @@ class IntegracionPagosController extends Controller
 {
     public function index()
     {
-        $ultimoLote = PagoLote::where('tipo', 'propia')->latest('id')->first();
+        $ultimoLote = PagoLote::latest('id')->first();
         $pagos = collect();
         if ($ultimoLote) {
             $pagos = Pago::where('lote_id', $ultimoLote->id)
@@ -47,7 +47,6 @@ class IntegracionPagosController extends Controller
         $path = $file->storeAs('integracion/pagos', time() . '_' . $file->getClientOriginalName());
 
         $lote = PagoLote::create([
-            'tipo'            => 'propia',
             'archivo'         => $path,
             'usuario_id'      => Auth::id(),
             'total_registros' => 0,

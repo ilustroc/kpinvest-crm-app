@@ -13,13 +13,17 @@ Route::middleware('can:access-integracion')
         Route::controller(IntegracionDataController::class)->prefix('data')->group(function () {
             Route::get('/', 'index')->name('data.index');
             Route::get('/template', 'template')->name('data.template');
+            Route::post('/preview', 'preview')->name('data.preview');
             Route::post('/import', 'import')->name('data.import');
+            Route::get('/errores', 'downloadErrors')->name('data.errors');
         });
 
         Route::controller(IntegracionAsignacionController::class)->prefix('asignacion')->group(function () {
             Route::get('/', 'index')->name('asignacion.index');
             Route::get('/template', 'template')->name('asignacion.template');
+            Route::post('/preview', 'preview')->name('asignacion.preview');
             Route::post('/import', 'import')->name('asignacion.import');
+            Route::get('/errores', 'downloadErrors')->name('asignacion.errors');
         });
 
         Route::controller(IntegracionCcdController::class)->prefix('ccd')->group(function () {

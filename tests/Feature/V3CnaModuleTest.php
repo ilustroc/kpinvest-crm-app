@@ -70,7 +70,7 @@ class V3CnaModuleTest extends TestCase
             ->assertRedirect(route('clientes.show', $dni))
             ->assertSessionHasNoErrors();
 
-        $supervisorCna = CnaSolicitud::where('dni', $dni)
+        $supervisorCna = CnaSolicitud::where('numdoc', $dni)
             ->where('observacion', 'CNA V3 supervisor preaprobada')
             ->firstOrFail();
 
@@ -88,7 +88,7 @@ class V3CnaModuleTest extends TestCase
             ->assertRedirect(route('clientes.show', $dni))
             ->assertSessionHasNoErrors();
 
-        $autoApproved = CnaSolicitud::where('dni', $dni)
+        $autoApproved = CnaSolicitud::where('numdoc', $dni)
             ->where('observacion', 'CNA V3 auto admin')
             ->firstOrFail();
 

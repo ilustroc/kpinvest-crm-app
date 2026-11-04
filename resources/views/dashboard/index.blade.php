@@ -27,7 +27,7 @@
 @endphp
 
 <div class="space-y-4" data-dashboard-page>
-    <script id="dashboard-json" type="application/json">{!! json_encode($dashboardJson, JSON_UNESCAPED_SLASHES) !!}</script>
+    <script id="dashboard-json" type="application/json">@json($dashboardJson)</script>
 
     <header class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>

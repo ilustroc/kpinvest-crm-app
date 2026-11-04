@@ -1,5 +1,6 @@
 import Chart from 'chart.js/auto';
 import { formatMoney } from '../../core/money';
+import { ready } from '../../core/dom';
 
 function getCssValue(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -102,4 +103,4 @@ function initDashboardChart() {
     requestAnimationFrame(() => loading?.classList.add('hidden'));
 }
 
-document.addEventListener('DOMContentLoaded', initDashboardChart);
+ready(initDashboardChart);

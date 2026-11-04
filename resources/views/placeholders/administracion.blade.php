@@ -251,6 +251,8 @@
           <form method="POST"
                 action="{{ route('administracion.usuarios.update', $u) }}"
                 autocomplete="off"
+                data-once
+                data-loading-text="Guardando..."
                 data-edit-user-form
                 data-current-role="{{ $vm->currentUser->role }}">
             @csrf
@@ -284,9 +286,8 @@
                 </div>
               @endif
 
-              <div class="border-t border-kp-border/60 pt-3" data-password-field>
-                <x-ui.input label="Nueva contraseña (opcional)" name="password" type="password" minlength="6" placeholder="Dejar en blanco para mantener la actual" />
-                <button type="button" class="mt-1 text-xs font-semibold text-kp-secondary" data-password-toggle>Ver</button>
+              <div class="border-t border-kp-border/60 pt-3">
+                <x-ui.password-input label="Nueva contraseña (opcional)" name="password" minlength="6" placeholder="Dejar en blanco para mantener la actual" />
               </div>
             </div>
 
@@ -300,20 +301,13 @@
 
     @if($vm->canUpdatePassword($u))
       <x-ui.modal id="pw-usr-{{ $u->id }}" title="Cambiar password" subtitle="{{ $u->name }}">
-          <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}">
+          <form method="POST" action="{{ route('administracion.usuarios.password', $u) }}" data-once data-loading-text="Actualizando...">
             @csrf
             @method('PATCH')
 
             <div class="space-y-4 p-5">
-              <div data-password-field>
-                <x-ui.input label="Nuevo password" name="password" type="password" minlength="6" required />
-                <button type="button" class="mt-1 text-xs font-semibold text-kp-secondary" data-password-toggle>Ver</button>
-              </div>
-
-              <div data-password-field>
-                <x-ui.input label="Confirmar password" name="password_confirmation" type="password" minlength="6" required />
-                <button type="button" class="mt-1 text-xs font-semibold text-kp-secondary" data-password-toggle>Ver</button>
-              </div>
+              <x-ui.password-input label="Nuevo password" name="password" minlength="6" required />
+              <x-ui.password-input label="Confirmar password" name="password_confirmation" minlength="6" required />
             </div>
 
             <div class="flex justify-between gap-2 border-t border-kp-border px-5 py-4">
@@ -329,6 +323,8 @@
       <form method="POST"
             action="{{ route('administracion.usuarios.store') }}"
             autocomplete="off"
+            data-once
+            data-loading-text="Guardando..."
             data-create-user-form
             data-current-role="{{ $vm->currentUser->role }}">
         @csrf
@@ -358,10 +354,7 @@
             </div>
           @endif
 
-          <div data-password-field>
-            <x-ui.input label="Password" name="password" type="password" required minlength="6" placeholder="Minimo 6 caracteres" />
-            <button type="button" class="mt-1 text-xs font-semibold text-kp-secondary" data-password-toggle>Ver</button>
-          </div>
+          <x-ui.password-input label="Password" name="password" required minlength="6" placeholder="Mínimo 6 caracteres" />
         </div>
 
         <div class="flex justify-between gap-2 border-t border-kp-border px-5 py-4">

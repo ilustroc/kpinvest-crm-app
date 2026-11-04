@@ -15,6 +15,12 @@ class AutorizacionIndexViewModel
         public readonly ?string $status,
         public readonly bool $isSupervisor,
         public readonly array $pagosByDni = [],
+        public readonly ?LengthAwarePaginator $asignacionRows = null,
+        public readonly array $asignacionFilters = [],
+        public readonly Collection $asignacionUsers = new Collection(),
+        public readonly bool $canReviewPromesasCna = true,
+        public readonly bool $canReviewAsignaciones = true,
+        public readonly string $roleLabel = 'Administrador',
     ) {
     }
 
@@ -28,6 +34,12 @@ class AutorizacionIndexViewModel
             'q' => $this->q,
             'status' => $this->status,
             'isSupervisor' => $this->isSupervisor,
+            'asignacionRows' => $this->asignacionRows,
+            'asignacionFilters' => $this->asignacionFilters,
+            'asignacionUsers' => $this->asignacionUsers,
+            'canReviewPromesasCna' => $this->canReviewPromesasCna,
+            'canReviewAsignaciones' => $this->canReviewAsignaciones,
+            'roleLabel' => $this->roleLabel,
         ];
     }
 }

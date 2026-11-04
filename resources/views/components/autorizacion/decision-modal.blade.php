@@ -37,7 +37,7 @@
 @endphp
 
 <x-ui.modal :id="$id" :title="$title" :title-id="$titleId" max-width="lg">
-    <form id="{{ $formId }}" method="POST" action="#">
+    <form id="{{ $formId }}" method="POST" action="#" data-once data-loading-text="Procesando...">
         @csrf
 
         <div class="space-y-4 px-5 py-4">

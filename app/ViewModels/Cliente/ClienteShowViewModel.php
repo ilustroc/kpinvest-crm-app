@@ -6,8 +6,12 @@ use Illuminate\Support\Collection;
 
 class ClienteShowViewModel
 {
+    public readonly string $dni;
+    public readonly string $numdoc;
+    public readonly Collection $asignacionesHistorial;
+
     public function __construct(
-        public readonly string $dni,
+        string $numdoc,
         public readonly string $titular,
         public readonly Collection $cuentas,
         public readonly Collection $pagos,
@@ -22,12 +26,18 @@ class ClienteShowViewModel
         public readonly Collection $pagosGrouped,
         public readonly ?string $nextNroCarta,
         public readonly float $totPagos,
+        ?string $dni = null,
+        ?Collection $asignacionesHistorial = null,
     ) {
+        $this->numdoc = $numdoc ?: (string) $dni;
+        $this->dni = $dni ?: $this->numdoc;
+        $this->asignacionesHistorial = $asignacionesHistorial ?? collect();
     }
 
     public function toArray(): array
     {
         return [
+            'numdoc' => $this->numdoc,
             'dni' => $this->dni,
             'titular' => $this->titular,
             'cuentas' => $this->cuentas,
@@ -43,6 +53,7 @@ class ClienteShowViewModel
             'pagosGrouped' => $this->pagosGrouped,
             'nextNroCarta' => $this->nextNroCarta,
             'totPagos' => $this->totPagos,
+            'asignacionesHistorial' => $this->asignacionesHistorial,
         ];
     }
 }

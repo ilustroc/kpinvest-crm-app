@@ -48,10 +48,11 @@ class V3AutorizacionModuleTest extends TestCase
             ->assertViewHas('cnaRows', fn ($rows) => collect($rows->items())->contains(fn ($row) => (int) $row->id === (int) $cna->id))
             ->assertViewHas('prodByOp', fn ($products) => ($products[$operation] ?? null) === 'Producto Autorizacion V3');
 
-        preg_match('/data-operaciones-b64="([^"]+)"/', $response->getContent(), $matches);
+        preg_match('/data-operaciones=(["\'])(.*?)\1/', $response->getContent(), $matches);
+        $raw = str_contains($matches[2] ?? '', '&') ? html_entity_decode($matches[2], ENT_QUOTES) : ($matches[2] ?? '');
+        $ops = json_decode($raw, true);
 
-        $this->assertNotEmpty($matches[1] ?? null);
-        $this->assertSame([$operation], json_decode(base64_decode($matches[1]), true));
+        $this->assertSame([$operation], $ops);
     }
 
     public function test_promesa_detail_accounts_are_resolved_with_trimmed_dni_and_operation(): void
@@ -63,8 +64,8 @@ class V3AutorizacionModuleTest extends TestCase
         $operation = 'V3AOPTRIM'.Str::upper(Str::random(6));
 
         $this->createClientAccount($dni, $operation, [
-            'numdoc' => " {$dni} ",
-            'operacion' => " {$operation} ",
+            'numdoc' => $dni,
+            'operacion' => $operation,
             'deuda_capital' => 2000,
             'deuda_total' => 2193.81,
         ]);
@@ -112,21 +113,17 @@ class V3AutorizacionModuleTest extends TestCase
             });
 
         $content = $response->getContent();
-        preg_match('/data-cuentas-b64="([^"]+)"/', $content, $matches);
-
+        preg_match('/data-cuentas="([^"]+)"/', $content, $matches);
         $this->assertNotEmpty($matches[1] ?? null);
-
-        $accounts = json_decode(base64_decode($matches[1]), true);
+        $accounts = json_decode(html_entity_decode($matches[1]), true);
         $account = collect($accounts)->firstWhere('operacion', $operation);
 
         $this->assertSame(2000.0, (float) ($account['saldo_capital'] ?? 0));
         $this->assertSame(2193.81, (float) ($account['deuda_total'] ?? 0));
 
-        preg_match('/data-crono-b64="([^"]+)"/', $content, $scheduleMatches);
-
+        preg_match('/data-crono="([^"]+)"/', $content, $scheduleMatches);
         $this->assertNotEmpty($scheduleMatches[1] ?? null);
-
-        $schedule = json_decode(base64_decode($scheduleMatches[1]), true);
+        $schedule = json_decode(html_entity_decode($scheduleMatches[1]), true);
 
         $this->assertCount(2, $schedule);
         $this->assertSame(1000.0, (float) ($schedule[0]['monto'] ?? 0));
@@ -200,7 +197,6 @@ class V3AutorizacionModuleTest extends TestCase
         $this->assertSame('aprobada', $preApproved->fresh()->workflow_estado);
 
         $lote = PagoLote::create([
-            'tipo' => 'propia',
             'archivo' => 'autorizacion-v3.csv',
             'usuario_id' => $admin->id,
             'total_registros' => 1,

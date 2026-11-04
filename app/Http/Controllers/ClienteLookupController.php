@@ -16,7 +16,7 @@ class ClienteLookupController extends Controller
         $result = $this->lookup->quickLookup((string) $request->query('q', ''));
 
         return match ($result['type']) {
-            'redirect' => redirect()->route('clientes.show', $result['dni']),
+            'redirect' => redirect()->route('clientes.show', $result['numdoc'] ?? $result['dni']),
             default => back()->withInput()->with('quick_error', $result['message']),
         };
     }

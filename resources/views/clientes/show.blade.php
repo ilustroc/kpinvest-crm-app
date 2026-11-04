@@ -28,8 +28,8 @@
     @endphp
 
     <x-layout.page-shell data-module="clientes-show">
-        @if(session('ok'))
-            <x-feedback.alert variant="success">{{ session('ok') }}</x-feedback.alert>
+        @if(session('ok') || session('status'))
+            <x-feedback.alert variant="success">{{ session('ok') ?: session('status') }}</x-feedback.alert>
         @endif
 
         @if($errors->any())
@@ -55,19 +55,36 @@
                 subtitle="{{ $accountCount }} {{ $accountCount === 1 ? 'cuenta' : 'cuentas' }} · {{ $operationCount }} {{ $operationCount === 1 ? 'operación' : 'operaciones' }} · Selecciona una operación para generar una propuesta"
             >
                 <x-slot:actions>
-                    <x-ui.button
-                        id="btnPropuesta"
-                        type="button"
-                        data-modal-open="#modalPropuesta"
-                        disabled
-                        class="w-full justify-center sm:w-auto"
-                    >
-                        <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Generar propuesta
-                        <span id="selCount" class="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none">0</span>
-                    </x-ui.button>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-ui.button
+                            id="btnSolicitarAsignacion"
+                            type="button"
+                            variant="secondary"
+                            data-modal-open="#modalSolicitarAsignacion"
+                            disabled
+                            class="w-full justify-center sm:w-auto"
+                        >
+                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+                            </svg>
+                            Solicitar asignación
+                            <span id="selCountAsignacion" class="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold leading-none text-kp-ink">0</span>
+                        </x-ui.button>
+
+                        <x-ui.button
+                            id="btnPropuesta"
+                            type="button"
+                            data-modal-open="#modalPropuesta"
+                            disabled
+                            class="w-full justify-center sm:w-auto"
+                        >
+                            <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Generar propuesta
+                            <span id="selCount" class="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold leading-none">0</span>
+                        </x-ui.button>
+                    </div>
                 </x-slot:actions>
 
                 <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[900px]" class="[&_th]:px-3 [&_td]:px-3">
@@ -118,7 +135,6 @@
                                 data-cna-ids="{{ $cnaIds }}"
                                 data-cna-status="{{ $last->workflow_estado ?? '' }}"
                                 data-cna-nro="{{ $last->nro_carta ?? '' }}"
-                                data-cna-reason="{{ $last->motivo_rechazo ?? '' }}"
                                 class="group cursor-pointer transition-colors hover:bg-slate-50/80 has-[:checked]:bg-kp-primary-soft/50">
                                 <x-tables.td align="center">
                                     <input type="checkbox"
@@ -260,10 +276,13 @@
             <x-clientes.payments-table :pagos="$pagos" :can-delete="$canDeletePagos" :dni="$dni" />
 
             <x-promesas.promise-history :promesas="$promesas" />
+
+            <x-asignaciones.history-panel :asignaciones="$asignacionesHistorial ?? collect()" :dni="$dni" />
         </div>
 
         <x-promesas.payment-schedule />
         <x-promesas.create-modal :dni="$dni" :titular="$titular" />
         <x-cna.create-modal :dni="$dni" :titular="$titular" :auto-open="$cnaHasErrors" />
+        <x-asignaciones.create-modal :dni="$dni" :titular="$titular" :auto-open="$errors->has('motivo')" />
     </x-layout.page-shell>
 @endsection

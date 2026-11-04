@@ -139,7 +139,7 @@ class V3WorkflowSmokeTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $convenio = PromesaPago::where('dni', $dni)->where('nota', 'V3 convenio smoke')->firstOrFail();
+        $convenio = PromesaPago::where('numdoc', $dni)->where('nota', 'V3 convenio smoke')->firstOrFail();
         $this->assertSame(2, DB::table('promesa_cuotas')->where('promesa_id', $convenio->id)->count());
 
         $this->actingAs($asesor)
@@ -157,7 +157,7 @@ class V3WorkflowSmokeTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $balon = PromesaPago::where('dni', $dni)->where('nota', 'V3 cuota balon smoke')->firstOrFail();
+        $balon = PromesaPago::where('numdoc', $dni)->where('nota', 'V3 cuota balon smoke')->firstOrFail();
         $this->assertDatabaseHas('promesa_cuotas', [
             'promesa_id' => $balon->id,
             'nro' => 2,
@@ -273,7 +273,6 @@ class V3WorkflowSmokeTest extends TestCase
         [$dni, $operacion] = $this->createClientAccount();
 
         PagoLote::create([
-            'tipo' => 'propia',
             'archivo' => 'v3-smoke.csv',
             'usuario_id' => $admin->id,
             'total_registros' => 1,
@@ -389,6 +388,8 @@ class V3WorkflowSmokeTest extends TestCase
             'numdoc' => $newDni,
             'operacion' => $newOperation,
         ]);
+
+        $this->makeUser('asesor', ['name' => 'Gestor V3']);
 
         $this->actingAs($admin)
             ->post(route('integracion.asignacion.import'), [

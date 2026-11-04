@@ -81,7 +81,7 @@
                 </div>
             @endcan
 
-            @can('review-promesas')
+            @if(auth()->user()?->can('review-promesas') || auth()->user()?->can('review-asignaciones'))
                 <div>
                     <div class="{{ $navGroup }}">Aprobaciones</div>
                     <a href="{{ route('autorizacion') }}"
@@ -94,7 +94,7 @@
                         <span class="{{ $navLabel }}">Autorización</span>
                     </a>
                 </div>
-            @endcan
+            @endif
 
             @if(auth()->user()?->can('access-integracion') || auth()->user()?->can('access-admin-users'))
                 <div>

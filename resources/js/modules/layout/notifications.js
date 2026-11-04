@@ -1,6 +1,6 @@
 import { $, escapeHtml, ready } from '../../core/dom';
-import { getEcho } from '../../core/echo';
 import { notify } from '../../core/toast';
+import { checkAuthResponse, toSafeInternalUrl } from '../../core/http';
 
 const LAST_COUNT_KEY = 'kp_notifications_unread_count';
 
@@ -49,6 +49,7 @@ function setupNotifications(root) {
         },
         ...options,
     }).then((response) => {
+        if (!checkAuthResponse(response)) throw new Error('Session expired');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
     });
@@ -92,7 +93,8 @@ function setupNotifications(root) {
         type: notification.type || '',
         module: notification.module || '',
         entity_id: notification.entity_id || null,
-        dni: notification.dni || '',
+        numdoc: notification.numdoc || notification.dni || '',
+        dni: notification.numdoc || notification.dni || '',
         cliente: notification.cliente || '',
         estado: notification.estado || '',
         title: notification.title || 'Nueva notificacion',
@@ -120,7 +122,7 @@ function setupNotifications(root) {
         list.innerHTML = items.map((item) => {
             const meta = [
                 item.module ? escapeHtml(item.module) : null,
-                item.dni ? `DNI ${escapeHtml(item.dni)}` : null,
+                (item.numdoc || item.dni) ? `Doc. ${escapeHtml(item.numdoc || item.dni)}` : null,
                 item.estado ? escapeHtml(item.estado) : null,
             ].filter(Boolean);
 
@@ -160,9 +162,9 @@ function setupNotifications(root) {
 
         list.querySelectorAll('[data-notification-open]').forEach((button) => {
             button.addEventListener('click', () => {
-                const url = button.dataset.url;
+                const url = toSafeInternalUrl(button.dataset.url);
                 markAsRead(button.dataset.id).finally(() => {
-                    if (url) window.location.href = url;
+                    if (url && url !== '#') window.location.href = url;
                 });
             });
         });
@@ -208,15 +210,22 @@ function setupNotifications(root) {
         }
     };
 
-    const subscribeRealtime = () => {
-        const echo = getEcho();
+    const subscribeRealtime = async () => {
         const userId = root.dataset.userId;
+        const reverbKey = import.meta.env.VITE_REVERB_APP_KEY;
 
-        if (!echo || !userId) {
+        if (!userId || !reverbKey) {
             return;
         }
 
         try {
+            const { getEcho } = await import('../../core/echo');
+            const echo = getEcho();
+
+            if (!echo) {
+                return;
+            }
+
             echo.private(`App.Models.User.${userId}`)
                 .notification((notification) => {
                     prependRealtimeNotification(notification);

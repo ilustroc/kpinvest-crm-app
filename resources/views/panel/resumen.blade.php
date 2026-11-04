@@ -38,7 +38,7 @@
 @endphp
 
 <x-layout.page-shell data-module="panel-resumen">
-  <script id="panel-chart-json" type="application/json">{!! json_encode($chartJson, JSON_UNESCAPED_SLASHES) !!}</script>
+  <script id="panel-chart-json" type="application/json">@json($chartJson)</script>
 
   <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
     <div>

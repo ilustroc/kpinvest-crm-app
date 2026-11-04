@@ -18,7 +18,7 @@ class ReporteCnaController extends Controller
         
         $rows = $this->service->getFilteredQuery($filters)
             ->orderByDesc('cna_fec')
-            ->orderByDesc('id')
+            ->orderByDesc('cna.id')
             ->paginate(25)->withQueryString();
 
         $facets = $this->service->getFacets($filters);

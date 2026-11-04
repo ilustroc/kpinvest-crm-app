@@ -72,7 +72,7 @@ class V3PromesaModuleTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $convenio = PromesaPago::where('dni', $dni)->where('nota', 'V3 promesa convenio')->firstOrFail();
+        $convenio = PromesaPago::where('numdoc', $dni)->where('nota', 'V3 promesa convenio')->firstOrFail();
         $this->assertSame('preaprobada', $convenio->workflow_estado);
         $this->assertSame(2, DB::table('promesa_cuotas')->where('promesa_id', $convenio->id)->count());
 
@@ -91,7 +91,7 @@ class V3PromesaModuleTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $balon = PromesaPago::where('dni', $dni)->where('nota', 'V3 promesa balon')->firstOrFail();
+        $balon = PromesaPago::where('numdoc', $dni)->where('nota', 'V3 promesa balon')->firstOrFail();
         $this->assertSame('aprobada', $balon->workflow_estado);
         $this->assertSame('convenio', $balon->tipo);
         $this->assertDatabaseHas('promesa_cuotas', [

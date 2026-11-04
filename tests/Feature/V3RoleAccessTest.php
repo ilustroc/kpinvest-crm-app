@@ -32,8 +32,8 @@ class V3RoleAccessTest extends TestCase
                 'forbidden' => ['/administracion', '/reportes/pagos', '/integracion/pagos', '/autorizacion'],
             ],
             'soporte' => [
-                'ok' => ['/', '/dashboard', '/administracion', '/reportes/pagos', '/integracion/pagos', route('clientes.show', $dni)],
-                'forbidden' => ['/autorizacion'],
+                'ok' => ['/', '/dashboard', '/administracion', '/reportes/pagos', '/integracion/pagos', '/autorizacion', route('clientes.show', $dni)],
+                'forbidden' => [],
             ],
         ];
 

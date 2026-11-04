@@ -59,7 +59,7 @@
                         <svg class="size-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z" />
                         </svg>
-                        DNI {{ $dni }}
+                        Doc. {{ $dni }}
                     </span>
                     <span>{{ $accountCount }} {{ $accountCount === 1 ? 'cuenta' : 'cuentas' }}</span>
                     <span>{{ $operationCount }} {{ $operationCount === 1 ? 'operación' : 'operaciones' }}</span>
@@ -81,10 +81,10 @@
                     <div class="flex flex-wrap gap-1.5 lg:justify-end max-w-md">
                         @foreach($ccdDocs as $document)
                             @php
-                                $href = $document->link
-                                    ?: (preg_match('#^https?://#', (string) $document->pdf)
-                                        ? $document->pdf
-                                        : (filled($document->pdf) ? asset('storage/ccd/'.ltrim((string) $document->pdf, '/')) : null));
+                                $href = route('clientes.ccd.show', [
+                                    'numdoc' => $dni,
+                                    'ccdCliente' => $document->id,
+                                ]);
                                 $name = filled($document->pdf)
                                     ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
                                     : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);
