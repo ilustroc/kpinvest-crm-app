@@ -667,6 +667,93 @@ class ClienteAssignmentModuleTest extends TestCase
         $record->delete();
     }
 
+    public function test_assignment_workflow_notifies_authorized_active_users_and_moves_history_to_reports(): void
+    {
+        $asesor = $this->makeUser('asesor', ['name' => 'Asesor solicitante']);
+        $admin = $this->makeUser('administrador', ['name' => 'Admin resolutor']);
+        $supervisor = $this->makeUser('supervisor');
+        $soporte = $this->makeUser('soporte');
+        $inactive = $this->makeUser('administrador', ['active' => 0]);
+        $numdoc = '0022097866';
+        $operation = '8190917';
+        $this->createAccount($numdoc, $operation, 'TESTEO GISELLA');
+
+        $this->actingAs($asesor)
+            ->post(route('clientes.asignaciones.store', $numdoc), [
+                'operaciones' => [$operation],
+                'motivo' => 'Solicitud para prueba de notificaciones.',
+            ])
+            ->assertRedirect(route('clientes.show', $numdoc));
+
+        foreach ([$admin, $supervisor, $soporte] as $reviewer) {
+            $this->assertSame(1, $reviewer->notifications()->where('data->type', 'asignacion_action_required')->count());
+        }
+        $this->assertSame(0, $inactive->notifications()->where('data->type', 'asignacion_action_required')->count());
+
+        $assignment = AsignarCliente::query()->where('numdoc', $numdoc)->where('operacion', $operation)->firstOrFail();
+
+        $this->actingAs($admin)
+            ->getJson(route('notificaciones.unread-count'))
+            ->assertOk()
+            ->assertJsonPath('unread_count', 1);
+        $notification = $admin->unreadNotifications()->firstOrFail();
+        $this->assertSame('/autorizacion#panel-asignaciones', parse_url((string) $notification->data['action_url'], PHP_URL_PATH).'#'.parse_url((string) $notification->data['action_url'], PHP_URL_FRAGMENT));
+        $this->actingAs($admin)
+            ->postJson(route('notificaciones.leer', $notification->id))
+            ->assertOk()
+            ->assertJsonPath('unread_count', 0);
+
+        $this->actingAs($admin)->get(route('autorizacion'))
+            ->assertOk()
+            ->assertSee('ASIGNAR CLIENTE')
+            ->assertSee($operation)
+            ->assertViewHas('asignacionRows', fn ($rows) => $rows->total() >= 1 && (int) $rows->first()->id === (int) $assignment->id);
+
+        $this->actingAs($asesor)->get(route('clientes.show', $numdoc))
+            ->assertOk()
+            ->assertDontSee('Historial de asignaciones')
+            ->assertViewMissing('asignacionesHistorial');
+
+        $this->actingAs($admin)
+            ->post(route('autorizacion.asignaciones.aprobar', $assignment), ['nota_estado' => 'Aprobación de prueba'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('asignar_clientes', ['id' => $assignment->id, 'estado' => AsignarCliente::ESTADO_APROBADA, 'aprobado_por_user_id' => $admin->id]);
+        $this->assertSame(1, $asesor->notifications()->where('data->type', 'asignacion_status')->count());
+        $this->actingAs($admin)->get(route('autorizacion'))
+            ->assertOk()
+            ->assertDontSee($operation);
+
+        $rejectedOperation = '8190918';
+        $this->createAccount($numdoc, $rejectedOperation, 'TESTEO GISELLA');
+        $this->actingAs($asesor)
+            ->post(route('clientes.asignaciones.store', $numdoc), [
+                'operaciones' => [$rejectedOperation],
+                'motivo' => 'Solicitud destinada a verificar el rechazo.',
+            ])
+            ->assertRedirect(route('clientes.show', $numdoc));
+        $rejected = AsignarCliente::query()->where('numdoc', $numdoc)->where('operacion', $rejectedOperation)->firstOrFail();
+        $this->actingAs($admin)
+            ->post(route('autorizacion.asignaciones.rechazar', $rejected), ['nota_estado' => 'No corresponde a la cartera.'])
+            ->assertRedirect();
+        $this->assertSame(1, $asesor->notifications()->where('data->type', 'asignacion_status')->where('data->estado', AsignarCliente::ESTADO_RECHAZADA)->count());
+
+        $this->actingAs($asesor)
+            ->get(route('reportes.asignaciones'))
+            ->assertForbidden();
+
+        $this->actingAs($admin)->get(route('reportes.asignaciones', ['numdoc' => $numdoc]))
+            ->assertOk()
+            ->assertSee('Historial de asignaciones')
+            ->assertSee($operation)
+            ->assertSee('Aprobada');
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones.export', ['numdoc' => $numdoc]))
+            ->assertOk()
+            ->assertDownload();
+    }
+
     private function makeUser(string $role, array $attributes = []): User
     {
         return User::query()->create(array_merge([

@@ -8,8 +8,6 @@ class ClienteShowViewModel
 {
     public readonly string $dni;
     public readonly string $numdoc;
-    public readonly Collection $asignacionesHistorial;
-
     public function __construct(
         string $numdoc,
         public readonly string $titular,
@@ -27,11 +25,9 @@ class ClienteShowViewModel
         public readonly ?string $nextNroCarta,
         public readonly float $totPagos,
         ?string $dni = null,
-        ?Collection $asignacionesHistorial = null,
     ) {
         $this->numdoc = $numdoc ?: (string) $dni;
         $this->dni = $dni ?: $this->numdoc;
-        $this->asignacionesHistorial = $asignacionesHistorial ?? collect();
     }
 
     public function toArray(): array
@@ -53,7 +49,6 @@ class ClienteShowViewModel
             'pagosGrouped' => $this->pagosGrouped,
             'nextNroCarta' => $this->nextNroCarta,
             'totPagos' => $this->totPagos,
-            'asignacionesHistorial' => $this->asignacionesHistorial,
         ];
     }
 }

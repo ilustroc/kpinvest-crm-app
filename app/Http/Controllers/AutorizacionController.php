@@ -10,6 +10,7 @@ use App\Models\PromesaPago;
 use App\Services\Asignacion\ClienteAssignmentService;
 use App\Services\Autorizacion\AutorizacionIndexService;
 use App\Services\Autorizacion\AutorizacionPaymentLookupService;
+use App\Support\WorkflowNotifier;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -42,11 +43,12 @@ class AutorizacionController extends Controller
             ?? $request->input('nota');
 
         try {
-            $this->assignments->approve(
+            $resolved = $this->assignments->approve(
                 $request->user(),
                 $asignacion,
                 is_string($nota) ? $nota : null,
             );
+            WorkflowNotifier::asignacionResuelta($resolved, true);
 
             return back()
                 ->with('ok', 'Solicitud de asignación aprobada correctamente.')
@@ -81,7 +83,8 @@ class AutorizacionController extends Controller
         }
 
         try {
-            $this->assignments->reject($request->user(), $asignacion, $motivo);
+            $resolved = $this->assignments->reject($request->user(), $asignacion, $motivo);
+            WorkflowNotifier::asignacionResuelta($resolved, false);
 
             return back()
                 ->with('ok', 'Solicitud de asignación rechazada.')

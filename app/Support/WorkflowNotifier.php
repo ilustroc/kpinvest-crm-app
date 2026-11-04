@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\CnaSolicitud;
+use App\Models\AsignarCliente;
 use App\Models\PromesaPago;
 use App\Models\User;
 use App\Notifications\Workflow\WorkflowActionRequiredNotification;
@@ -13,6 +14,87 @@ use Illuminate\Notifications\Notification;
 
 class WorkflowNotifier
 {
+    /**
+     * Reutiliza database + broadcast de CNA/Promesas. Una solicitud con varias
+     * operaciones llega como una notificación agrupada a cada resolutor.
+     *
+     * @param Collection<int, AsignarCliente> $asignaciones
+     */
+    public static function asignacionSolicitada(Collection $asignaciones): void
+    {
+        $first = $asignaciones->first();
+        if (! $first instanceof AsignarCliente) {
+            return;
+        }
+
+        $first->loadMissing(['solicitante', 'clienteCuenta']);
+        $operations = $asignaciones
+            ->pluck('operacion')
+            ->map(fn ($operation) => trim((string) $operation))
+            ->filter()
+            ->unique()
+            ->values();
+        $cliente = $first->clienteCuenta?->nombre ?: self::nombreClientePorDni((string) $first->numdoc);
+        $solicitante = $first->solicitante;
+        $operationsLabel = $operations->implode(', ');
+        $message = $operations->count() === 1
+            ? sprintf('%s solicita la asignación de la operación %s del cliente %s.', $solicitante?->name ?: 'Un asesor', $operationsLabel, $first->numdoc)
+            : sprintf('%s solicita la asignación de %d operaciones del cliente %s: %s.', $solicitante?->name ?: 'Un asesor', $operations->count(), $first->numdoc, $operationsLabel);
+
+        $context = [
+            'asesor' => $solicitante,
+            'numdoc' => (string) $first->numdoc,
+            'cliente' => $cliente ?: 'Cliente registrado',
+        ];
+
+        self::notifyActionRequired(
+            User::query()
+                ->whereIn('role', [
+                    \App\Support\Authorization\Roles::ADMINISTRADOR,
+                    \App\Support\Authorization\Roles::SUPERVISOR,
+                    \App\Support\Authorization\Roles::SOPORTE,
+                ])
+                ->where('active', 1)
+                ->get(),
+            'asignacion',
+            (int) $first->id,
+            $context,
+            AsignarCliente::ESTADO_PENDIENTE,
+            'Nueva solicitud de asignación',
+            $message,
+            route('autorizacion').'#panel-asignaciones',
+        );
+    }
+
+    public static function asignacionResuelta(AsignarCliente $asignacion, bool $approved): void
+    {
+        $asignacion->loadMissing(['solicitante', 'clienteCuenta', 'aprobadoPor']);
+        $solicitante = $asignacion->solicitante;
+        if (! $solicitante || ! $solicitante->active) {
+            return;
+        }
+
+        $resolver = $asignacion->aprobadoPor?->name ?: 'Un autorizador';
+        $title = $approved ? 'Asignación aprobada' : 'Asignación rechazada';
+        $message = $approved
+            ? sprintf('%s aprobó tu solicitud de asignación para la operación %s.', $resolver, $asignacion->operacion)
+            : sprintf('Tu solicitud de asignación para la operación %s fue rechazada.', $asignacion->operacion);
+
+        self::notifyStatus(
+            $solicitante,
+            'asignacion',
+            (int) $asignacion->id,
+            [
+                'asesor' => $solicitante,
+                'numdoc' => (string) $asignacion->numdoc,
+                'cliente' => $asignacion->clienteCuenta?->nombre ?: self::nombreClientePorDni((string) $asignacion->numdoc),
+            ],
+            $approved ? AsignarCliente::ESTADO_APROBADA : AsignarCliente::ESTADO_RECHAZADA,
+            $title,
+            $message,
+        );
+    }
+
     public static function promesaPendiente(PromesaPago $promesa): void
     {
         $context = WorkflowMailer::promesaContext($promesa);
@@ -206,7 +288,8 @@ class WorkflowNotifier
             return;
         }
 
-        $payload = self::payload($module, $entityId, $context, $estado, $title, $message, 'Ver estado', WorkflowMailer::statusUrl($context['dni']), false);
+        $documento = (string) ($context['dni'] ?? $context['numdoc'] ?? '');
+        $payload = self::payload($module, $entityId, $context, $estado, $title, $message, 'Ver estado', WorkflowMailer::statusUrl($documento), false);
 
         self::notifyUser($recipient, new WorkflowStatusNotification($payload), [
             'module' => $module,

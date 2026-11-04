@@ -76,6 +76,10 @@
                                 <span class="size-1.5 rounded-full bg-current opacity-50"></span>
                                 <span class="{{ $navLabel }}">Promesas</span>
                             </a>
+                            <a href="{{ route('reportes.asignaciones') }}" class="{{ $navLink(request()->routeIs('reportes.asignaciones*')).' kp-nav-sub' }}">
+                                <span class="size-1.5 rounded-full bg-current opacity-50"></span>
+                                <span class="{{ $navLabel }}">Asignaciones</span>
+                            </a>
                         </div>
                     </details>
                 </div>

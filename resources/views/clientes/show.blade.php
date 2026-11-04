@@ -277,7 +277,6 @@
 
             <x-promesas.promise-history :promesas="$promesas" />
 
-            <x-asignaciones.history-panel :asignaciones="$asignacionesHistorial ?? collect()" :dni="$dni" />
         </div>
 
         <x-promesas.payment-schedule />

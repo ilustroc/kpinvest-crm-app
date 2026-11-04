@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ReporteCnaController;
+use App\Http\Controllers\ReporteAsignacionesController;
 use App\Http\Controllers\ReportePagosController;
 use App\Http\Controllers\ReportePromesasController;
 use Illuminate\Support\Facades\Route;
@@ -22,5 +23,10 @@ Route::middleware('can:access-reportes')->prefix('reportes')->name('reportes.')-
         Route::get('/', 'index')->name('pdp');
         Route::get('/facets', 'facets')->name('pdp.facets');
         Route::get('/export', 'export')->name('pdp.export');
+    });
+
+    Route::controller(ReporteAsignacionesController::class)->prefix('asignaciones')->group(function () {
+        Route::get('/', 'index')->name('asignaciones');
+        Route::get('/export', 'export')->name('asignaciones.export');
     });
 });

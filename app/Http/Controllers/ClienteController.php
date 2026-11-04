@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Cliente\DeleteClientePaymentAction;
 use App\Services\Asignacion\ClienteAssignmentService;
 use App\Services\Cliente\ClienteProfileService;
+use App\Support\WorkflowNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -59,6 +60,10 @@ class ClienteController extends Controller
             $validated['operaciones'],
             (string) $validated['motivo'],
         );
+
+        // Una sola notificación agrupada evita saturar la campana cuando el
+        // asesor selecciona varias operaciones del mismo cliente.
+        WorkflowNotifier::asignacionSolicitada($created);
 
         $count = $created->count();
         $label = $count === 1

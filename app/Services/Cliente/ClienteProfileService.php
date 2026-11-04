@@ -42,10 +42,6 @@ class ClienteProfileService
             $resolvedAssignments,
         );
 
-        $asignacionesHistorial = Schema::hasTable('asignar_clientes')
-            ? $this->assignments->historyForClient($dni, 50)
-            : collect();
-
         [$ccdDocs, $ccdByDni, $ccdByCodigo, $ccdByCosecha, $ccdCosechaKeys] = $this->ccdData($dni, $cuentas);
         [$cnasByCuenta, $cnasByOperacion] = $this->cnaData($dni, $cuentas, $accountByOperation);
 
@@ -66,7 +62,6 @@ class ClienteProfileService
             nextNroCarta: $this->nextNroCarta(),
             totPagos: $this->payments->total($pagos),
             dni: $dni,
-            asignacionesHistorial: $asignacionesHistorial,
         );
     }
 

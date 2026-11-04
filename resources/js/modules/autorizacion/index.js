@@ -682,60 +682,15 @@ function setupAsignacionDetail(root) {
             setText("asig_det_titular", d.titular || "-");
             setText("asig_det_numdoc", d.numdoc || "-");
             setText("asig_det_operacion", d.operacion || "-");
-            setText("asig_det_capital", money(d.capital || 0));
-            setText("asig_det_deuda", money(d.deuda || 0));
             setText("asig_det_solicitante", d.solicitante || "-");
             setText("asig_det_asesor_destino", d.asesorDestino || "-");
-            setText("asig_det_asesor_vigente", d.asesorVigente || "-");
             setText("asig_det_fecha", d.fechaSolicitud || "-");
-            setText("asig_det_entidad_prod", `${d.entidad || "-"} · ${d.producto || "-"}`);
-            setText("asig_det_cosecha_cuenta", `${d.cosecha || "-"} · ${d.cuenta || "-"}`);
-            setText("asig_det_origen", d.origen || "-");
-            setText(
-                "asig_det_resolucion",
-                d.resueltoPor
-                    ? `${d.resueltoPor}${d.fechaResolucion ? ` (${d.fechaResolucion})` : ""}`
-                    : "Pendiente de resolución",
-            );
             setText("asig_det_motivo", d.motivo || "-");
-
-            const estadoEl = $("#asig_det_estado");
-            setText("asig_det_estado", d.estado || "Pendiente");
-            setBadgeVariant(estadoEl, badgeVariantForStatus(d.estado));
-
-            const obsWrap = $("#asig_det_obs_wrap");
-            const obsText = (d.observacionResolucion || "").trim();
-            if (obsWrap) obsWrap.classList.toggle("hidden", !obsText);
-            setText("asig_det_obs", obsText || "—");
 
             const fichaLink = $("#asig_det_ficha_link");
             if (fichaLink) {
                 const safeUrl = toSafeInternalUrl((d.clienteUrl || "").trim());
                 fichaLink.href = safeUrl && safeUrl !== "#" ? safeUrl : "#";
-            }
-
-            const history = parseJsonAttribute(button, "data-historial", []);
-            const countBadge = $("#asig_det_hist_count");
-            if (countBadge) {
-                countBadge.textContent = `${history.length} ${history.length === 1 ? "registro" : "registros"}`;
-            }
-
-            const tbody = $("#asig_det_hist_tbody");
-            if (tbody) {
-                if (!history.length) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="border-t border-kp-border px-4 py-4 text-center text-[12px] text-kp-muted">Sin historial registrado.</td></tr>';
-                } else {
-                    tbody.innerHTML = history.map((h) => `
-                        <tr class="transition-colors hover:bg-slate-50/70">
-                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] tabular-nums text-slate-600">${escapeHtml(h.fecha_solicitud || "Histórico")}</td>
-                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.solicitante || "-")}</td>
-                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] font-semibold text-kp-ink">${escapeHtml(h.asesor || "-")}</td>
-                            <td class="border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.motivo || "-")}</td>
-                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11px] font-semibold uppercase text-slate-600">${escapeHtml(h.estado || "-")}</td>
-                            <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-[11.5px] text-slate-600">${escapeHtml(h.aprobado_por ? `${h.aprobado_por} (${h.fecha_aprobacion || ""})` : "En revisión")}</td>
-                        </tr>
-                    `).join("");
-                }
             }
         });
     });
