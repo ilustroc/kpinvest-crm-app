@@ -1,8 +1,8 @@
 # KP INVEST CRM V3 — Optimización Docker + Laravel
 
-Fecha de validación: 2026-11-04 (America/Lima)  
-Repositorio: `ilustroc/kpinvest-crm-app`  
-Base analizada: `eee305bd8be4324e17bb0734525117769fd87ff3`  
+Fecha de validación: 2026-11-04 (America/Lima)
+Repositorio: `ilustroc/kpinvest-crm-app`
+Base analizada: `eee305bd8be4324e17bb0734525117769fd87ff3`
 Runtime validado: Laravel 10.50.0, PHP 8.3.36 en Apache, MariaDB 11.8.9.
 
 ## 1. Causa raíz demostrada
@@ -115,9 +115,12 @@ El cambio de runtime y herramientas de medición quedó registrado en:
 ```text
 00a8adbf531e8d98d04b2380e02476145e1b044a
 perf(docker): isolate vendor and enable development opcache
+
+7231d00
+docs: document Docker Laravel performance optimization
 ```
 
-Este informe se registra en el commit documental posterior. La sincronización de `feature/meridian-ui-v3` y el fast-forward de `main` se verifican después de crear ese commit, sin force-push.
+La sincronización de `feature/meridian-ui-v3` y el fast-forward de `main` se verifican al cierre, sin force-push.
 
 ## 10. Reconstrucción local
 
