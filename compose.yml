@@ -10,6 +10,10 @@ services:
     working_dir: /var/www/html
     volumes:
       - ./:/var/www/html
+      # Las dependencias no deben cruzar el bind mount Windows <-> Linux en
+      # cada include/stat de PHP. El volumen se inicializa desde la imagen y
+      # el entrypoint lo vuelve a instalar sólo cuando cambia composer.lock.
+      - kpcrm_meridian_ui_vendor:/var/www/html/vendor
       - kpcrm_meridian_ui_revision_storage:/var/www/html/storage
       - C:/Backups/KPInvest/CCD/BBVA/BBVA_5:/mnt/ccd-import/BBVA_5:ro
     environment:
@@ -57,6 +61,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+    # Sin esto, Docker Desktop puede volver a levantar Apache tras un reinicio
+    # dejando a Laravel sin el host `db` y produciendo timeouts de DNS/PDO.
+    restart: unless-stopped
     networks: [crm_ui_net]
 
 volumes:
@@ -64,6 +71,8 @@ volumes:
     name: kpcrm_meridian_ui_mariadb_data
   kpcrm_meridian_ui_revision_storage:
     name: kpcrm_meridian_ui_revision_storage
+  kpcrm_meridian_ui_vendor:
+    name: kpcrm_meridian_ui_vendor
 
 networks:
   crm_ui_net:

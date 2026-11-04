@@ -22,6 +22,18 @@ RUN sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-avail
     && a2enconf laravel
 
 COPY --from=composer_bin /usr/bin/composer /usr/local/bin/composer
+
+# Se instala exactamente el lockfile en la imagen. Cuando compose crea por
+# primera vez el volumen de vendor, Docker copia este árbol Linux nativo al
+# volumen en vez de leer miles de ficheros del bind mount de Windows.
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    && sha256sum composer.lock | awk '{print $1}' > vendor/.kpcrm-composer-lock.sha256
+
 COPY docker/crm/php-dev.ini /usr/local/etc/php/conf.d/99-kpcrm-dev.ini
+COPY --chmod=755 docker/crm/entrypoint.sh /usr/local/bin/kpcrm-entrypoint
 WORKDIR /var/www/html
 EXPOSE 80
+
+ENTRYPOINT ["kpcrm-entrypoint"]
+CMD ["apache2-foreground"]
