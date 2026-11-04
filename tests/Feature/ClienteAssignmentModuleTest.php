@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Imports\AsignacionImport;
+use App\Exports\AssignmentExport;
 use App\Models\AsignarCliente;
 use App\Models\ClienteCuenta;
 use App\Models\User;
 use App\Services\Asignacion\ClienteAssignmentService;
+use App\Services\AssignmentReportService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -15,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class ClienteAssignmentModuleTest extends TestCase
@@ -594,6 +597,18 @@ class ClienteAssignmentModuleTest extends TestCase
         $this->assertNotNull($created->fecha_solicitud);
         $this->assertNotNull($created->fecha_aprobacion);
 
+        $template = $this->actingAs($admin)
+            ->get(route('integracion.asignacion.template'));
+        $template->assertOk();
+        $this->assertStringContainsString('NUMDOC,OPERACION,NAME', $template->streamedContent());
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones', ['numdoc' => '00887766', 'operacion' => '000554433']))
+            ->assertOk()
+            ->assertSee('CLIENTE MASIVO OK')
+            ->assertSee('Carga masiva')
+            ->assertSee('Admin Importador');
+
         // 4. Reimportación idempotente del mismo archivo -> sin_cambio_efectivo = 1, nuevas_asignaciones = 0
         $this->actingAs($admin)
             ->post(route('integracion.asignacion.import'), [
@@ -611,6 +626,124 @@ class ClienteAssignmentModuleTest extends TestCase
             ->where('operacion', '000554433')
             ->count();
         $this->assertSame(1, $totalRowsForAccount, 'No debe duplicar el historial cuando el asesor vigente ya es el mismo.');
+    }
+
+    public function test_assignment_report_handles_historical_nulls_filters_pagination_and_excel(): void
+    {
+        $admin = $this->makeUser('administrador', ['name' => 'Admin Reporte']);
+        $asesor = $this->makeUser('asesor', ['name' => 'Asesor Reporte']);
+
+        $historical = AsignarCliente::query()->create([
+            'numdoc' => '0000001234',
+            'operacion' => '0000005678',
+            'name' => 'BOLSA',
+            'fecha_solicitud' => null,
+            'motivo' => null,
+            'estado' => AsignarCliente::ESTADO_APROBADA,
+            'fecha_aprobacion' => null,
+            'origen' => AsignarCliente::ORIGEN_CARGA_MASIVA,
+        ]);
+
+        $manualAccount = $this->createAccount('0000004321', '0000008765', 'CLIENTE MANUAL REPORTE');
+        AsignarCliente::query()->create([
+            'numdoc' => $manualAccount->numdoc,
+            'operacion' => $manualAccount->operacion,
+            'cliente_cuenta_id' => $manualAccount->id,
+            'name' => $asesor->name,
+            'solicitante_user_id' => $asesor->id,
+            'asesor_destino_user_id' => $asesor->id,
+            'fecha_solicitud' => Carbon::parse('2026-11-04 14:00:00', 'America/Lima'),
+            'motivo' => 'Solicitud manual de reporte',
+            'estado' => AsignarCliente::ESTADO_APROBADA,
+            'aprobado_por_user_id' => $admin->id,
+            'fecha_aprobacion' => Carbon::parse('2026-11-04 14:05:00', 'America/Lima'),
+            'origen' => AsignarCliente::ORIGEN_MANUAL,
+        ]);
+
+        $otherAccount = $this->createAccount('0000007777', '0000008765', 'CLIENTE MISMA OPERACIÓN');
+        AsignarCliente::query()->create([
+            'numdoc' => $otherAccount->numdoc,
+            'operacion' => $otherAccount->operacion,
+            'cliente_cuenta_id' => $otherAccount->id,
+            'name' => $asesor->name,
+            'solicitante_user_id' => $admin->id,
+            'asesor_destino_user_id' => $asesor->id,
+            'fecha_solicitud' => Carbon::parse('2026-11-04 13:00:00', 'America/Lima'),
+            'motivo' => 'Carga distinta',
+            'estado' => AsignarCliente::ESTADO_APROBADA,
+            'aprobado_por_user_id' => $admin->id,
+            'fecha_aprobacion' => Carbon::parse('2026-11-04 13:00:00', 'America/Lima'),
+            'origen' => AsignarCliente::ORIGEN_CARGA_MASIVA,
+        ]);
+
+        for ($i = 1; $i <= 26; $i++) {
+            AsignarCliente::query()->create([
+                'numdoc' => '0000009999',
+                'operacion' => 'PAGE-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+                'name' => 'ESCALL',
+                'fecha_solicitud' => Carbon::parse('2026-10-01 00:00:00', 'America/Lima')->addMinutes($i),
+                'motivo' => 'Histórico paginado',
+                'estado' => AsignarCliente::ESTADO_APROBADA,
+                'origen' => AsignarCliente::ORIGEN_CARGA_MASIVA,
+            ]);
+        }
+
+        $report = app(AssignmentReportService::class);
+        $historicalRow = $report->filteredQuery(['numdoc' => $historical->numdoc])->first();
+        $this->assertSame('Histórico', $historicalRow->cliente);
+        $this->assertSame('Sistema / Histórico', $historicalRow->solicitante);
+        $this->assertSame('BOLSA', $historicalRow->asesor_destino);
+        $this->assertSame('Histórico', $historicalRow->motivo);
+        $this->assertSame('Sin información', $historicalRow->resuelto_por);
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones', ['numdoc' => $historical->numdoc]))
+            ->assertOk()
+            ->assertSee('Histórico')
+            ->assertSee('BOLSA')
+            ->assertSee('Sistema / Histórico');
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones', [
+                'numdoc' => $manualAccount->numdoc,
+                'operacion' => $manualAccount->operacion,
+                'asesor' => $asesor->name,
+                'estado' => AsignarCliente::ESTADO_APROBADA,
+                'origen' => AsignarCliente::ORIGEN_MANUAL,
+            ]))
+            ->assertOk()
+            ->assertSee('CLIENTE MANUAL REPORTE')
+            ->assertDontSee('CLIENTE MISMA OPERACIÓN');
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones', ['numdoc' => '0000009999', 'page' => 2]))
+            ->assertOk()
+            ->assertSee('PAGE-01');
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones', ['numdoc' => 'SIN-RESULTADO']))
+            ->assertOk()
+            ->assertSee('No hay asignaciones para los filtros indicados.');
+
+        $this->actingAs($asesor)
+            ->get(route('reportes.asignaciones'))
+            ->assertForbidden();
+
+        $path = (new AssignmentExport($report->filteredQuery(['numdoc' => $manualAccount->numdoc])))->export();
+        $sheet = IOFactory::load($path)->getActiveSheet();
+        $this->assertSame('ID', $sheet->getCell('A1')->getValue());
+        $this->assertSame('Fecha solicitud', $sheet->getCell('B1')->getValue());
+        $this->assertSame('Documento', $sheet->getCell('C1')->getValue());
+        $this->assertSame('Operación', $sheet->getCell('E1')->getValue());
+        $this->assertSame('Fecha resolución', $sheet->getCell('L1')->getValue());
+        $this->assertSame('0000004321', $sheet->getCell('C2')->getValue());
+        $this->assertSame('0000008765', $sheet->getCell('E2')->getValue());
+        @unlink($path);
+
+        $this->actingAs($admin)
+            ->get(route('reportes.asignaciones.export', ['numdoc' => $manualAccount->numdoc]))
+            ->assertOk()
+            ->assertDownload();
     }
 
     /**

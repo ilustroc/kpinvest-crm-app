@@ -19,7 +19,16 @@ class AssignmentReportService
             ->leftJoin('users as solicitante', 'solicitante.id', '=', 'ac.solicitante_user_id')
             ->leftJoin('users as destino', 'destino.id', '=', 'ac.asesor_destino_user_id')
             ->leftJoin('users as resolvedor', 'resolvedor.id', '=', 'ac.aprobado_por_user_id')
-            ->selectRaw("ac.id, ac.fecha_solicitud, ac.numdoc, COALESCE(cc.nombre, 'Cliente registrado') as cliente, ac.operacion, COALESCE(solicitante.name, 'Sistema / Histórico') as solicitante, COALESCE(destino.name, ac.name, 'Sin asignar') as asesor_destino, ac.motivo, ac.origen, ac.estado, COALESCE(resolvedor.name, '') as resuelto_por, ac.fecha_aprobacion");
+            ->selectRaw("ac.id, ac.fecha_solicitud, ac.numdoc,
+                COALESCE(NULLIF(TRIM(cc.nombre), ''), 'Histórico') as cliente,
+                ac.operacion,
+                COALESCE(NULLIF(TRIM(solicitante.name), ''), 'Sistema / Histórico') as solicitante,
+                COALESCE(NULLIF(TRIM(destino.name), ''), NULLIF(TRIM(ac.name), ''), 'Sin información') as asesor_destino,
+                COALESCE(NULLIF(TRIM(ac.motivo), ''), 'Histórico') as motivo,
+                ac.origen,
+                ac.estado,
+                COALESCE(NULLIF(TRIM(resolvedor.name), ''), 'Sin información') as resuelto_por,
+                ac.fecha_aprobacion");
 
         foreach (['numdoc', 'operacion'] as $field) {
             $value = trim((string) ($filters[$field] ?? ''));

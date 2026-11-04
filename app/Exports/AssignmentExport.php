@@ -3,12 +3,14 @@
 namespace App\Exports;
 
 use App\Support\ExportSanitizer;
+use Illuminate\Database\Query\Builder;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class AssignmentExport
 {
-    public function __construct(private readonly mixed $query)
+    public function __construct(private readonly Builder $query)
     {
     }
 
@@ -19,25 +21,28 @@ class AssignmentExport
         $sheet->fromArray($headers, null, 'A1');
         $row = 2;
 
-        $this->query->chunkByIdDesc(1000, function ($items) use (&$row, $sheet): void {
-            foreach ($items as $item) {
-                $sheet->fromArray([
-                    (int) $item->id,
-                    ExportSanitizer::sanitize((string) $item->fecha_solicitud),
-                    ExportSanitizer::sanitize((string) $item->numdoc),
-                    ExportSanitizer::sanitize((string) $item->cliente),
-                    ExportSanitizer::sanitize((string) $item->operacion),
-                    ExportSanitizer::sanitize((string) $item->solicitante),
-                    ExportSanitizer::sanitize((string) $item->asesor_destino),
-                    ExportSanitizer::sanitize((string) $item->motivo),
-                    ExportSanitizer::sanitize((string) $item->origen),
-                    ExportSanitizer::sanitize((string) $item->estado),
-                    ExportSanitizer::sanitize((string) $item->resuelto_por),
-                    ExportSanitizer::sanitize((string) $item->fecha_aprobacion),
-                ], null, "A{$row}");
-                $row++;
-            }
-        }, 'ac.id', 'id');
+        foreach ($this->query->cursor() as $item) {
+            $documento = ExportSanitizer::sanitize((string) $item->numdoc);
+            $operacion = ExportSanitizer::sanitize((string) $item->operacion);
+
+            $sheet->fromArray([
+                (int) $item->id,
+                ExportSanitizer::sanitize((string) ($item->fecha_solicitud ?: 'Histórico')),
+                $documento,
+                ExportSanitizer::sanitize((string) $item->cliente),
+                $operacion,
+                ExportSanitizer::sanitize((string) $item->solicitante),
+                ExportSanitizer::sanitize((string) $item->asesor_destino),
+                ExportSanitizer::sanitize((string) $item->motivo),
+                ExportSanitizer::sanitize((string) $item->origen),
+                ExportSanitizer::sanitize((string) $item->estado),
+                ExportSanitizer::sanitize((string) $item->resuelto_por),
+                ExportSanitizer::sanitize((string) ($item->fecha_aprobacion ?: 'Sin información')),
+            ], null, "A{$row}");
+            $sheet->setCellValueExplicit("C{$row}", $documento, DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("E{$row}", $operacion, DataType::TYPE_STRING);
+            $row++;
+        }
 
         $path = tempnam(sys_get_temp_dir(), 'asignaciones_');
         (new Xlsx($sheet->getParent()))->save($path);
