@@ -149,13 +149,13 @@ function renderAccounts(accounts, operationText = "") {
                     <span class="block text-[13px] font-semibold text-kp-ink">Operación ${escapeHtml(account?.operacion || "-")}</span>
                     <span class="mt-0.5 block text-[11px] text-kp-muted">${escapeHtml(account?.entidad || "-")} · ${escapeHtml(account?.cosecha || "-")}</span>
                 </summary>
-                <dl class="grid gap-2 border-t border-kp-border p-3 sm:grid-cols-2">
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Año castigo</dt><dd class="mt-0.5 text-[12px] font-medium text-kp-ink">${escapeHtml(year)}</dd></div>
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Entidad</dt><dd class="mt-0.5 text-[12px] font-medium text-kp-ink">${escapeHtml(account?.entidad || "-")}</dd></div>
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Producto</dt><dd class="mt-0.5 text-[12px] font-medium text-kp-ink">${escapeHtml(account?.producto || "-")}</dd></div>
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Cosecha</dt><dd class="mt-0.5 text-[12px] font-medium text-kp-ink">${escapeHtml(account?.cosecha || "-")}</dd></div>
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Capital</dt><dd class="mt-0.5 text-[12px] font-medium tabular-nums text-kp-ink">${money(account?.saldo_capital)}</dd></div>
-                    <div class="rounded-md bg-slate-50 px-2.5 py-2"><dt class="text-[10px] font-semibold uppercase tracking-[0.04em] text-kp-muted">Deuda total</dt><dd class="mt-0.5 text-[12px] font-medium tabular-nums text-kp-ink">${money(account?.deuda_total)}</dd></div>
+                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-kp-border px-3.5 py-3 sm:grid-cols-3">
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Año castigo</dt><dd class="mt-0.5 text-[13px] font-semibold text-kp-ink">${escapeHtml(year)}</dd></div>
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Entidad</dt><dd class="mt-0.5 text-[13px] font-semibold text-kp-ink">${escapeHtml(account?.entidad || "-")}</dd></div>
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Producto</dt><dd class="mt-0.5 text-[13px] font-semibold text-kp-ink">${escapeHtml(account?.producto || "-")}</dd></div>
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Cosecha</dt><dd class="mt-0.5 text-[13px] font-semibold text-kp-ink">${escapeHtml(account?.cosecha || "-")}</dd></div>
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Deuda capital</dt><dd class="mt-0.5 text-[13px] font-semibold tabular-nums text-kp-ink">${money(account?.saldo_capital)}</dd></div>
+                    <div><dt class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Deuda total</dt><dd class="mt-0.5 text-[13px] font-semibold tabular-nums text-kp-ink">${money(account?.deuda_total)}</dd></div>
                 </dl>
             </details>
         `;
@@ -326,123 +326,6 @@ function setBadgeVariant(element, variant) {
     element.className = `inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] ${variants[variant] || variants.neutral}`;
 }
 
-function renderCnaTimeline(button) {
-    const container = $("#cna_flujo");
-
-    if (!container) return;
-
-    const status = String(button.dataset.estado || "").toLowerCase();
-    const steps = [];
-    const requestedBy = (button.dataset.solicitante || "").trim();
-    const requestedAt = toDmy(button.dataset.fecha);
-
-    steps.push({
-        title: "Solicitud registrada",
-        detail:
-            [requestedBy, requestedAt !== "-" ? requestedAt : ""]
-                .filter(Boolean)
-                .join(" · ") || "Registrada",
-        tone: "primary",
-    });
-
-    const preBy = (button.dataset.preaprobadoPor || "").trim();
-    const preAt = toDmy(button.dataset.preaprobadoAt);
-
-    if (
-        preBy ||
-        preAt !== "-" ||
-        status.includes("pre") ||
-        (status.includes("aprob") && !status.includes("pre"))
-    ) {
-        steps.push({
-            title: "Preaprobación",
-            detail:
-                [preBy, preAt !== "-" ? preAt : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "Registrada",
-            tone: "info",
-        });
-    }
-
-    const approvedBy = (button.dataset.aprobadoPor || "").trim();
-    const approvedAt = toDmy(button.dataset.aprobadoAt);
-
-    if (
-        approvedBy ||
-        approvedAt !== "-" ||
-        (status.includes("aprob") && !status.includes("pre"))
-    ) {
-        steps.push({
-            title: "Aprobación",
-            detail:
-                [approvedBy, approvedAt !== "-" ? approvedAt : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "Registrada",
-            tone: "success",
-        });
-    }
-
-    const rejectedBy = (button.dataset.rechazadoPor || "").trim();
-    const rejectedAt = toDmy(button.dataset.rechazadoAt);
-    const rejectionReason = (button.dataset.motivoRechazo || "").trim();
-
-    if (rejectedBy || rejectedAt !== "-" || status.includes("rechaz")) {
-        steps.push({
-            title: "Rechazo",
-            detail:
-                [rejectedBy, rejectedAt !== "-" ? rejectedAt : ""]
-                    .filter(Boolean)
-                    .join(" · ") || "Registrado",
-            note: rejectionReason,
-            tone: "danger",
-        });
-    }
-
-    if (steps.length === 1) {
-        steps.push({
-            title: "Revisión pendiente",
-            detail: "La solicitud espera la decisión del siguiente nivel.",
-            tone: "muted",
-        });
-    }
-
-    const tones = {
-        primary: "bg-kp-primary",
-        info: "bg-kp-secondary",
-        success: "bg-kp-primary",
-        danger: "bg-red-500",
-        muted: "bg-slate-300",
-    };
-
-    container.innerHTML = steps
-        .map(
-            (step) => `
-        <li class="relative flex gap-3 pb-3 last:pb-0">
-            <span class="mt-1.5 size-2 shrink-0 rounded-full ${tones[step.tone] || tones.muted}" aria-hidden="true"></span>
-            <div class="min-w-0">
-                <p class="text-[12px] font-semibold text-kp-ink">${escapeHtml(step.title)}</p>
-                <p class="mt-0.5 text-[11px] text-kp-muted">${escapeHtml(step.detail)}</p>
-                ${step.note ? `<p class="mt-1 whitespace-pre-line rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] leading-5 text-red-700">${escapeHtml(step.note)}</p>` : ""}
-            </div>
-        </li>
-    `,
-        )
-        .join("");
-}
-
-function renderCnaDocument(button) {
-    const panel = $("#cna_document_panel");
-
-    if (!panel) return;
-
-    const selector = (button.dataset.docTemplate || "").trim();
-    const template = selector ? document.querySelector(selector) : null;
-
-    panel.innerHTML = template
-        ? template.innerHTML
-        : '<div class="rounded-lg border border-dashed border-kp-border bg-slate-50 px-3.5 py-3 text-[12px] text-kp-muted">Sin información documental disponible.</div>';
-}
-
 function setCnaPaymentContext(payments, cnaOperations = null) {
     const count = $("#cna_pagos_count");
     const context = $("#cna_pagos_context");
@@ -599,7 +482,6 @@ function setupCnaDetail(root) {
             setText("cna_carta", button.dataset.nrocarta || "-");
             setText("cna_estado", button.dataset.estado || "-");
             setText("cna_solicitante", button.dataset.solicitante || "-");
-            setText("cna_producto", button.dataset.producto || "-");
             setText("cna_fecha", toDmy(button.dataset.fecha));
             setText("cna_fecha_pago", toDmy(button.dataset.fechaPago));
             setText("cna_monto_pagado", money(button.dataset.montoPagado));
@@ -619,9 +501,6 @@ function setupCnaDetail(root) {
                 clientLink.href = hasValidUrl ? safeUrl : "#";
                 clientLink.classList.toggle("hidden", !hasValidUrl);
             }
-
-            renderCnaTimeline(button);
-            renderCnaDocument(button);
 
             let operations = uniqueOperations(
                 parseJsonAttribute(button, "data-operaciones", []),

@@ -290,7 +290,6 @@
                   data-estado="{{ $estadoCna }}"
                   data-solicitante="{{ $cnaSolicitante }}"
                   data-nrocarta="{{ $cna->nro_carta }}"
-                  data-producto="{{ $productoTxt }}"
                   data-operaciones="{{ $opsJson }}"
                   data-fecha="{{ optional($cna->created_at)->format('Y-m-d') }}"
                   data-fecha-pago="{{ optional($cna->fecha_pago_realizado)->format('Y-m-d') }}"
@@ -305,7 +304,6 @@
                   data-rechazado-por="{{ $cna->rechazadoPor?->name }}"
                   data-rechazado-at="{{ optional($cna->rechazado_at)->format('Y-m-d H:i') }}"
                   data-motivo-rechazo="{{ $cna->motivo_rechazo }}"
-                  data-doc-template="#cna-doc-template-{{ $cna->id }}"
                 >
                   Detalle
                 </x-ui.button>
@@ -357,10 +355,6 @@
                   </x-ui.button>
                 @endif
               </div>
-
-              <template id="cna-doc-template-{{ $cna->id }}">
-                <x-cna.document-state :cna="$cna" mode="panel" />
-              </template>
             </x-tables.td>
           </tr>
         @empty
@@ -646,11 +640,6 @@
               </svg>
             </a>
           </div>
-
-          <div class="sm:w-[220px] sm:text-right">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Pago informado</p>
-            <p class="mt-1 text-xl font-semibold tabular-nums text-kp-ink"><span id="cna_monto_pagado">S/ 0.00</span></p>
-          </div>
         </div>
 
         <div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-kp-border/60 pt-3 sm:grid-cols-3">
@@ -667,8 +656,8 @@
             <p id="cna_solicitante" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
           </div>
           <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Producto</p>
-            <p id="cna_producto" class="mt-0.5 text-[13px] font-semibold text-kp-ink">—</p>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Monto pagado</p>
+            <p id="cna_monto_pagado" class="mt-0.5 text-[13px] font-semibold tabular-nums text-kp-ink">S/ 0.00</p>
           </div>
           <div>
             <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Entidad / cosecha (según pagos)</p>
@@ -682,17 +671,6 @@
       </div>
 
       <div class="space-y-5 p-5">
-        <section>
-          <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Flujo de autorización</h4>
-          <ol id="cna_flujo" class="mt-2 space-y-0"></ol>
-        </section>
-
-        <section>
-          <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Documento de la CNA</h4>
-          <div id="cna_document_panel" class="mt-2"></div>
-          <p class="mt-1.5 text-[10.5px] text-kp-muted">La plantilla se determina por la cosecha/entidad de las operaciones al generar el documento.</p>
-        </section>
-
         <section>
           <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Observación</h4>
           <div id="cna_obs" class="mt-2 whitespace-pre-line rounded-lg border border-kp-border bg-white px-3.5 py-3 text-[13px] leading-6 text-kp-ink">—</div>

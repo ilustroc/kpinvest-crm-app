@@ -39,7 +39,6 @@
             :titular="$titular"
             :cuentas="$cuentas"
             :pagos="$pagos"
-            :promesas="$promesas"
             :ccd-docs="$ccdDocs"
             :tot-capital="$totCapital"
             :tot-deuda="$totDeuda"

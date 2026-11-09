@@ -59,20 +59,6 @@
                 required
             >{{ old('motivo') }}</x-forms.textarea>
 
-            <div class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-3">
-                <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-white text-amber-600 shadow-xs" aria-hidden="true">
-                    <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                    </svg>
-                </span>
-                <div class="min-w-0 text-[11.5px] leading-5 text-amber-900">
-                    <p class="font-semibold">¿Está seguro de que desea solicitar la asignación de esta cuenta?</p>
-                    <p class="mt-0.5 text-[10.5px] text-amber-800/90">
-                        La solicitud quedará en estado <strong>Pendiente</strong> en la Bandeja de Autorizaciones y no modificará el asesor actual hasta ser aprobada.
-                    </p>
-                </div>
-            </div>
-
             <div id="asignacionOpsHidden"></div>
         </div>
 
