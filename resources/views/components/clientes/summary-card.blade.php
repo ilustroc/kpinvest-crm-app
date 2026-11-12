@@ -19,7 +19,7 @@
         <span class="size-1.5 shrink-0 rounded-full {{ $dots[$tone] ?? $dots['neutral'] }}" aria-hidden="true"></span>
         {{ $label }}
     </dt>
-    <dd class="mt-1.5 truncate text-[19px] font-semibold leading-none tracking-tight text-kp-ink sm:text-[20px]">
+    <dd class="mt-1.5 break-words text-[18px] font-semibold leading-[1.1] tracking-tight text-kp-ink sm:text-[19px]">
         {{ $value }}
     </dd>
     @if($hint)
