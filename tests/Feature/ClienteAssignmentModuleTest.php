@@ -160,6 +160,23 @@ class ClienteAssignmentModuleTest extends TestCase
         $this->assertSame(AsignarCliente::ORIGEN_MANUAL, $record->origen);
     }
 
+    public function test_assignment_request_modal_keeps_only_the_required_reason_field(): void
+    {
+        $asesor = $this->makeUser('asesor');
+        $numdoc = '00458913';
+        $this->createAccount($numdoc, '000987655', 'CLIENTE MODAL COMPACTO');
+
+        $this->actingAs($asesor)
+            ->get(route('clientes.show', $numdoc))
+            ->assertOk()
+            ->assertSee('Motivo de la solicitud')
+            ->assertSee('Solicitar asignación')
+            ->assertDontSee('Pendiente de aprobación')
+            ->assertDontSee('Solicitante / Destino:')
+            ->assertDontSee('Operaciones seleccionadas')
+            ->assertDontSee('Revisa las operaciones seleccionadas e ingresa el motivo de tu solicitud antes de enviarla a revisión.');
+    }
+
     /**
      * 4. Solicitud manual con múltiples operaciones seleccionadas crea un registro por operación.
      */

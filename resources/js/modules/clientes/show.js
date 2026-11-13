@@ -283,72 +283,31 @@ function setupAsignacionForm(root) {
     const badge = $('#selCountAsignacion', root);
     const selectAll = $('#chkAll', root);
     const checks = $$('.chkOp', root);
-    const summary = $('#asignacionOpsResumen', root);
     const hidden = $('#asignacionOpsHidden', root);
-    const countNode = $('#asignacionOpsCount', root);
-    const countLabel = $('#asignacionOpsCountLabel', root);
-    const footerOps = $('#asignacionFooterOps', root);
 
-    if (!button && !summary) return;
+    if (!button && !hidden) return;
 
-    function selectedDetails() {
+    function selectedOperations() {
         return checks
             .filter((input) => input.checked && !input.disabled)
-            .map((input) => {
-                const row = input.closest('tr');
-                return {
-                    operation: input.value,
-                    account: row?.dataset.cuenta || '',
-                    entity: row?.dataset.entidad || '',
-                    harvest: row?.dataset.cosecha || '',
-                    advisor: row?.dataset.asesor || 'Sin asignar',
-                };
-            })
-            .filter((item) => item.operation);
+            .map((input) => input.value)
+            .filter(Boolean);
     }
 
     function sync() {
-        const details = selectedDetails();
-        const count = details.length;
+        const operations = selectedOperations();
+        const count = operations.length;
 
         if (badge) badge.textContent = String(count);
         if (button) button.disabled = count === 0;
-        if (countNode) countNode.textContent = String(count);
-        if (countLabel) countLabel.textContent = count === 1 ? 'operación' : 'operaciones';
-        if (footerOps) {
-            footerOps.textContent = `${count} ${count === 1 ? 'operación seleccionada' : 'operaciones seleccionadas'}`;
-        }
-
-        if (summary) {
-            if (!count) {
-                summary.innerHTML = '<p class="rounded-md border border-dashed border-kp-border bg-kp-surface-muted px-3 py-2 text-[11px] text-kp-muted sm:col-span-2">Ninguna operación seleccionada.</p>';
-            } else {
-                summary.innerHTML = details.map((detail) => {
-                    const meta = [detail.entity, detail.harvest, `Actual: ${detail.advisor || 'Sin asignar'}`]
-                        .filter(Boolean)
-                        .map((val) => escapeHtml(val))
-                        .join(' · ');
-
-                    return `
-                        <div class="flex min-w-0 items-start gap-2 rounded-md border border-kp-border bg-white px-2.5 py-2">
-                            <span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded bg-kp-primary-soft text-[9px] font-bold text-kp-primary-ink">OP</span>
-                            <div class="min-w-0">
-                                <p class="truncate text-[12px] font-semibold text-kp-ink">${escapeHtml(detail.operation)}</p>
-                                <p class="mt-0.5 truncate text-[10.5px] text-kp-muted">${meta}</p>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
 
         if (hidden) {
             hidden.innerHTML = '';
-            details.forEach((detail) => {
+            operations.forEach((operation) => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'operaciones[]';
-                input.value = detail.operation;
+                input.value = operation;
                 hidden.appendChild(input);
             });
         }
