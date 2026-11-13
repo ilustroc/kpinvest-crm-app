@@ -46,7 +46,10 @@ class V3AutorizacionModuleTest extends TestCase
                     && collect($row->cuentas_json)->contains(fn ($account) => ($account['operacion'] ?? null) === $operation);
             })
             ->assertViewHas('cnaRows', fn ($rows) => collect($rows->items())->contains(fn ($row) => (int) $row->id === (int) $cna->id))
-            ->assertViewHas('prodByOp', fn ($products) => ($products[$operation] ?? null) === 'Producto Autorizacion V3');
+            ->assertViewHas('prodByOp', fn ($products) => ($products[$operation] ?? null) === 'Producto Autorizacion V3')
+            ->assertSee('id="t_titular"', false)
+            ->assertDontSee('id="t_estado"', false)
+            ->assertDontSee('Promesa de pago');
 
         preg_match('/data-operaciones=(["\'])(.*?)\1/', $response->getContent(), $matches);
         $raw = str_contains($matches[2] ?? '', '&') ? html_entity_decode($matches[2], ENT_QUOTES) : ($matches[2] ?? '');

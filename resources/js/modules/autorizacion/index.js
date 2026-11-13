@@ -244,7 +244,6 @@ function setupPromiseDetail(root) {
                 money(button.dataset.capital || button.dataset.capitalRaw),
             );
             setText("t_neg", money(button.dataset.negociado));
-            setText("t_estado", button.dataset.estado || "-");
 
             const noteGeneral =
                 [
