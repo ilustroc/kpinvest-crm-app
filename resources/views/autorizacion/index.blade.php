@@ -256,7 +256,6 @@
 
             $opTxt = $ops->isEmpty() ? '-' : $ops->implode(', ');
             $cnaSolicitante = $cna->solicitante?->name ?: '—';
-            $estadoCna = $cna->workflow_estado ?: ($isSupervisor ? 'pendiente' : 'preaprobada');
             $montoPagado = (float) ($cna->monto_pagado ?? 0);
           @endphp
 
@@ -285,7 +284,6 @@
                   data-numdoc="{{ $cnaDoc }}"
                   data-dni="{{ $cnaDoc }}"
                   data-titular="{{ $cna->titular ?? '' }}"
-                  data-estado="{{ $estadoCna }}"
                   data-solicitante="{{ $cnaSolicitante }}"
                   data-nrocarta="{{ $cna->nro_carta }}"
                   data-operaciones="{{ $opsJson }}"
@@ -616,11 +614,7 @@
       <div class="border-b border-kp-border bg-slate-50/70 px-5 py-4">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <x-ui.badge variant="neutral">Solicitud CNA</x-ui.badge>
-              <x-ui.badge id="cna_estado" :variant="$isSupervisor ? 'warning' : 'info'">{{ $statusLabel }}</x-ui.badge>
-            </div>
-            <p class="mt-3 text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Cliente</p>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.05em] text-kp-muted">Cliente</p>
             <h3 id="cna_titular" class="mt-0.5 truncate text-lg font-semibold text-kp-ink">—</h3>
             <p class="mt-1 text-[12px] text-slate-500">
               DNI <span id="cna_dni" class="font-medium text-slate-700">—</span>
@@ -667,12 +661,12 @@
       <div class="space-y-5 p-5">
         <section>
           <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Observación</h4>
-          <div id="cna_obs" class="mt-2 whitespace-pre-line rounded-lg border border-kp-border bg-white px-3.5 py-3 text-[13px] leading-6 text-kp-ink">—</div>
+          <div id="cna_obs" class="mt-2 whitespace-pre-line text-[13px] leading-6 text-kp-ink">—</div>
         </section>
 
         <section id="cna_nota_wrap" class="hidden">
           <h4 class="text-[12px] font-semibold uppercase tracking-[0.05em] text-slate-500">Notas de autorización</h4>
-          <div id="cna_nota" class="mt-2 whitespace-pre-line rounded-lg border border-kp-border bg-white px-3.5 py-3 text-[13px] leading-6 text-kp-ink">—</div>
+          <div id="cna_nota" class="mt-2 whitespace-pre-line border-l-2 border-kp-secondary-border pl-3 text-[13px] leading-6 text-kp-ink">—</div>
         </section>
 
         <section class="flex flex-col gap-2 rounded-lg border border-kp-primary-border bg-kp-success-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

@@ -296,35 +296,6 @@ function renderEmptyPayments(message, tone = "muted") {
     body.innerHTML = `<tr><td colspan="7" class="border-t border-kp-border px-4 py-6 text-center text-[12px] ${color}">${escapeHtml(message)}</td></tr>`;
 }
 
-function badgeVariantForStatus(status) {
-    const normalized = String(status || "").toLowerCase();
-
-    if (normalized.includes("aprob") && !normalized.includes("pre"))
-        return "success";
-    if (normalized.includes("pre")) return "info";
-    if (normalized.includes("rechaz")) return "danger";
-    if (normalized.includes("pend")) return "warning";
-
-    return "neutral";
-}
-
-function setBadgeVariant(element, variant) {
-    if (!element) return;
-
-    const variants = {
-        neutral: "border-slate-200 bg-slate-50 text-slate-600",
-        primary:
-            "border-kp-primary-border bg-kp-primary-soft text-kp-primary-ink",
-        success:
-            "border-kp-primary-border bg-kp-success-soft text-kp-success-ink",
-        danger: "border-red-200 bg-red-50 text-red-700",
-        warning: "border-amber-200 bg-amber-50 text-amber-700",
-        info: "border-kp-secondary-border bg-kp-secondary-soft text-kp-secondary-dark",
-    };
-
-    element.className = `inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] ${variants[variant] || variants.neutral}`;
-}
-
 function setCnaPaymentContext(payments, cnaOperations = null) {
     const count = $("#cna_pagos_count");
     const context = $("#cna_pagos_context");
@@ -479,17 +450,11 @@ function setupCnaDetail(root) {
             setText("cna_titular", button.dataset.titular || "-");
             setText("cna_dni", dni || "-");
             setText("cna_carta", button.dataset.nrocarta || "-");
-            setText("cna_estado", button.dataset.estado || "-");
             setText("cna_solicitante", button.dataset.solicitante || "-");
             setText("cna_fecha", toDmy(button.dataset.fecha));
             setText("cna_fecha_pago", toDmy(button.dataset.fechaPago));
             setText("cna_monto_pagado", money(button.dataset.montoPagado));
             setText("cna_obs", observation || "Sin observaciones registradas.");
-            setBadgeVariant(
-                $("#cna_estado"),
-                badgeVariantForStatus(button.dataset.estado),
-            );
-
             if (noteWrap) noteWrap.classList.toggle("hidden", !note);
             setText("cna_nota", note || "");
 
