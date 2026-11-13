@@ -3,6 +3,7 @@
 namespace App\Services\Cliente;
 
 use App\Models\CcdCliente;
+use App\Models\CcdClienteCuenta;
 use App\Models\PromesaPago;
 use App\Services\Asignacion\ClienteAssignmentService;
 use App\ViewModels\Cliente\ClienteShowViewModel;
@@ -104,6 +105,36 @@ class ClienteProfileService
             ->where('numdoc', $dni)
             ->orderByDesc('id')
             ->get($selected);
+
+        if (Schema::hasTable('ccd_cliente_cuenta') && $ccdDocs->isNotEmpty()) {
+            $confirmedLinks = CcdClienteCuenta::query()
+                ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
+                ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+                ->with('ccdCliente:id,numdoc,pdf,cosecha')
+                ->get()
+                ->filter(fn (CcdClienteCuenta $link) => $link->ccdCliente !== null
+                    && hash_equals($dni, (string) $link->ccdCliente->numdoc))
+                ->groupBy('cliente_cuenta_id');
+
+            $confirmedIds = $confirmedLinks
+                ->flatten()
+                ->pluck('ccd_cliente_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->all();
+
+            foreach ($cuentas as $account) {
+                $account->ccdConfirmados = collect($confirmedLinks->get((int) $account->id, []))
+                    ->pluck('ccdCliente')
+                    ->filter()
+                    ->sortBy('id')
+                    ->values();
+            }
+
+            $ccdDocs = $ccdDocs
+                ->reject(fn (CcdCliente $document): bool => in_array((int) $document->id, $confirmedIds, true))
+                ->values();
+        }
 
         $ccdByDni = collect([$dni => $ccdDocs->values()]);
 

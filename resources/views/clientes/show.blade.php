@@ -246,7 +246,32 @@
                                     @endif
                                 </x-tables.td>
                                 <x-tables.td align="center">
-                                    <span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>
+                                    @php
+                                        $ccdConfirmados = collect($c->ccdConfirmados ?? []);
+                                    @endphp
+                                    @if($ccdConfirmados->isNotEmpty())
+                                        <div class="flex flex-wrap justify-center gap-1">
+                                            @foreach($ccdConfirmados as $document)
+                                                @php
+                                                    $name = filled($document->pdf)
+                                                        ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
+                                                        : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);
+                                                @endphp
+                                                <a
+                                                    href="{{ route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $document->id]) }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex size-7 items-center justify-center rounded-md text-kp-secondary transition-colors hover:bg-kp-secondary-soft hover:text-kp-secondary-dark kp-focus"
+                                                    title="Abrir {{ $name }}"
+                                                    aria-label="Abrir {{ $name }}"
+                                                >
+                                                    <x-ui.registration-paper-icon class="size-5" />
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-slate-400" aria-label="Sin CCD confirmado para esta operación">—</span>
+                                    @endif
                                 </x-tables.td>
                                 <x-tables.td>
                                     <div class="flex flex-col items-start gap-1">
