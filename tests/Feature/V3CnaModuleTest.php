@@ -98,6 +98,41 @@ class V3CnaModuleTest extends TestCase
         $this->filesToDelete[] = storage_path('app/'.$autoApproved->docx_path);
     }
 
+    public function test_compact_cna_request_requires_only_date_comment_and_operations(): void
+    {
+        Mail::fake();
+
+        $asesor = $this->makeUser('asesor');
+        [$dni, $operation] = $this->createClientAccount();
+
+        $this->actingAs($asesor)
+            ->post(route('clientes.cna.store', $dni), [
+                'fecha_pago_realizado' => now()->toDateString(),
+                'operaciones' => [$operation],
+                'observacion' => 'Solicitud compacta de CNA',
+            ])
+            ->assertRedirect(route('clientes.show', $dni))
+            ->assertSessionHasNoErrors();
+
+        $cna = CnaSolicitud::query()
+            ->where('numdoc', $dni)
+            ->where('observacion', 'Solicitud compacta de CNA')
+            ->firstOrFail();
+
+        $this->assertNull($cna->monto_pagado);
+
+        $this->actingAs($asesor)
+            ->get(route('clientes.show', $dni))
+            ->assertOk()
+            ->assertSee('Fecha de pago')
+            ->assertSee('Comentario')
+            ->assertSee('name="fecha_pago_realizado"', false)
+            ->assertSee('name="observacion"', false)
+            ->assertDontSee('name="monto_pagado"', false)
+            ->assertDontSee('Plantilla documental')
+            ->assertDontSee('Datos de pago informado');
+    }
+
     public function test_cna_workflow_permissions_downloads_and_fallback_are_preserved(): void
     {
         Mail::fake();

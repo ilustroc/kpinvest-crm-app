@@ -13,7 +13,6 @@
         $accountCount = $cuentas->pluck('cuenta')->filter(fn ($account) => trim((string) $account) !== '')->unique()->count();
         $operationCount = $cuentas->count();
         $cnaHasErrors = $errors->has('fecha_pago_realizado')
-            || $errors->has('monto_pagado')
             || $errors->has('operaciones')
             || $errors->has('cuenta')
             || $errors->has('observacion');

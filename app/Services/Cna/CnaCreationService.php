@@ -84,7 +84,7 @@ class CnaCreationService
                 'nota' => $data['nota'] ?? null,
                 'observacion' => $data['observacion'] ?? null,
                 'fecha_pago_realizado' => $data['fecha_pago_realizado'],
-                'monto_pagado' => $data['monto_pagado'],
+                'monto_pagado' => $data['monto_pagado'] ?? null,
                 'user_id' => $user->id,
             ];
 

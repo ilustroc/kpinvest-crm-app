@@ -32,13 +32,12 @@ class CnaController extends Controller
                 'nota' => ['nullable', 'string', 'max:1000'],
                 'observacion' => ['nullable', 'string', 'max:1000'],
                 'fecha_pago_realizado' => ['required', 'date'],
-                'monto_pagado' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
+                'monto_pagado' => ['nullable', 'numeric', 'min:0.01', 'max:999999999.99'],
                 'operaciones' => ['required', 'array', 'min:1'],
                 'operaciones.*' => ['string', 'max:50'],
                 'cuenta' => ['nullable', 'string', 'max:50'],
             ], [], [
                 'fecha_pago_realizado' => 'fecha de pago realizado',
-                'monto_pagado' => 'monto pagado',
                 'operaciones' => 'operaciones',
             ]);
 
