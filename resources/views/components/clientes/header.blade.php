@@ -30,8 +30,8 @@
     <div class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-kp-navy via-kp-primary to-kp-primary-dark" aria-hidden="true"></div>
 
     <div class="px-4 pb-3.5 pt-[18px] sm:px-5 sm:pb-4 sm:pt-[22px] lg:px-5">
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center lg:gap-0">
-            <div class="min-w-0 lg:pr-5">
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,13fr)] lg:items-center lg:gap-0">
+            <div class="min-w-0 lg:pr-3">
                 <span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-kp-muted">Ficha del cliente</span>
 
                 <h1 class="mt-1 break-words text-[20px] font-semibold uppercase leading-[1.15] tracking-tight text-kp-ink sm:text-[22px] lg:text-[21px]">
