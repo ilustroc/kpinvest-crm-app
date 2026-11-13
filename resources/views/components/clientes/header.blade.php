@@ -3,14 +3,12 @@
     'titular',
     'cuentas',
     'pagos',
-    'ccdDocs',
     'totCapital' => 0,
     'totDeuda' => 0,
     'totPagos' => 0,
 ])
 
 @php
-    $ccdDocs = collect($ccdDocs ?? []);
     $cuentas = collect($cuentas ?? []);
     $pagos = collect($pagos ?? []);
 
@@ -53,74 +51,25 @@
                 </div>
             </div>
 
-            <dl class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-kp-border/80 pt-3 sm:gap-x-5 md:grid-cols-4 md:gap-x-0 md:gap-y-0 md:divide-x md:divide-kp-border/80 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.15fr)_minmax(0,1.15fr)_auto] lg:border-l lg:pl-4 lg:pt-0">
+            <dl class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-kp-border/80 pt-3 sm:gap-x-5 md:grid-cols-3 lg:border-t-0 lg:pt-0">
                 <x-clientes.summary-card
                     label="Deuda total"
                     value="{{ \App\Support\Money::format($totDeuda, $summaryCurrency) }}"
                     tone="primary"
-                    class="min-w-0 md:px-3 md:first:pl-0"
+                    class="min-w-0"
                 />
                 <x-clientes.summary-card
                     label="Deuda capital"
                     value="{{ \App\Support\Money::format($totCapital, $summaryCurrency) }}"
                     tone="neutral"
-                    class="min-w-0 md:px-3"
+                    class="min-w-0"
                 />
                 <x-clientes.summary-card
                     label="Pagos registrados"
                     value="{{ \App\Support\Money::format($totPagos, $summaryCurrency) }}"
                     tone="success"
-                    class="min-w-0 md:px-3"
+                    class="min-w-0"
                 />
-
-                <div class="min-w-0 md:px-3 md:last:pr-0">
-                    <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-kp-muted">
-                        <span class="size-1.5 shrink-0 rounded-full bg-kp-navy" aria-hidden="true"></span>
-                        CCD
-                    </dt>
-                    <dd class="mt-1.5 flex min-h-5 flex-wrap items-center gap-1">
-                        @if($ccdDocs->isEmpty())
-                            <span class="text-[11px] font-medium text-kp-muted">Sin CCD</span>
-                        @else
-                            @foreach($ccdDocs as $document)
-                                @php
-                                    $href = route('clientes.ccd.show', [
-                                        'numdoc' => $dni,
-                                        'ccdCliente' => $document->id,
-                                    ]);
-                                    $name = filled($document->pdf)
-                                        ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
-                                        : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);
-                                @endphp
-
-                                @if($href)
-                                    <a
-                                        href="{{ $href }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="inline-flex size-6 items-center justify-center rounded-md text-kp-primary transition-colors hover:bg-kp-primary/5 hover:text-kp-primary-dark kp-focus"
-                                        title="Abrir {{ $name }}"
-                                        aria-label="Abrir {{ $name }}"
-                                    >
-                                        <svg class="size-5 transition-transform hover:scale-110" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                                        </svg>
-                                    </a>
-                                @else
-                                    <span
-                                        class="inline-flex items-center justify-center text-slate-400"
-                                        title="{{ $name }}"
-                                        aria-label="{{ $name }} (no disponible)"
-                                    >
-                                        <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                                        </svg>
-                                    </span>
-                                @endif
-                            @endforeach
-                        @endif
-                    </dd>
-                </div>
             </dl>
         </div>
     </div>

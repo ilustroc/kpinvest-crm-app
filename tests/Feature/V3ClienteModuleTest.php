@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CnaSolicitud;
+use App\Models\CcdCliente;
 use App\Models\Pago;
 use App\Models\PromesaPago;
 use App\Models\User;
@@ -138,8 +139,58 @@ class V3ClienteModuleTest extends TestCase
             })
             ->assertViewHas('pagos', fn ($pagos) => $pagos->contains('id', $payment->id))
             ->assertViewHas('promesas', fn ($promesas) => $promesas->contains('id', $promesa->id))
+            ->assertViewHas('ccdDocs', fn ($ccdDocs) => $ccdDocs->isEmpty())
             ->assertViewHas('cnasByOperacion', fn ($cnas) => $cnas->has($operation)
-                && (int) $cnas->get($operation)->first()->id === (int) $cna->id);
+                && (int) $cnas->get($operation)->first()->id === (int) $cna->id)
+            ->assertDontSee('CCD sin operación verificada');
+    }
+
+    public function test_ccd_without_an_operation_key_stays_explicitly_unassigned(): void
+    {
+        $user = $this->makeUser('asesor');
+        $dni = 'V3CCD'.Str::upper(Str::random(7));
+
+        $this->createAccountForCcd($dni, 'CCD-UNICA', 'CAJAAQP1');
+        $this->createAccountForCcd($dni, 'CCD-OTRA-COSECHA', 'BBVA5');
+        $this->createAccountForCcd($dni, 'CCD-AMB-01', 'CAJAAQP2');
+        $this->createAccountForCcd($dni, 'CCD-AMB-02', 'CAJAAQP2');
+
+        $uniqueFirst = CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => 'CCD_AQP1-001.pdf',
+            'cosecha' => 'AQP1',
+            'link' => 'https://storage.kpinvest.pe/ccd/CCD_AQP1-001.pdf',
+        ]);
+        $uniqueSecond = CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => 'CCD_AQP1-002.pdf',
+            'cosecha' => 'AQP1',
+            'link' => 'https://storage.kpinvest.pe/ccd/CCD_AQP1-002.pdf',
+        ]);
+        $differentHarvest = CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => 'CCD_BBVA5-001.pdf',
+            'cosecha' => 'BBVA_5',
+            'link' => 'https://storage.kpinvest.pe/ccd/CCD_BBVA5-001.pdf',
+        ]);
+        $ambiguous = CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => 'CCD_AQP2-001.pdf',
+            'cosecha' => 'AQP2',
+            'link' => 'https://storage.kpinvest.pe/ccd/CCD_AQP2-001.pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('clientes.show', $dni))
+            ->assertOk()
+            ->assertSee('CCD sin operación verificada')
+            ->assertSee(route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $uniqueFirst->id]), false)
+            ->assertSee(route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $uniqueSecond->id]), false)
+            ->assertSee(route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $differentHarvest->id]), false)
+            ->assertSee(route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $ambiguous->id]), false)
+            ->assertDontSee('href="https://storage.kpinvest.pe/ccd/', false)
+            ->assertSee('aria-label="Solicitar CNA"', false)
+            ->assertSee('data-modal-open="#modalCna"', false);
     }
 
     public function test_cliente_payment_delete_keeps_existing_role_rules(): void
@@ -215,5 +266,30 @@ class V3ClienteModuleTest extends TestCase
         ]);
 
         return [$dni, $operation];
+    }
+
+    private function createAccountForCcd(string $dni, string $operation, string $cosecha): int
+    {
+        return (int) DB::table('clientes_cuentas')->insertGetId([
+            'numdoc' => $dni,
+            'cuenta' => 'CTA-'.$operation,
+            'nombre' => 'Cliente CCD V3',
+            'dpto' => 'Lima',
+            'operacion' => $operation,
+            'entidad' => 'Caja AQP',
+            'producto' => 'Producto CCD V3',
+            'cosecha' => $cosecha,
+            'moneda' => 'PEN',
+            'fecha_compra' => now()->subYear()->toDateString(),
+            'fecha_castigo' => now()->subMonths(6)->toDateString(),
+            'deuda_capital' => 1000,
+            'interes' => 50,
+            'deuda_total' => 1050,
+            'direccion' => 'Direccion CCD',
+            'provincia' => 'Lima',
+            'distrito' => 'Lima',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

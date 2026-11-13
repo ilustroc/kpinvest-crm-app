@@ -39,7 +39,6 @@
             :titular="$titular"
             :cuentas="$cuentas"
             :pagos="$pagos"
-            :ccd-docs="$ccdDocs"
             :tot-capital="$totCapital"
             :tot-deuda="$totDeuda"
             :tot-pagos="$totPagos"
@@ -84,7 +83,7 @@
                     </div>
                 </x-slot:actions>
 
-                <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[900px]" class="[&_th]:px-3 [&_td]:px-3">
+                <x-tables.table id="tblCuentas" :flush="true" :contained="true" min-width="min-w-[980px]" class="[&_th]:px-3 [&_td]:px-3">
                     <thead>
                         <tr>
                             <x-tables.th align="center" class="w-9">
@@ -97,6 +96,7 @@
                             <x-tables.th align="right">INTERÉS</x-tables.th>
                             <x-tables.th align="right">TOTAL</x-tables.th>
                             <x-tables.th align="center">CNA</x-tables.th>
+                            <x-tables.th align="center">CCD</x-tables.th>
                             <x-tables.th>PAGOS</x-tables.th>
                         </tr>
                     </thead>
@@ -227,8 +227,6 @@
                                                     :pagos-count="$cnt"
                                                     :pagos-sum="$sum"
                                                     :moneda="$currency"
-                                                    label="Solicitar nueva"
-                                                    title="Solicitar una nueva CNA para esta cuenta de deuda"
                                                 />
                                             </div>
                                         @else
@@ -245,10 +243,11 @@
                                             :pagos-count="$cnt"
                                             :pagos-sum="$sum"
                                             :moneda="$currency"
-                                            label="Solicitar"
-                                            title="Solicitar CNA para las operaciones de esta cuenta de deuda"
                                         />
                                     @endif
+                                </x-tables.td>
+                                <x-tables.td align="center">
+                                    <span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>
                                 </x-tables.td>
                                 <x-tables.td>
                                     <div class="flex flex-col items-start gap-1">
@@ -260,9 +259,40 @@
                                 </x-tables.td>
                             </tr>
                         @empty
-                            <x-tables.empty-row colspan="9" message="Sin cuentas u operaciones registradas." />
+                            <x-tables.empty-row colspan="10" message="Sin cuentas u operaciones registradas." />
                         @endforelse
                     </tbody>
+                    @if($ccdDocs->isNotEmpty())
+                        <tfoot>
+                            <tr>
+                                <td colspan="10" class="border-t border-kp-border bg-kp-surface-muted/50 px-3 py-2.5">
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                        <span class="text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-500">CCD sin operación verificada</span>
+                                        <span class="text-[11px] text-kp-muted">La fuente no conserva una relación determinística con la cuenta.</span>
+                                        <div class="flex flex-wrap items-center gap-1">
+                                            @foreach($ccdDocs->sortBy('id') as $document)
+                                                @php
+                                                    $name = filled($document->pdf)
+                                                        ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
+                                                        : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);
+                                                @endphp
+                                                <a
+                                                    href="{{ route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $document->id]) }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex size-7 items-center justify-center rounded-md text-kp-secondary transition-colors hover:bg-kp-secondary-soft hover:text-kp-secondary-dark kp-focus"
+                                                    title="Abrir {{ $name }}"
+                                                    aria-label="Abrir {{ $name }}"
+                                                >
+                                                    <x-ui.registration-paper-icon class="size-5" />
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </x-tables.table>
 
                 <div class="border-t border-kp-border px-4 py-2 text-right text-[10.5px] text-kp-muted sm:hidden">
