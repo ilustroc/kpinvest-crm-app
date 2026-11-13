@@ -30,8 +30,8 @@
     <div class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-kp-navy via-kp-primary to-kp-primary-dark" aria-hidden="true"></div>
 
     <div class="px-4 pb-3.5 pt-[18px] sm:px-5 sm:pb-4 sm:pt-[22px] lg:px-5">
-        <div class="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,13fr)] lg:items-center lg:gap-0">
-            <div class="min-w-0 lg:pr-3">
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-0">
+            <div class="min-w-0 lg:pr-5">
                 <span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-kp-muted">Ficha del cliente</span>
 
                 <h1 class="mt-1 break-words text-[20px] font-semibold uppercase leading-[1.15] tracking-tight text-kp-ink sm:text-[22px] lg:text-[21px]">
@@ -51,7 +51,7 @@
                 </div>
             </div>
 
-            <dl class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-kp-border/80 pt-3 sm:gap-x-5 md:grid-cols-3 lg:border-t-0 lg:pt-0">
+            <dl class="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-kp-border/80 pt-3 sm:gap-x-5 md:grid-cols-3 lg:w-fit lg:grid-cols-[repeat(3,max-content)] lg:justify-self-end lg:gap-x-12 lg:border-t-0 lg:pt-0">
                 <x-clientes.summary-card
                     label="Deuda total"
                     value="{{ \App\Support\Money::format($totDeuda, $summaryCurrency) }}"
