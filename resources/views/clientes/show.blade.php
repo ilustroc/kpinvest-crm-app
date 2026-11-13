@@ -306,7 +306,7 @@
         </div>
 
         <x-promesas.payment-schedule />
-        <x-promesas.create-modal :dni="$dni" :titular="$titular" />
+        <x-promesas.create-modal :dni="$dni" />
         <x-cna.create-modal :dni="$dni" :titular="$titular" :auto-open="$cnaHasErrors" />
         <x-asignaciones.create-modal :dni="$dni" :titular="$titular" :auto-open="$errors->has('motivo')" />
     </x-layout.page-shell>

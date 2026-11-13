@@ -101,6 +101,23 @@ class V3PromesaModuleTest extends TestCase
         ]);
     }
 
+    public function test_compact_proposal_modal_keeps_only_the_required_proposal_inputs(): void
+    {
+        $asesor = $this->makeUser('asesor');
+        [$dni] = $this->createClientAccount();
+
+        $this->actingAs($asesor)
+            ->get(route('clientes.show', $dni))
+            ->assertOk()
+            ->assertSee('Tipo de propuesta *')
+            ->assertSee('Teléfono de contacto *')
+            ->assertSee('Monto convenio (S/) *')
+            ->assertSee('Generar cronograma')
+            ->assertDontSee('Operaciones incluidas')
+            ->assertDontSee('Tipo actual')
+            ->assertDontSee('Completa las condiciones y revisa el cronograma antes de guardar.');
+    }
+
     public function test_promesa_workflow_permissions_and_states_are_preserved(): void
     {
         Mail::fake();

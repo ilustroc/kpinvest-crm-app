@@ -1,4 +1,4 @@
-import { $, $$, escapeHtml } from '../../core/dom';
+import { $, $$ } from '../../core/dom';
 import { formatMoney } from '../../core/money';
 import { notify } from '../../core/toast';
 
@@ -39,30 +39,8 @@ function createHidden(name, value) {
     return input;
 }
 
-function operationCard(detail) {
-    const meta = [detail.account, detail.entity, detail.harvest]
-        .filter(Boolean)
-        .map((value) => escapeHtml(value))
-        .join(' · ');
-
-    return `
-        <div class="flex min-w-0 items-start gap-2 rounded-md border border-kp-border bg-white px-2.5 py-2">
-            <span class="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded bg-kp-primary-soft text-[9px] font-bold text-kp-primary-ink">OP</span>
-            <div class="min-w-0">
-                <p class="truncate text-[12px] font-semibold text-kp-ink">${escapeHtml(detail.operation)}</p>
-                <p class="mt-0.5 truncate text-[10.5px] text-kp-muted">${meta || 'Sin cuenta asociada'}</p>
-            </div>
-        </div>
-    `;
-}
-
-function emptySelection() {
-    return '<p class="rounded-md border border-dashed border-kp-border bg-kp-surface-muted px-3 py-2 text-[11px] text-kp-muted sm:col-span-2">Ninguna operación seleccionada.</p>';
-}
-
 export function setupPromesaForm(root) {
     const typeSelect = $('#tipoPropuesta', root);
-    const typeTag = $('#modalTipoTag', root);
     const conventionBox = $('#formConvenio', root);
     const cancelBox = $('#formCancelacion', root);
     const error = $('#cvErr', root);
@@ -77,7 +55,6 @@ export function setupPromesaForm(root) {
     const diffNode = $('#cvDiff', root);
     const scheduleCount = $('#cvScheduleCount', root);
     const hidden = $('#cvHidden', root);
-    const dayHint = $('#cvHintDia', root);
     const form = $('#formPropuesta', root);
     const submitButton = form?.querySelector('button[type="submit"]');
     const balloonInput = $('#cronBalon', root);
@@ -86,29 +63,12 @@ export function setupPromesaForm(root) {
     const operationChecks = $$('.chkOp', root);
     const proposalButton = $('#btnPropuesta', root);
     const selectionCount = $('#selCount', root);
-    const operationsSummary = $('#opsResumen', root);
     const operationsHidden = $('#opsHidden', root);
-    const operationsCount = $('#opsCount', root);
-    const operationsCountLabel = $('#opsCountLabel', root);
 
     const selectedOperations = () => operationChecks
         .filter((input) => input.checked && !input.disabled)
         .map((input) => input.value)
         .filter(Boolean);
-
-    const selectedOperationDetails = () => operationChecks
-        .filter((input) => input.checked && !input.disabled)
-        .map((input) => {
-            const row = input.closest('tr');
-
-            return {
-                operation: input.value,
-                account: row?.dataset.cuenta || '',
-                entity: row?.dataset.entidad || '',
-                harvest: row?.dataset.cosecha || '',
-            };
-        })
-        .filter((detail) => detail.operation);
 
     function isConventionType() {
         const type = String(typeSelect?.value || '').toLowerCase();
@@ -116,30 +76,11 @@ export function setupPromesaForm(root) {
         return type === 'convenio' || type === 'convenio_balon';
     }
 
-    function renderSelectionSummary(details) {
-        if (operationsSummary) {
-            operationsSummary.innerHTML = details.length
-                ? details.map(operationCard).join('')
-                : emptySelection();
-        }
-
-        if (operationsCount) {
-            operationsCount.textContent = String(details.length);
-        }
-
-        if (operationsCountLabel) {
-            operationsCountLabel.textContent = details.length === 1 ? 'operación' : 'operaciones';
-        }
-    }
-
     function refreshSelection() {
-        const details = selectedOperationDetails();
-        const selected = details.map((detail) => detail.operation);
+        const selected = selectedOperations();
 
         if (selectionCount) selectionCount.textContent = String(selected.length);
         if (proposalButton) proposalButton.disabled = selected.length === 0;
-
-        renderSelectionSummary(details);
 
         return selected;
     }
@@ -305,10 +246,6 @@ export function setupPromesaForm(root) {
         setRequired('[name="fecha_pago_cancel"]', !convention);
         setRequired('[name="monto_cancel"]', !convention);
 
-        if (typeTag) {
-            typeTag.textContent = typeSelect?.selectedOptions?.[0]?.textContent?.trim() || 'Convenio';
-        }
-
         if (convention) {
             if (tableBody && tableBody.children.length === 0) {
                 renderRows(quotaCount?.value || 1, false);
@@ -399,18 +336,6 @@ export function setupPromesaForm(root) {
         if (event.target.matches('.cr-monto, .cr-fecha')) recalc();
     });
     total?.addEventListener('input', recalc);
-    startDate?.addEventListener('change', () => {
-        if (!dayHint) return;
-
-        if (!startDate.value) {
-            dayHint.textContent = 'Día de pago: -';
-            return;
-        }
-
-        const date = new Date(`${startDate.value}T00:00:00`);
-        dayHint.textContent = `Día de pago: ${date.getDate()} de cada mes`;
-    });
-
     form?.addEventListener('submit', (event) => {
         const type = String(typeSelect?.value || '').toLowerCase();
         const convention = type === 'convenio' || type === 'convenio_balon';

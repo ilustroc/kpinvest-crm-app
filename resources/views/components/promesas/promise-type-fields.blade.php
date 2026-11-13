@@ -1,13 +1,7 @@
 <section aria-labelledby="promesaCondicionesTitle">
-    <div class="flex flex-wrap items-end justify-between gap-2">
-        <div>
-            <h4 id="promesaCondicionesTitle" class="text-[13px] font-semibold text-kp-ink">Condiciones de la promesa</h4>
-            <p class="mt-0.5 text-[11px] text-kp-muted">Define la modalidad, el contacto y los datos de la propuesta.</p>
-        </div>
-        <span class="text-[10px] font-medium text-slate-400">Los campos con * son obligatorios</span>
-    </div>
+    <h4 id="promesaCondicionesTitle" class="sr-only">Datos de la propuesta</h4>
 
-    <div class="mt-3 grid gap-3 md:grid-cols-2">
+    <div class="grid gap-3 md:grid-cols-2">
         <div>
             <x-ui.select label="Tipo de propuesta *" name="tipo" id="tipoPropuesta" required autofocus>
                 <optgroup label="Convenios">
@@ -31,10 +25,8 @@
                 pattern="^\+?\d[\d\s\-]{5,}$"
                 title="Ingresa un teléfono válido"
                 placeholder="+51 9XXXXXXXX"
-                aria-describedby="telefonoHelp"
                 required
             />
-            <p id="telefonoHelp" class="mt-1 text-[10.5px] text-kp-muted">Formato local o internacional. Se usa para coordinar el pago.</p>
             <x-forms.error name="telefono" />
         </div>
     </div>
@@ -48,27 +40,11 @@
             maxlength="500"
             placeholder="Comentario contextual para la propuesta"
         />
-        <div class="mt-1 flex flex-wrap items-center justify-between gap-2">
-            <x-forms.error name="nota" />
-            <p class="text-[10.5px] text-kp-muted">Opcional · máximo 500 caracteres.</p>
-        </div>
+        <x-forms.error name="nota" />
     </div>
 </section>
 
 <div id="formConvenio" class="mt-5 space-y-3 border-t border-kp-border pt-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-            <h4 class="text-[13px] font-semibold text-kp-ink">Cronograma del convenio</h4>
-            <p class="mt-0.5 text-[11px] text-kp-muted">Define el importe, las cuotas y las fechas de pago.</p>
-        </div>
-        <span class="inline-flex items-center gap-1.5 rounded-md border border-kp-border bg-kp-surface-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.04em] text-slate-500">
-            <svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-            </svg>
-            Editable
-        </span>
-    </div>
-
     <div class="rounded-lg border border-kp-border bg-kp-surface-muted p-3.5">
         <div class="grid gap-3 sm:grid-cols-3">
             <div>
@@ -112,7 +88,6 @@
                     inputmode="decimal"
                     placeholder="Opcional"
                 />
-                <p class="mt-1 text-[10.5px] text-kp-muted">Referencia para generar el cronograma.</p>
                 <x-forms.error name="monto_cuota" />
             </div>
         </div>
@@ -131,7 +106,6 @@
         <div class="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
                 <x-ui.date label="Fecha inicial" id="cvFechaIni" />
-                <p id="cvHintDia" class="mt-1 text-[10.5px] font-medium text-kp-muted">Día de pago: -</p>
             </div>
             <x-ui.button type="button" id="cvGen" variant="secondary" class="w-full sm:w-auto">
                 <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
@@ -144,10 +118,7 @@
 
     <div class="overflow-hidden rounded-[10px] border border-kp-border bg-white">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-kp-border bg-white px-3.5 py-2.5">
-            <div>
-                <h5 class="text-[12px] font-semibold text-kp-ink">Cuotas</h5>
-                <p class="mt-0.5 text-[10.5px] text-kp-muted">Edita fechas e importes; el total se calcula automáticamente.</p>
-            </div>
+            <h5 class="text-[12px] font-semibold text-kp-ink">Cuotas</h5>
             <span id="cvScheduleCount" class="inline-flex items-center rounded-full border border-kp-border bg-kp-surface-muted px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                 0 cuotas
             </span>
@@ -190,11 +161,6 @@
 </div>
 
 <div id="formCancelacion" class="mt-5 hidden space-y-3 border-t border-kp-border pt-4">
-    <div>
-        <h4 class="text-[13px] font-semibold text-kp-ink">Detalles de cancelación</h4>
-        <p class="mt-0.5 text-[11px] text-kp-muted">Registra el importe y la fecha límite de pago de la cancelación.</p>
-    </div>
-
     <div class="rounded-lg border border-kp-border bg-kp-surface-muted p-3.5">
         <div class="grid gap-3 md:grid-cols-2">
             <div>
@@ -215,9 +181,5 @@
                 <x-forms.error name="fecha_pago_cancel" />
             </div>
         </div>
-
-        <p class="mt-2 text-[10.5px] text-kp-muted">
-            La propuesta se registrará como cancelación total de la operación seleccionada.
-        </p>
     </div>
 </div>
