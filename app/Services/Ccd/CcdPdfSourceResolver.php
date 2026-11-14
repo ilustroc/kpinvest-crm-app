@@ -2,7 +2,9 @@
 
 namespace App\Services\Ccd;
 
+use App\Contracts\CcdTemporaryPdfSourceProvider;
 use App\Contracts\CcdZipV12PdfSourceProvider;
+use App\Contracts\CcdZipV12PdfSourceDiagnostics;
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +13,7 @@ use Throwable;
 class CcdPdfSourceResolver
 {
     /**
-     * @return array{status:string,source:?string,path:?string,evidence:string}
+     * @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null}
      */
     public function resolve(CcdCliente $ccd): array
     {
@@ -40,7 +42,7 @@ class CcdPdfSourceResolver
         return $this->zipV12Source($ccd);
     }
 
-    /** @return array{status:string,source:?string,path:?string,evidence:string} */
+    /** @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null} */
     private function privateSource(int $archivoId): array
     {
         $archivo = CcdArchivo::query()->find($archivoId);
@@ -72,10 +74,11 @@ class CcdPdfSourceResolver
             'source' => 'privado',
             'path' => $path,
             'evidence' => 'fuente_privada_verificada',
+            'cleanup' => null,
         ];
     }
 
-    /** @return array{status:string,source:?string,path:?string,evidence:string} */
+    /** @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null} */
     private function zipV12Source(CcdCliente $ccd): array
     {
         $configured = config('ccd.zip_v12_source_provider');
@@ -97,7 +100,11 @@ class CcdPdfSourceResolver
         }
 
         if ($path === null || ! is_file($path) || ! is_readable($path)) {
-            return $this->unavailable('fuente_zip_v12_no_disponible');
+            $evidence = $provider instanceof CcdZipV12PdfSourceDiagnostics
+                ? ($provider->lastFailure() ?? 'fuente_zip_v12_no_disponible')
+                : 'fuente_zip_v12_no_disponible';
+
+            return $this->unavailable($evidence);
         }
 
         return [
@@ -105,10 +112,23 @@ class CcdPdfSourceResolver
             'source' => 'zip_v12',
             'path' => $path,
             'evidence' => 'fuente_zip_v12_lectura',
+            'cleanup' => $provider instanceof CcdTemporaryPdfSourceProvider
+                ? static function () use ($provider, $path): void {
+                    $provider->releaseTemporarySource($path);
+                }
+                : null,
         ];
     }
 
-    /** @return array{status:string,source:?string,path:?string,evidence:string} */
+    /** @param array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null} $source */
+    public function release(array $source): void
+    {
+        if ($source['cleanup'] !== null) {
+            ($source['cleanup'])();
+        }
+    }
+
+    /** @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null} */
     private function unavailable(string $evidence): array
     {
         return [
@@ -116,6 +136,7 @@ class CcdPdfSourceResolver
             'source' => null,
             'path' => null,
             'evidence' => $evidence,
+            'cleanup' => null,
         ];
     }
 }

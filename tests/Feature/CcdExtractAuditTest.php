@@ -5,12 +5,15 @@ namespace Tests\Feature;
 use App\Contracts\CcdZipV12PdfSourceProvider;
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
+use App\Services\Ccd\CcdPdfIdentifierExtractor;
 use Dompdf\Dompdf;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use ZipArchive;
 
 class CcdExtractAuditTest extends TestCase
 {
@@ -18,6 +21,9 @@ class CcdExtractAuditTest extends TestCase
 
     /** @var array<int,string> */
     private array $temporaryFiles = [];
+
+    /** @var array<int,string> */
+    private array $temporaryDirectories = [];
 
     protected function setUp(): void
     {
@@ -30,6 +36,10 @@ class CcdExtractAuditTest extends TestCase
     {
         foreach ($this->temporaryFiles as $path) {
             @unlink($path);
+        }
+
+        foreach ($this->temporaryDirectories as $directory) {
+            File::deleteDirectory($directory);
         }
 
         parent::tearDown();
@@ -121,6 +131,165 @@ class CcdExtractAuditTest extends TestCase
         $this->assertStringContainsString('coincidencia_exacta', $csv);
     }
 
+    public function test_extract_audit_reads_a_zip_v12_entry_and_removes_its_private_temporary_file(): void
+    {
+        $dni = '05378290';
+        $operation = '0001382';
+        $pdfName = 'CCD_CONFIANZA1-1382.pdf';
+        $this->createAccount($dni, $operation, 'CONFIANZA1', 'CTA-ZIP-V12');
+        $ccd = $this->createZipOnlyCcd($dni, 'CONFIANZA1', $pdfName);
+        $environment = $this->configureZipV12([
+            $pdfName => $this->pdf("DNI: {$dni}\nOperación: {$operation}\nEntidad: Caja AQP"),
+        ]);
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-real-zip-v12-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-real-zip-v12-test.csv');
+
+        $this->assertStringContainsString('zip_v12', $csv);
+        $this->assertStringContainsString('coincidencia_exacta', $csv);
+        $this->assertSame([], File::files($environment['temporary']));
+    }
+
+    public function test_extract_audit_reports_missing_zip_entry_without_creating_a_temporary_file(): void
+    {
+        $ccd = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', 'CCD_CONFIANZA1-AUSENTE.pdf');
+        $environment = $this->configureZipV12([
+            'CCD_CONFIANZA1-OTRO.pdf' => $this->pdf('DNI: 05378290'),
+        ]);
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-zip-missing-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-zip-missing-test.csv');
+
+        $this->assertStringContainsString('pdf_zip_v12_no_encontrado', $csv);
+        $this->assertSame([], File::files($environment['temporary']));
+    }
+
+    public function test_extract_audit_rejects_an_unsafe_zip_entry_name(): void
+    {
+        $ccd = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', '../fuera.pdf');
+        $this->configureZipV12([]);
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-zip-invalid-name-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-zip-invalid-name-test.csv');
+
+        $this->assertStringContainsString('nombre_pdf_zip_v12_invalido', $csv);
+    }
+
+    public function test_extract_audit_rejects_oversized_and_invalid_signature_zip_entries(): void
+    {
+        $oversized = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', 'CCD_CONFIANZA1-GRANDE.pdf');
+        $this->configureZipV12([
+            'CCD_CONFIANZA1-GRANDE.pdf' => '%PDF-'.str_repeat('x', 100),
+            'CCD_CONFIANZA1-FIRMA.pdf' => 'NO ES UN PDF',
+        ], 32);
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $oversized->id,
+            '--output' => 'ccd-zip-oversized-test.csv',
+        ])->assertExitCode(0);
+
+        $signature = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', 'CCD_CONFIANZA1-FIRMA.pdf');
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $signature->id,
+            '--output' => 'ccd-zip-signature-test.csv',
+        ])->assertExitCode(0);
+
+        $disk = Storage::disk((string) config('ccd.private_disk'));
+        $this->assertStringContainsString('pdf_zip_v12_tamano_invalido', $disk->get('audits/ccd-zip-oversized-test.csv'));
+        $this->assertStringContainsString('pdf_zip_v12_firma_invalida', $disk->get('audits/ccd-zip-signature-test.csv'));
+    }
+
+    public function test_extract_audit_reports_a_damaged_or_unavailable_zip(): void
+    {
+        $ccd = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', 'CCD_CONFIANZA1-DAÑADO.pdf');
+        $environment = $this->configureZipV12([], null, false);
+        file_put_contents($environment['root'].DIRECTORY_SEPARATOR.'CONFIANZA1.zip', 'no es un zip');
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-zip-damaged-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-zip-damaged-test.csv');
+
+        $this->assertStringContainsString('zip_v12_danado', $csv);
+
+        $unavailable = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', 'CCD_CONFIANZA1-AUSENTE.zip.pdf');
+        $this->configureZipV12([], null, false);
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $unavailable->id,
+            '--output' => 'ccd-zip-unavailable-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-zip-unavailable-test.csv');
+        $this->assertStringContainsString('zip_v12_no_disponible', $csv);
+    }
+
+    public function test_extract_audit_removes_zip_temporary_file_when_extraction_throws(): void
+    {
+        $pdfName = 'CCD_CONFIANZA1-ERROR.pdf';
+        $ccd = $this->createZipOnlyCcd('05378290', 'CONFIANZA1', $pdfName);
+        $environment = $this->configureZipV12([
+            $pdfName => $this->pdf('DNI: 05378290'),
+        ]);
+        app()->bind(CcdPdfIdentifierExtractor::class, static fn (): CcdPdfIdentifierExtractor => new class extends CcdPdfIdentifierExtractor {
+            public function extract(string $path): array
+            {
+                throw new \RuntimeException('Fallo recuperable de extracción de prueba.');
+            }
+        });
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-zip-exception-test.csv',
+        ])->assertExitCode(1);
+
+        $this->assertSame([], File::files($environment['temporary']));
+    }
+
+    public function test_extract_audit_preserves_a_previously_confirmed_association(): void
+    {
+        $dni = '05378290';
+        $operation = '0002744794';
+        $accountId = $this->createAccount($dni, $operation, 'AQP1', 'CTA-CONFIRMADA');
+        $ccd = $this->createPrivateCcd($dni, 'AQP1', "DNI: {$dni}\nOperación: {$operation}");
+        DB::table('ccd_cliente_cuenta')->insert([
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'revision_visual_pdf',
+            'evidencia' => 'Confirmación previa de prueba.',
+            'confirmado_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-confirmed-preserved-test.csv',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'revision_visual_pdf',
+        ]);
+        $this->assertSame(1, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
     private function createPrivateCcd(string $dni, string $cosecha, string $text): CcdCliente
     {
         $pdf = $this->pdf($text);
@@ -148,9 +317,49 @@ class CcdExtractAuditTest extends TestCase
         ]);
     }
 
-    private function createAccount(string $dni, string $operation, string $cosecha, string $account): void
+    private function createZipOnlyCcd(string $dni, string $cosecha, string $pdf): CcdCliente
     {
-        DB::table('clientes_cuentas')->insert([
+        return CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => $pdf,
+            'cosecha' => $cosecha,
+            'link' => 'https://storage.kpinvest.pe/ccd/legacy.zip',
+        ]);
+    }
+
+    /** @return array{root:string,temporary:string} */
+    private function configureZipV12(array $entries, ?int $maximumBytes = null, bool $createZip = true): array
+    {
+        $root = storage_path('framework/testing/ccd-zip-v12-'.Str::uuid());
+        $temporary = $root.DIRECTORY_SEPARATOR.'temporary';
+        File::ensureDirectoryExists($root, 0700, true);
+        $this->temporaryDirectories[] = $root;
+
+        if ($createZip) {
+            $zip = new ZipArchive();
+            $this->assertTrue($zip->open($root.DIRECTORY_SEPARATOR.'CONFIANZA1.zip', ZipArchive::CREATE) === true);
+
+            foreach ($entries as $name => $contents) {
+                $this->assertTrue($zip->addFromString($name, $contents));
+            }
+
+            $zip->close();
+        }
+
+        config([
+            'ccd.zip_v12_source_provider' => \App\Services\Ccd\CcdZipV12FileSourceProvider::class,
+            'ccd.zip_v12_root' => $root,
+            'ccd.zip_v12_temp_root' => $temporary,
+            'ccd.zip_v12_cosechas' => ['CONFIANZA1'],
+            'ccd.max_file_bytes' => $maximumBytes ?? 52_428_800,
+        ]);
+
+        return compact('root', 'temporary');
+    }
+
+    private function createAccount(string $dni, string $operation, string $cosecha, string $account): int
+    {
+        return (int) DB::table('clientes_cuentas')->insertGetId([
             'numdoc' => $dni,
             'cuenta' => $account,
             'nombre' => 'Cliente CCD Extractor',

@@ -8,6 +8,7 @@ use App\Services\Ccd\CcdPdfIdentifierExtractor;
 use App\Services\Ccd\CcdPdfSourceResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -113,7 +114,9 @@ class ExtractCcdAudit extends Command
                 ]));
             }
         } catch (Throwable $exception) {
-            report($exception);
+            Log::error('CCD extract audit failed during private extraction.', [
+                'exception_class' => $exception::class,
+            ]);
             fclose($handle);
             $disk->delete($temporary);
             $this->error('La auditoría no pudo completar el CSV privado. Revise el log de la aplicación.');
@@ -181,19 +184,23 @@ class ExtractCcdAudit extends Command
             ];
         }
 
-        $extraction = $extractor->extract($source['path']);
-        $match = $matcher->classify($ccd, $extraction);
+        try {
+            $extraction = $extractor->extract($source['path']);
+            $match = $matcher->classify($ccd, $extraction);
 
-        return [
-            'source' => (string) $source['source'],
-            'dnis' => $extraction['dnis'],
-            'cuentas' => $extraction['cuentas'],
-            'operaciones' => $extraction['operaciones'],
-            'entidades' => $extraction['entidades'],
-            'operacion_candidata' => $match['operacion_candidata'],
-            'clasificacion' => $match['clasificacion'],
-            'evidence' => $match['evidence'],
-        ];
+            return [
+                'source' => (string) $source['source'],
+                'dnis' => $extraction['dnis'],
+                'cuentas' => $extraction['cuentas'],
+                'operaciones' => $extraction['operaciones'],
+                'entidades' => $extraction['entidades'],
+                'operacion_candidata' => $match['operacion_candidata'],
+                'clasificacion' => $match['clasificacion'],
+                'evidence' => $match['evidence'],
+            ];
+        } finally {
+            $sources->release($source);
+        }
     }
 
     /** @return array{ccd_id:?int,dni:?string,after_id:int,limit:int,output:string}|null */
