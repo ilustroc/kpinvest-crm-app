@@ -64,6 +64,123 @@ class CcdExtractAuditTest extends TestCase
         $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
     }
 
+    public function test_bbva_ccd_4_finds_only_the_first_unlabelled_candidate_operation(): void
+    {
+        [$first, $second] = $this->createBbvaCandidates('05378290');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 05378290\nResumen BBVA {$first}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-4-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-4-test.csv');
+
+        $this->assertStringContainsString('coincidencia_exacta', $csv);
+        $this->assertStringContainsString($first, $csv);
+        $this->assertStringContainsString('operacion_candidata_en_texto_pdf', $csv);
+        $this->assertStringNotContainsString($second.',coincidencia_exacta', $csv);
+    }
+
+    public function test_bbva_ccd_5_finds_only_the_second_unlabelled_candidate_operation_with_separators(): void
+    {
+        [$first, $second] = $this->createBbvaCandidates('05378290');
+        $formattedSecond = '0011030192-5001679374';
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 05378290\nResumen BBVA {$formattedSecond}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-5-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-5-test.csv');
+
+        $this->assertStringContainsString('coincidencia_exacta', $csv);
+        $this->assertStringContainsString($second, $csv);
+        $this->assertStringNotContainsString($first.',coincidencia_exacta', $csv);
+    }
+
+    public function test_bbva_unlabelled_document_with_both_candidate_operations_is_ambiguous(): void
+    {
+        [$first, $second] = $this->createBbvaCandidates('05378290');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 05378290\n{$first}\n{$second}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-ambiguous-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-ambiguous-test.csv');
+
+        $this->assertStringContainsString('ambigua', $csv);
+        $this->assertStringContainsString('operaciones_candidatas_en_texto_pdf', $csv);
+    }
+
+    public function test_bbva_operation_embedded_in_a_larger_number_is_not_a_match(): void
+    {
+        [$first] = $this->createBbvaCandidates('05378290');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 05378290\n9{$first}8");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-substring-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-substring-test.csv');
+
+        $this->assertStringContainsString('sin_coincidencia', $csv);
+        $this->assertStringNotContainsString('operacion_candidata_en_texto_pdf', $csv);
+    }
+
+    public function test_bbva_unlabelled_document_without_a_candidate_operation_stays_without_match(): void
+    {
+        $this->createBbvaCandidates('05378290');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', 'DNI: 05378290'."\nReferencia 99887766554433221100");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-absent-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-absent-test.csv');
+
+        $this->assertStringContainsString('sin_coincidencia', $csv);
+    }
+
+    public function test_explicit_conflicting_dni_overrides_a_candidate_operation_found_in_text(): void
+    {
+        [$first] = $this->createBbvaCandidates('05378290');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 87654321\n{$first}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-bbva-conflicting-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-bbva-conflicting-dni-test.csv');
+
+        $this->assertStringContainsString('sin_coincidencia', $csv);
+        $this->assertStringContainsString('dni_documental_no_coincide', $csv);
+    }
+
+    public function test_ccd_23303_style_operation_keeps_its_existing_exact_match(): void
+    {
+        $dni = '80201928';
+        $operation = '2744794';
+        $this->createAccount($dni, $operation, 'AQP1', 'CTA-23303');
+        $ccd = $this->createPrivateCcd($dni, 'AQP1', "DNI: {$dni}\nOperación: {$operation}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-23303-regression-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-23303-regression-test.csv');
+
+        $this->assertStringContainsString('coincidencia_exacta', $csv);
+        $this->assertStringContainsString('operacion_documental_exacta', $csv);
+    }
+
     public function test_extract_audit_does_not_resolve_a_shared_account_without_an_operation(): void
     {
         $dni = '80201928'; // Caso de referencia CCD 23303.
@@ -325,6 +442,17 @@ class CcdExtractAuditTest extends TestCase
             'cosecha' => $cosecha,
             'link' => 'https://storage.kpinvest.pe/ccd/legacy.zip',
         ]);
+    }
+
+    /** @return array{0:string,1:string} */
+    private function createBbvaCandidates(string $dni): array
+    {
+        $first = '00110301995001707769';
+        $second = '00110301925001679374';
+        $this->createAccount($dni, $first, 'BBVA1', 'CTA-BBVA-PRIMERA');
+        $this->createAccount($dni, $second, 'BBVA1', 'CTA-BBVA-SEGUNDA');
+
+        return [$first, $second];
     }
 
     /** @return array{root:string,temporary:string} */

@@ -47,6 +47,35 @@ class CcdExtractionMatcher
             return $this->result('ambigua', null, 'operacion_documental_corresponde_a_varias_cuentas', $candidates->count());
         }
 
+        // Algunos PDF BBVA contienen la operación sin la etiqueta esperada.
+        // Se comparan únicamente las operaciones numéricas que ya son
+        // candidatas del mismo DNI/cosecha; no se normaliza el documento
+        // completo ni se unen números de líneas distintas.
+        $textOperationMatches = $candidates
+            ->filter(fn (ClienteCuenta $account): bool => $this->containsCandidateOperation(
+                (string) $extraction['text'],
+                (string) $account->operacion,
+            ))
+            ->values();
+
+        if ($textOperationMatches->count() === 1) {
+            return $this->result(
+                'coincidencia_exacta',
+                (string) $textOperationMatches->first()->operacion,
+                'operacion_candidata_en_texto_pdf',
+                $candidates->count(),
+            );
+        }
+
+        if ($textOperationMatches->count() > 1) {
+            return $this->result(
+                'ambigua',
+                null,
+                'operaciones_candidatas_en_texto_pdf',
+                $candidates->count(),
+            );
+        }
+
         $accounts = array_map(fn (string $account): string => $this->normalize($account), $extraction['cuentas']);
         $accountMatches = $candidates
             ->filter(fn (ClienteCuenta $account): bool => in_array($this->normalize($account->cuenta), $accounts, true))
@@ -86,5 +115,23 @@ class CcdExtractionMatcher
     private function normalize(?string $value): string
     {
         return preg_replace('/\s+/', '', strtoupper(trim((string) $value))) ?: '';
+    }
+
+    /**
+     * Busca la operación con límites numéricos estrictos. Los únicos
+     * separadores admitidos son espacio, tabulación, punto y guion entre
+     * dígitos consecutivos: no se compacta el texto completo del PDF.
+     */
+    private function containsCandidateOperation(string $text, string $operation): bool
+    {
+        $digits = preg_replace('/[ \t.\-]+/', '', trim($operation));
+
+        if ($digits === null || ! preg_match('/^[0-9]{6,}$/D', $digits)) {
+            return false;
+        }
+
+        $pattern = implode('[ \\t.\\-]?', str_split($digits));
+
+        return preg_match('/(?<![0-9])'.$pattern.'(?![0-9])/', $text) === 1;
     }
 }
