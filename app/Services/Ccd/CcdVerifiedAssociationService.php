@@ -60,9 +60,11 @@ class CcdVerifiedAssociationService
                 );
             }
 
-            $accounts = $this->candidateAccountsFor($ccd)
-                ->filter(fn (ClienteCuenta $account): bool => $this->normalize($account->operacion) === $this->normalize((string) $match['operacion_candidata']))
-                ->values();
+            $accounts = ($match['cuenta_candidata'] ?? null) instanceof ClienteCuenta
+                ? collect([$match['cuenta_candidata']])
+                : $this->candidateAccountsFor($ccd)
+                    ->filter(fn (ClienteCuenta $account): bool => $this->normalize($account->operacion) === $this->normalize((string) $match['operacion_candidata']))
+                    ->values();
 
             if ($accounts->count() !== 1) {
                 return $this->result(
@@ -137,13 +139,13 @@ class CcdVerifiedAssociationService
             if ($account === null
                 || $this->normalize($account->numdoc) !== $this->normalize($lockedCcd->numdoc)
                 || $this->normalize($account->operacion) !== $this->normalize((string) $analysis['operacion'])) {
-                return $this->result('revision', $analysis['source'], null, $analysis['operacion'], $analysis['evidence'], 'cuenta_cambio_durante_verificacion');
+                return $this->result('revision', $analysis['source'], null, $analysis['operacion'], $analysis['evidence'], 'cuenta_cambio_durante_verificacion', $analysis['dni_evidence']);
             }
 
             $existing = $this->existingState((int) $lockedCcd->id, (int) $account->id, true);
 
             if ($existing !== null) {
-                return $this->result($existing['status'], $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], $existing['reason']);
+                return $this->result($existing['status'], $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], $existing['reason'], $analysis['dni_evidence']);
             }
 
             $link = CcdClienteCuenta::query()
@@ -160,7 +162,7 @@ class CcdVerifiedAssociationService
             }
 
             if ($link->exists && $link->estado === CcdClienteCuenta::ESTADO_EN_REVISION) {
-                return $this->result('revision', $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], 'asociacion_existente_en_revision');
+                return $this->result('revision', $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], 'asociacion_existente_en_revision', $analysis['dni_evidence']);
             }
 
             $link->fill([
@@ -171,7 +173,7 @@ class CcdVerifiedAssociationService
                 'confirmado_at' => now(),
             ])->save();
 
-            return $this->result('confirmada', $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], 'confirmacion_automatica_aplicada');
+            return $this->result('confirmada', $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], 'confirmacion_automatica_aplicada', $analysis['dni_evidence']);
         }, 3);
     }
 

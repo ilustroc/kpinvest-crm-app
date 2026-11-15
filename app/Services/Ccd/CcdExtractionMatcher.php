@@ -12,8 +12,8 @@ class CcdExtractionMatcher
     ) {}
 
     /**
-     * @param array{status:string,text_length:int,dnis:array<int,string>,cuentas:array<int,string>,operaciones:array<int,string>,entidades:array<int,string>,text:string,evidence:string} $extraction
-     * @return array{clasificacion:string,operacion_candidata:?string,evidence:string,candidate_count:int}
+     * @param  array{status:string,text_length:int,dnis:array<int,string>,cuentas:array<int,string>,operaciones:array<int,string>,entidades:array<int,string>,text:string,evidence:string}  $extraction
+     * @return array{clasificacion:string,operacion_candidata:?string,cliente_cuenta_id:?int,cuenta_candidata:?ClienteCuenta,evidence:string,candidate_count:int}
      */
     public function classify(CcdCliente $ccd, array $extraction): array
     {
@@ -51,6 +51,8 @@ class CcdExtractionMatcher
                 (string) $operationMatches->first()->operacion,
                 $usesGenericConfianza ? 'operacion_documental_confianza_cosecha_generica' : 'operacion_documental_exacta',
                 $candidates->count(),
+                (int) $operationMatches->first()->id,
+                $operationMatches->first(),
             );
         }
 
@@ -80,6 +82,8 @@ class CcdExtractionMatcher
                 (string) $textOperationMatches->first()->operacion,
                 $usesGenericConfianza ? 'operacion_documental_confianza_cosecha_generica' : 'operacion_candidata_en_texto_pdf',
                 $candidates->count(),
+                (int) $textOperationMatches->first()->id,
+                $textOperationMatches->first(),
             );
         }
 
@@ -126,12 +130,14 @@ class CcdExtractionMatcher
         return $this->result('sin_coincidencia', null, 'identificador_documental_sin_cuenta_compatible', $candidates->count());
     }
 
-    /** @return array{clasificacion:string,operacion_candidata:?string,evidence:string,candidate_count:int} */
-    private function result(string $classification, ?string $operation, string $evidence, int $candidateCount): array
+    /** @return array{clasificacion:string,operacion_candidata:?string,cliente_cuenta_id:?int,cuenta_candidata:?ClienteCuenta,evidence:string,candidate_count:int} */
+    private function result(string $classification, ?string $operation, string $evidence, int $candidateCount, ?int $accountId = null, ?ClienteCuenta $account = null): array
     {
         return [
             'clasificacion' => $classification,
             'operacion_candidata' => $operation,
+            'cliente_cuenta_id' => $accountId,
+            'cuenta_candidata' => $account,
             'evidence' => $evidence,
             'candidate_count' => $candidateCount,
         ];

@@ -12,6 +12,14 @@ use Illuminate\Support\Facades\DB;
 
 class CcdCuentaAssociationService
 {
+    private const ACCOUNT_CACHE_LIMIT = 250;
+
+    /** @var array<string,Collection<int,ClienteCuenta>> */
+    private array $accountsByDocument = [];
+
+    /** @var array<int,string> */
+    private array $accountCacheOrder = [];
+
     public function __construct(
         private readonly ClienteAccountService $accounts,
     ) {}
@@ -93,10 +101,7 @@ class CcdCuentaAssociationService
             return collect();
         }
 
-        return ClienteCuenta::query()
-            ->where('numdoc', $numdoc)
-            ->orderBy('id')
-            ->get(['id', 'numdoc', 'cuenta', 'operacion', 'entidad', 'producto', 'cosecha'])
+        return $this->accountsForDocument($numdoc)
             ->filter(fn (ClienteCuenta $account): bool => $this->normalizeCosecha((string) $account->cosecha) === $ccdCosecha)
             ->values();
     }
@@ -117,10 +122,7 @@ class CcdCuentaAssociationService
             return collect();
         }
 
-        return ClienteCuenta::query()
-            ->where('numdoc', $numdoc)
-            ->orderBy('id')
-            ->get(['id', 'numdoc', 'cuenta', 'operacion', 'entidad', 'producto', 'cosecha'])
+        return $this->accountsForDocument($numdoc)
             ->filter(fn (ClienteCuenta $account): bool => $this->normalizeEntity((string) $account->entidad) === 'FINANCIERA CONFIANZA'
                 && $this->normalizeCosecha((string) $account->cosecha, false) === 'CONFIANZA')
             ->values();
@@ -145,6 +147,31 @@ class CcdCuentaAssociationService
     private function normalizeEntity(string $entity): string
     {
         return preg_replace('/\s+/u', ' ', strtoupper(trim($entity))) ?: '';
+    }
+
+    /** @return Collection<int,ClienteCuenta> */
+    private function accountsForDocument(string $numdoc): Collection
+    {
+        if (isset($this->accountsByDocument[$numdoc])) {
+            return $this->accountsByDocument[$numdoc];
+        }
+
+        if (count($this->accountCacheOrder) >= self::ACCOUNT_CACHE_LIMIT) {
+            $oldest = array_shift($this->accountCacheOrder);
+
+            if ($oldest !== null) {
+                unset($this->accountsByDocument[$oldest]);
+            }
+        }
+
+        $accounts = ClienteCuenta::query()
+            ->where('numdoc', $numdoc)
+            ->orderBy('id')
+            ->get(['id', 'numdoc', 'cuenta', 'operacion', 'entidad', 'producto', 'cosecha']);
+
+        $this->accountCacheOrder[] = $numdoc;
+
+        return $this->accountsByDocument[$numdoc] = $accounts;
     }
 
     private function confirmationCandidate(Collection $candidates, ?string $operation): ?ClienteCuenta

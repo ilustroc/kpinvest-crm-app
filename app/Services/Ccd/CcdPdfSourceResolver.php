@@ -3,8 +3,8 @@
 namespace App\Services\Ccd;
 
 use App\Contracts\CcdTemporaryPdfSourceProvider;
-use App\Contracts\CcdZipV12PdfSourceProvider;
 use App\Contracts\CcdZipV12PdfSourceDiagnostics;
+use App\Contracts\CcdZipV12PdfSourceProvider;
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +12,10 @@ use Throwable;
 
 class CcdPdfSourceResolver
 {
+    private ?CcdZipV12PdfSourceProvider $resolvedZipProvider = null;
+
+    private ?string $resolvedZipProviderClass = null;
+
     /**
      * @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null}
      */
@@ -20,7 +24,10 @@ class CcdPdfSourceResolver
         $archivoId = $ccd->getAttribute('ccd_archivo_id');
 
         if ($archivoId !== null) {
-            $private = $this->privateSource((int) $archivoId);
+            $private = $this->privateSource(
+                (int) $archivoId,
+                $ccd->relationLoaded('archivo') ? $ccd->archivo : null,
+            );
 
             if ($private['status'] === 'ok') {
                 return $private;
@@ -43,9 +50,11 @@ class CcdPdfSourceResolver
     }
 
     /** @return array{status:string,source:?string,path:?string,evidence:string,cleanup:(callable():void)|null} */
-    private function privateSource(int $archivoId): array
+    private function privateSource(int $archivoId, ?CcdArchivo $loadedArchivo = null): array
     {
-        $archivo = CcdArchivo::query()->find($archivoId);
+        $archivo = $loadedArchivo?->getKey() === $archivoId
+            ? $loadedArchivo
+            : CcdArchivo::query()->find($archivoId);
 
         if ($archivo === null) {
             return $this->unavailable('archivo_privado_no_catalogado');
@@ -88,7 +97,24 @@ class CcdPdfSourceResolver
         }
 
         try {
-            $provider = is_object($configured) ? $configured : app((string) $configured);
+            if (is_object($configured)) {
+                $provider = $configured;
+            } else {
+                $providerClass = (string) $configured;
+
+                if ($this->resolvedZipProvider === null || $this->resolvedZipProviderClass !== $providerClass) {
+                    $resolved = app($providerClass);
+
+                    if (! $resolved instanceof CcdZipV12PdfSourceProvider) {
+                        return $this->unavailable('fuente_zip_v12_incompatible');
+                    }
+
+                    $this->resolvedZipProvider = $resolved;
+                    $this->resolvedZipProviderClass = $providerClass;
+                }
+
+                $provider = $this->resolvedZipProvider;
+            }
 
             if (! $provider instanceof CcdZipV12PdfSourceProvider) {
                 return $this->unavailable('fuente_zip_v12_incompatible');

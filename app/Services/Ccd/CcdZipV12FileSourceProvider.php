@@ -15,6 +15,9 @@ class CcdZipV12FileSourceProvider implements CcdTemporaryPdfSourceProvider, CcdZ
 {
     private ?string $failure = null;
 
+    /** @var array<string,ZipArchive> */
+    private array $openArchives = [];
+
     public function sourcePath(CcdCliente $ccd): ?string
     {
         $this->failure = null;
@@ -47,89 +50,84 @@ class CcdZipV12FileSourceProvider implements CcdTemporaryPdfSourceProvider, CcdZ
             return $this->fail('zip_v12_no_disponible');
         }
 
-        $zip = new ZipArchive();
-        $opened = $zip->open($zipPath, ZipArchive::RDONLY);
+        $zip = $this->archive($zipPath);
 
-        if ($opened !== true) {
-            return $this->fail('zip_v12_danado');
+        if ($zip === null) {
+            return null;
+        }
+
+        $stat = $zip->statName($pdf);
+
+        if ($stat === false) {
+            return $this->fail('pdf_zip_v12_no_encontrado');
+        }
+
+        $size = (int) ($stat['size'] ?? -1);
+        $maximum = (int) config('ccd.max_file_bytes');
+
+        if ($size < 5 || $maximum <= 0 || $size > $maximum) {
+            return $this->fail('pdf_zip_v12_tamano_invalido');
+        }
+
+        $stream = $zip->getStream($pdf);
+
+        if (! is_resource($stream)) {
+            return $this->fail('pdf_zip_v12_no_legible');
+        }
+
+        $temporary = tempnam($temporaryRoot, 'ccd-zip-');
+
+        if ($temporary === false) {
+            fclose($stream);
+
+            return $this->fail('pdf_zip_v12_temporal_no_creado');
+        }
+
+        $output = fopen($temporary, 'wb');
+
+        if ($output === false) {
+            fclose($stream);
+            @unlink($temporary);
+
+            return $this->fail('pdf_zip_v12_temporal_no_escribible');
         }
 
         try {
-            $stat = $zip->statName($pdf);
+            $signature = fread($stream, 5);
 
-            if ($stat === false) {
-                return $this->fail('pdf_zip_v12_no_encontrado');
+            if ($signature !== '%PDF-') {
+                return $this->removeAndFail($temporary, 'pdf_zip_v12_firma_invalida');
             }
 
-            $size = (int) ($stat['size'] ?? -1);
-            $maximum = (int) config('ccd.max_file_bytes');
-
-            if ($size < 5 || $maximum <= 0 || $size > $maximum) {
-                return $this->fail('pdf_zip_v12_tamano_invalido');
+            if (fwrite($output, $signature) !== 5) {
+                return $this->removeAndFail($temporary, 'pdf_zip_v12_temporal_no_escribible');
             }
 
-            $stream = $zip->getStream($pdf);
+            $written = 5;
 
-            if (! is_resource($stream)) {
-                return $this->fail('pdf_zip_v12_no_legible');
-            }
+            while (! feof($stream)) {
+                $chunk = fread($stream, min(8192, $maximum - $written + 1));
 
-            $temporary = tempnam($temporaryRoot, 'ccd-zip-');
-
-            if ($temporary === false) {
-                fclose($stream);
-
-                return $this->fail('pdf_zip_v12_temporal_no_creado');
-            }
-
-            $output = fopen($temporary, 'wb');
-
-            if ($output === false) {
-                fclose($stream);
-                @unlink($temporary);
-
-                return $this->fail('pdf_zip_v12_temporal_no_escribible');
-            }
-
-            try {
-                $signature = fread($stream, 5);
-
-                if ($signature !== '%PDF-') {
-                    return $this->removeAndFail($temporary, 'pdf_zip_v12_firma_invalida');
+                if ($chunk === false) {
+                    return $this->removeAndFail($temporary, 'pdf_zip_v12_error_lectura');
                 }
 
-                if (fwrite($output, $signature) !== 5) {
-                    return $this->removeAndFail($temporary, 'pdf_zip_v12_temporal_no_escribible');
+                if ($chunk === '' && ! feof($stream)) {
+                    return $this->removeAndFail($temporary, 'pdf_zip_v12_error_lectura');
                 }
 
-                $written = 5;
+                $written += strlen($chunk);
 
-                while (! feof($stream)) {
-                    $chunk = fread($stream, min(8192, $maximum - $written + 1));
-
-                    if ($chunk === false) {
-                        return $this->removeAndFail($temporary, 'pdf_zip_v12_error_lectura');
-                    }
-
-                    if ($chunk === '' && ! feof($stream)) {
-                        return $this->removeAndFail($temporary, 'pdf_zip_v12_error_lectura');
-                    }
-
-                    $written += strlen($chunk);
-
-                    if ($written > $maximum || fwrite($output, $chunk) === false) {
-                        return $this->removeAndFail($temporary, 'pdf_zip_v12_tamano_invalido');
-                    }
+                if ($written > $maximum || fwrite($output, $chunk) === false) {
+                    return $this->removeAndFail($temporary, 'pdf_zip_v12_tamano_invalido');
                 }
-            } finally {
-                fclose($output);
-                fclose($stream);
             }
-
-            return $temporary;
         } finally {
-            $zip->close();
+            fclose($output);
+            fclose($stream);
         }
+
+        return $temporary;
     }
 
     public function releaseTemporarySource(string $path): void
@@ -157,6 +155,30 @@ class CcdZipV12FileSourceProvider implements CcdTemporaryPdfSourceProvider, CcdZ
     public function lastFailure(): ?string
     {
         return $this->failure;
+    }
+
+    public function __destruct()
+    {
+        foreach ($this->openArchives as $archive) {
+            $archive->close();
+        }
+
+        $this->openArchives = [];
+    }
+
+    private function archive(string $path): ?ZipArchive
+    {
+        if (isset($this->openArchives[$path])) {
+            return $this->openArchives[$path];
+        }
+
+        $archive = new ZipArchive;
+
+        if ($archive->open($path, ZipArchive::RDONLY) !== true) {
+            return $this->fail('zip_v12_danado');
+        }
+
+        return $this->openArchives[$path] = $archive;
     }
 
     private function safeCosecha(string $value): ?string
