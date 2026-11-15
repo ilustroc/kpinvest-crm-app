@@ -100,6 +100,42 @@ class CcdCuentaAssociationTest extends TestCase
             ->assertDontSee('href="https://storage.kpinvest.pe/ccd/', false);
     }
 
+    public function test_manual_confirmation_refuses_to_create_a_second_confirmed_account_for_the_same_ccd(): void
+    {
+        $user = $this->makeUser();
+        $dni = 'V3CCDC'.Str::upper(Str::random(7));
+        $firstAccountId = $this->createAccount($dni, '2744794', 'CAJAAQP1');
+        $secondAccountId = $this->createAccount($dni, '2744795', 'CAJAAQP1');
+        $ccd = $this->createCcd($dni, 'AQP1');
+
+        $this->artisan('ccd:associate-audit', [
+            '--ccd-id' => $ccd->id,
+            '--confirm-operation' => '2744794',
+            '--evidence' => 'Primera confirmación manual de prueba.',
+            '--confirmed-by' => $user->id,
+            '--apply' => true,
+        ])->assertExitCode(0);
+
+        $this->artisan('ccd:associate-audit', [
+            '--ccd-id' => $ccd->id,
+            '--confirm-operation' => '2744795',
+            '--evidence' => 'Intento manual concurrente de prueba.',
+            '--confirmed-by' => $user->id,
+            '--apply' => true,
+        ])->assertExitCode(1);
+
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $firstAccountId,
+            'estado' => CcdClienteCuenta::ESTADO_CONFIRMADA,
+        ]);
+        $this->assertDatabaseMissing('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $secondAccountId,
+            'estado' => CcdClienteCuenta::ESTADO_CONFIRMADA,
+        ]);
+    }
+
     private function makeUser(): User
     {
         return User::create([

@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\CcdCliente;
+use App\Services\Ccd\CcdAutoAssociationApplyGuard;
 use App\Services\Ccd\CcdVerifiedAssociationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -25,11 +27,17 @@ class AssociateVerifiedCcd extends Command
 
     protected $description = 'Simula o aplica asociaciones CCD verificadas de nuevo contra el PDF';
 
-    public function handle(CcdVerifiedAssociationService $associations): int
+    public function handle(CcdVerifiedAssociationService $associations, CcdAutoAssociationApplyGuard $applyGuard): int
     {
         $options = $this->validatedOptions();
 
         if ($options === null) {
+            return self::FAILURE;
+        }
+
+        if ($options['apply'] && ($reason = $applyGuard->rejectionReason(DB::connection())) !== null) {
+            $this->error($reason);
+
             return self::FAILURE;
         }
 
@@ -79,6 +87,7 @@ class AssociateVerifiedCcd extends Command
                 'resultado',
                 'motivo',
                 'evidencia',
+                'metodo_verificacion',
                 'modo',
             ]);
 
@@ -93,6 +102,7 @@ class AssociateVerifiedCcd extends Command
                         'account_id' => null,
                         'operacion' => null,
                         'evidence' => 'procesamiento_tecnico',
+                        'method' => 'operacion_pdf_automatica',
                         'reason' => 'procesamiento_tecnico',
                     ];
                 }
@@ -106,6 +116,7 @@ class AssociateVerifiedCcd extends Command
                     $result['status'],
                     $result['reason'],
                     $result['evidence'],
+                    $result['method'],
                     $options['apply'] ? 'aplicacion' : 'simulacion',
                 ]));
             }

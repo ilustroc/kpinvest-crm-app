@@ -6,6 +6,7 @@ use App\Models\CcdCliente;
 use App\Models\User;
 use App\Services\Ccd\CcdCuentaAssociationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class AuditCcdCuentaAssociations extends Command
@@ -91,7 +92,9 @@ class AuditCcdCuentaAssociations extends Command
                     $result['status'],
                 ];
             } catch (Throwable $exception) {
-                report($exception);
+                Log::warning('CCD association audit rejected.', [
+                    'exception_class' => $exception::class,
+                ]);
                 $counts['errores']++;
                 $details[] = [$ccd->id, $ccd->numdoc, $ccd->cosecha ?: '—', '—', 'error'];
                 $this->error("CCD {$ccd->id}: {$exception->getMessage()}");

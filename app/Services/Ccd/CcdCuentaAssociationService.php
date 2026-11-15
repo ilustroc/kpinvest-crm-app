@@ -50,6 +50,12 @@ class CcdCuentaAssociationService
                 $evidence,
                 $verificationMethod
             ): void {
+                CcdCliente::query()->lockForUpdate()->findOrFail($ccd->id);
+                CcdClienteCuenta::query()
+                    ->where('ccd_cliente_id', $ccd->id)
+                    ->lockForUpdate()
+                    ->get();
+
                 foreach ($candidates as $candidate) {
                     $this->storeCandidate($ccd, $candidate);
                 }
@@ -183,6 +189,14 @@ class CcdCuentaAssociationService
         string $evidence,
         string $verificationMethod,
     ): void {
+        if (CcdClienteCuenta::query()
+            ->where('ccd_cliente_id', $ccd->id)
+            ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+            ->where('cliente_cuenta_id', '!=', $account->id)
+            ->exists()) {
+            throw new DomainException('La CCD ya tiene una confirmación para otra cuenta; no puede sobrescribirse.');
+        }
+
         $link = CcdClienteCuenta::query()->firstOrNew([
             'ccd_cliente_id' => $ccd->id,
             'cliente_cuenta_id' => $account->id,

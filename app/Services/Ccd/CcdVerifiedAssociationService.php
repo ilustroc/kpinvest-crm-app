@@ -22,7 +22,7 @@ class CcdVerifiedAssociationService
     ) {}
 
     /**
-     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,reason:string}
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string}
      */
     public function analyze(CcdCliente $ccd): array
     {
@@ -96,7 +96,7 @@ class CcdVerifiedAssociationService
      * Vuelve a analizar dentro de una transacción y bajo bloqueo de la CCD;
      * así un segundo proceso no puede confirmar otra cuenta al mismo tiempo.
      *
-     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,reason:string}
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string}
      */
     public function apply(CcdCliente $ccd): array
     {
@@ -195,11 +195,21 @@ class CcdVerifiedAssociationService
         }
 
         $pattern = implode('[ \\t.\\-]?', str_split($digits));
+        $bounded = '(?<![0-9])'.$pattern.'(?![0-9])';
+        $explicitIdentity = '/\b(?:DNI|DOCUMENTO(?:\s+DE\s+IDENTIDAD)?|DOC(?:UMENTO)?\.?\s*(?:DE\s+IDENTIDAD)?)\s*(?:N(?:RO)?\.?|[º°])?\s*[:#\-]?\s*'.$bounded.'/iu';
 
-        return preg_match('/(?<![0-9])'.$pattern.'(?![0-9])/', $text) === 1;
+        if (preg_match($explicitIdentity, $text) === 1) {
+            return true;
+        }
+
+        // Formato histórico de destinatario BBVA: documento en la misma
+        // línea del encabezado, aunque no se imprima la etiqueta DNI.
+        $recipientHeading = '/(?mi)^\s*(?:SEÑOR(?:\(A\)|A)?|SR(?:A)?\.?|DESTINATARIO|CLIENTE|TITULAR)\s*:?[^0-9\r\n]{0,140}?'.$bounded.'(?=[^0-9]|$)/u';
+
+        return preg_match($recipientHeading, $text) === 1;
     }
 
-    /** @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,reason:string} */
+    /** @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string} */
     private function result(string $status, string $source, ?int $accountId, ?string $operation, string $evidence, string $reason): array
     {
         return [
@@ -208,6 +218,7 @@ class CcdVerifiedAssociationService
             'account_id' => $accountId,
             'operacion' => $operation,
             'evidence' => $evidence,
+            'method' => 'operacion_pdf_automatica',
             'reason' => $reason,
         ];
     }

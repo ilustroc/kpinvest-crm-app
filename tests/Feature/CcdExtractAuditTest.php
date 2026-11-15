@@ -5,13 +5,17 @@ namespace Tests\Feature;
 use App\Contracts\CcdZipV12PdfSourceProvider;
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
+use App\Services\Ccd\CcdAutoAssociationApplyGuard;
 use App\Services\Ccd\CcdPdfIdentifierExtractor;
+use App\Services\Ccd\CcdVerifiedAssociationService;
 use Dompdf\Dompdf;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Mockery;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -99,21 +103,37 @@ class CcdExtractAuditTest extends TestCase
         $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
     }
 
-    public function test_verified_association_apply_confirms_once_and_is_idempotent(): void
+    public function test_verified_association_command_rejects_apply_outside_the_exact_staging_database(): void
+    {
+        $dni = '80201928';
+        $operation = '2744794';
+        $this->createAccount($dni, $operation, 'AQP1', 'CTA-23303');
+        $ccd = $this->createPrivateCcd($dni, 'AQP1', "DNI: {$dni}\nOperación: {$operation}");
+        config(['ccd.auto_association_apply_enabled' => true]);
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--apply' => true,
+            '--authorization' => 'CONFIRMAR_ASOCIACION_AUTOMATICA',
+            '--output' => 'ccd-verified-blocked-database-test.csv',
+        ])->assertExitCode(1);
+
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_service_confirms_once_and_is_idempotent_in_testing_fixture(): void
     {
         $dni = '80201928';
         $operation = '2744794';
         $accountId = $this->createAccount($dni, $operation, 'AQP1', 'CTA-23303');
         $ccd = $this->createPrivateCcd($dni, 'AQP1', "DNI: {$dni}\nOperación: {$operation}");
-        $options = [
-            '--ccd-id' => $ccd->id,
-            '--apply' => true,
-            '--authorization' => 'CONFIRMAR_ASOCIACION_AUTOMATICA',
-        ];
+        $service = app(CcdVerifiedAssociationService::class);
 
-        $this->artisan('ccd:associate-verified', $options + ['--output' => 'ccd-verified-apply-first-test.csv'])
-            ->assertExitCode(0);
+        $first = $service->apply($ccd);
+        $second = $service->apply($ccd->fresh());
 
+        $this->assertSame('confirmada', $first['status']);
+        $this->assertSame('ya_confirmada', $second['status']);
         $this->assertDatabaseHas('ccd_cliente_cuenta', [
             'ccd_cliente_id' => $ccd->id,
             'cliente_cuenta_id' => $accountId,
@@ -121,13 +141,24 @@ class CcdExtractAuditTest extends TestCase
             'metodo_verificacion' => 'operacion_pdf_automatica',
             'confirmado_por_user_id' => null,
         ]);
-
-        $this->artisan('ccd:associate-verified', $options + ['--output' => 'ccd-verified-apply-second-test.csv'])
-            ->assertExitCode(0);
-
-        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-apply-second-test.csv');
-        $this->assertStringContainsString('ya_confirmada', $csv);
         $this->assertSame(1, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_apply_guard_requires_exact_staging_database_and_explicit_enablement(): void
+    {
+        $connection = Mockery::mock(ConnectionInterface::class);
+        $connection->shouldReceive('getDatabaseName')->andReturn(CcdAutoAssociationApplyGuard::STAGING_DATABASE);
+        $guard = app(CcdAutoAssociationApplyGuard::class);
+
+        config(['ccd.auto_association_apply_enabled' => false]);
+        $this->assertNotNull($guard->rejectionReason($connection));
+
+        config(['ccd.auto_association_apply_enabled' => true]);
+        $this->assertNull($guard->rejectionReason($connection));
+
+        $production = Mockery::mock(ConnectionInterface::class);
+        $production->shouldReceive('getDatabaseName')->andReturn('u480021566_produccion');
+        $this->assertNotNull($guard->rejectionReason($production));
     }
 
     public function test_verified_association_preserves_manual_confirmation_for_another_operation_as_conflict(): void
@@ -180,6 +211,38 @@ class CcdExtractAuditTest extends TestCase
         $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-no-dni-test.csv');
         $this->assertStringContainsString('dni_documental_no_corrobable', $csv);
         $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_rejects_an_accidental_unlabelled_dni_reference(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-ACCIDENTAL', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "Referencia interna {$dni}\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-accidental-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-accidental-dni-test.csv');
+        $this->assertStringContainsString('dni_documental_no_corrobable', $csv);
+    }
+
+    public function test_verified_association_accepts_historical_bbva_recipient_heading_identity(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-DESTINATARIO', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "SEÑOR(A): CLIENTE DE PRUEBA {$dni}\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-recipient-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-recipient-dni-test.csv');
+        $this->assertStringContainsString('elegible', $csv);
     }
 
     public function test_verified_association_handles_generic_confianza_and_zip_source_without_writing_in_simulation(): void
