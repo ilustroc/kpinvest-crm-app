@@ -64,6 +64,205 @@ class CcdExtractAuditTest extends TestCase
         $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
     }
 
+    public function test_verified_association_simulation_is_read_only_and_reports_an_eligible_private_pdf(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $accountId = $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-4', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: {$dni}\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-simulation-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-simulation-test.csv');
+
+        $this->assertStringContainsString('elegible', $csv);
+        $this->assertStringContainsString((string) $accountId, $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_apply_requires_explicit_authorization(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301925001679374';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-5', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: {$dni}\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--apply' => true,
+            '--output' => 'ccd-verified-no-auth-test.csv',
+        ])->assertExitCode(1);
+
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_apply_confirms_once_and_is_idempotent(): void
+    {
+        $dni = '80201928';
+        $operation = '2744794';
+        $accountId = $this->createAccount($dni, $operation, 'AQP1', 'CTA-23303');
+        $ccd = $this->createPrivateCcd($dni, 'AQP1', "DNI: {$dni}\nOperación: {$operation}");
+        $options = [
+            '--ccd-id' => $ccd->id,
+            '--apply' => true,
+            '--authorization' => 'CONFIRMAR_ASOCIACION_AUTOMATICA',
+        ];
+
+        $this->artisan('ccd:associate-verified', $options + ['--output' => 'ccd-verified-apply-first-test.csv'])
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'operacion_pdf_automatica',
+            'confirmado_por_user_id' => null,
+        ]);
+
+        $this->artisan('ccd:associate-verified', $options + ['--output' => 'ccd-verified-apply-second-test.csv'])
+            ->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-apply-second-test.csv');
+        $this->assertStringContainsString('ya_confirmada', $csv);
+        $this->assertSame(1, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_preserves_manual_confirmation_for_another_operation_as_conflict(): void
+    {
+        $dni = '05378290';
+        $automaticAccountId = $this->createAccount($dni, '00110301995001707769', 'BBVA1', 'CTA-BBVA-A', 'BBVA');
+        $manualAccountId = $this->createAccount($dni, '00110301925001679374', 'BBVA1', 'CTA-BBVA-B', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: {$dni}\n00110301995001707769");
+        DB::table('ccd_cliente_cuenta')->insert([
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $manualAccountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'revision_visual_pdf',
+            'evidencia' => 'Confirmación manual previa.',
+            'confirmado_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-conflict-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-conflict-test.csv');
+        $this->assertStringContainsString('conflicto', $csv);
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $manualAccountId,
+            'metodo_verificacion' => 'revision_visual_pdf',
+        ]);
+        $this->assertDatabaseMissing('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $automaticAccountId,
+        ]);
+    }
+
+    public function test_verified_association_requires_documentary_dni_even_when_operation_is_exact(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-DNI', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "Resumen {$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-no-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-no-dni-test.csv');
+        $this->assertStringContainsString('dni_documental_no_corrobable', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_handles_generic_confianza_and_zip_source_without_writing_in_simulation(): void
+    {
+        $dni = '00003862';
+        $operation = '6878399';
+        $pdfName = 'CCD_CONFIANZA1-23550.pdf';
+        $accountId = $this->createAccount($dni, $operation, 'CONFIANZA', '3303632', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createZipOnlyCcd($dni, 'CONFIANZA1', $pdfName);
+        $this->configureZipV12([
+            $pdfName => $this->pdf("DNI: {$dni}\n{$operation}DEUDAACTUAL"),
+        ]);
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-confianza-zip-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-confianza-zip-test.csv');
+        $this->assertStringContainsString('elegible', $csv);
+        $this->assertStringContainsString((string) $accountId, $csv);
+        $this->assertStringContainsString('operacion_documental_confianza_cosecha_generica', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_sends_multiple_operations_or_textless_pdf_to_review_without_writing(): void
+    {
+        $dni = '05378290';
+        $this->createAccount($dni, '00110301995001707769', 'BBVA1', 'CTA-BBVA-M1', 'BBVA');
+        $this->createAccount($dni, '00110301925001679374', 'BBVA1', 'CTA-BBVA-M2', 'BBVA');
+        $multiple = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: {$dni}\n00110301995001707769\n00110301925001679374");
+        $textless = $this->createPrivateCcd($dni, 'BBVA_1_2', '');
+
+        foreach ([$multiple, $textless] as $index => $ccd) {
+            $this->artisan('ccd:associate-verified', [
+                '--ccd-id' => $ccd->id,
+                '--output' => "ccd-verified-review-{$index}-test.csv",
+            ])->assertExitCode(0);
+
+            $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+        }
+
+        $multipleCsv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-review-0-test.csv');
+        $textlessCsv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-review-1-test.csv');
+        $this->assertStringContainsString('revision', $multipleCsv);
+        $this->assertStringContainsString('no_elegible', $textlessCsv);
+    }
+
+    public function test_verified_association_marks_repeated_operation_in_two_candidate_accounts_for_review(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-DUPLICADA-1', 'BBVA');
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-DUPLICADA-2', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: {$dni}\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-duplicate-operation-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-duplicate-operation-test.csv');
+        $this->assertStringContainsString('revision', $csv);
+        $this->assertStringContainsString('ambigua', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_verified_association_does_not_match_an_operation_owned_only_by_another_dni(): void
+    {
+        $operation = '00110301995001707769';
+        $this->createAccount('87654321', $operation, 'BBVA1', 'CTA-OTRO-DNI', 'BBVA');
+        $ccd = $this->createPrivateCcd('05378290', 'BBVA_1_2', "DNI: 05378290\n{$operation}");
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-other-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-other-dni-test.csv');
+        $this->assertStringContainsString('no_elegible', $csv);
+        $this->assertStringContainsString('sin_cuenta_compatible_por_dni_y_cosecha', $csv);
+    }
+
     public function test_bbva_ccd_4_finds_only_the_first_unlabelled_candidate_operation(): void
     {
         [$first, $second] = $this->createBbvaCandidates('05378290');
