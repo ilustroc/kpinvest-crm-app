@@ -234,7 +234,7 @@ class CcdExtractAuditTest extends TestCase
         $dni = '05378290';
         $operation = '00110301995001707769';
         $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-DESTINATARIO', 'BBVA');
-        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "SEÑOR(A): CLIENTE DE PRUEBA {$dni}\n{$operation}");
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "Estimado(a) Sr.(a): CLIENTE DE PRUEBA - {$dni}\n{$operation}");
 
         $this->artisan('ccd:associate-verified', [
             '--ccd-id' => $ccd->id,
@@ -243,6 +243,91 @@ class CcdExtractAuditTest extends TestCase
 
         $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-recipient-dni-test.csv');
         $this->assertStringContainsString('elegible', $csv);
+        $this->assertStringContainsString('dni_destinatario_bbva_estimado_sr', $csv);
+    }
+
+    public function test_verified_association_accepts_historical_confianza_reference_recipient_identity_after_pdf_line_flattening(): void
+    {
+        $dni = '00003862';
+        $operation = '6878399';
+        $this->createAccount($dni, $operation, 'CONFIANZA', 'CTA-CONFIANZA-DNI', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createPrivateCcd(
+            $dni,
+            'CONFIANZA1',
+            "Lima, 20 de mayo de 2014 Referencia: {$dni} Señor(a): CLIENTE DE PRUEBA\n{$operation}DEUDAACTUAL",
+        );
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-confianza-recipient-dni-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-confianza-recipient-dni-test.csv');
+        $this->assertStringContainsString('elegible', $csv);
+        $this->assertStringContainsString('dni_destinatario_confianza_referencia_senor', $csv);
+    }
+
+    public function test_verified_association_keeps_a_manual_confirmation_for_the_same_operation_when_identity_is_not_reparseable(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $accountId = $this->createAccount($dni, $operation, 'BBVA1', 'CTA-MANUAL-SAME', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "Resumen {$operation}");
+        DB::table('ccd_cliente_cuenta')->insert([
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'revision_visual_pdf',
+            'evidencia' => 'Confirmación manual previa.',
+            'confirmado_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-manual-same-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-manual-same-test.csv');
+        $this->assertStringContainsString('ya_confirmada', $csv);
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'metodo_verificacion' => 'revision_visual_pdf',
+        ]);
+    }
+
+    public function test_verified_association_reports_conflict_when_an_explicit_document_dni_contradicts_a_manual_confirmation(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $accountId = $this->createAccount($dni, $operation, 'BBVA1', 'CTA-MANUAL-CONTRADICTORY', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "DNI: 87654321\n{$operation}");
+        DB::table('ccd_cliente_cuenta')->insert([
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'estado' => 'confirmada',
+            'metodo_verificacion' => 'revision_visual_pdf',
+            'evidencia' => 'Confirmación manual previa.',
+            'confirmado_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-verified-manual-dni-conflict-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-manual-dni-conflict-test.csv');
+        $this->assertStringContainsString('conflicto', $csv);
+        $this->assertStringContainsString('dni_documental_contradice_confirmacion_existente', $csv);
+        $this->assertDatabaseHas('ccd_cliente_cuenta', [
+            'ccd_cliente_id' => $ccd->id,
+            'cliente_cuenta_id' => $accountId,
+            'metodo_verificacion' => 'revision_visual_pdf',
+        ]);
     }
 
     public function test_verified_association_handles_generic_confianza_and_zip_source_without_writing_in_simulation(): void

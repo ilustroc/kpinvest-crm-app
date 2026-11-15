@@ -22,7 +22,7 @@ class CcdVerifiedAssociationService
     ) {}
 
     /**
-     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string}
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
      */
     public function analyze(CcdCliente $ccd): array
     {
@@ -37,6 +37,19 @@ class CcdVerifiedAssociationService
             $match = $this->matcher->classify($ccd, $extraction);
 
             if ($match['clasificacion'] !== 'coincidencia_exacta' || $match['operacion_candidata'] === null) {
+                if ($match['evidence'] === 'dni_documental_no_coincide'
+                    && ($confirmed = $this->confirmedAssociationForCcd((int) $ccd->id)) !== null) {
+                    return $this->result(
+                        'conflicto',
+                        (string) $source['source'],
+                        (int) $confirmed->cliente_cuenta_id,
+                        $confirmed->clienteCuenta?->operacion,
+                        $match['evidence'],
+                        'dni_documental_contradice_confirmacion_existente',
+                        'dni_documental_contradictorio',
+                    );
+                }
+
                 return $this->result(
                     $match['clasificacion'] === 'ambigua' ? 'revision' : 'no_elegible',
                     (string) $source['source'],
@@ -44,17 +57,6 @@ class CcdVerifiedAssociationService
                     null,
                     $match['evidence'],
                     $match['clasificacion'],
-                );
-            }
-
-            if (! $this->documentContainsDni((string) $extraction['text'], (string) $ccd->numdoc)) {
-                return $this->result(
-                    'revision',
-                    (string) $source['source'],
-                    null,
-                    (string) $match['operacion_candidata'],
-                    $match['evidence'],
-                    'dni_documental_no_corrobable',
                 );
             }
 
@@ -86,7 +88,29 @@ class CcdVerifiedAssociationService
                 return $this->result($existing['status'], (string) $source['source'], (int) $account->id, (string) $account->operacion, $match['evidence'], $existing['reason']);
             }
 
-            return $this->result('elegible', (string) $source['source'], (int) $account->id, (string) $account->operacion, $match['evidence'], 'operacion_y_dni_documentales_verificados');
+            $dniEvidence = $this->documentDniEvidence((string) $extraction['text'], (string) $ccd->numdoc);
+
+            if ($dniEvidence === null) {
+                return $this->result(
+                    'revision',
+                    (string) $source['source'],
+                    null,
+                    (string) $match['operacion_candidata'],
+                    $match['evidence'],
+                    'dni_documental_no_corrobable',
+                    'dni_documental_no_corrobable',
+                );
+            }
+
+            return $this->result(
+                'elegible',
+                (string) $source['source'],
+                (int) $account->id,
+                (string) $account->operacion,
+                $match['evidence'],
+                'operacion_y_dni_documentales_verificados',
+                $dniEvidence,
+            );
         } finally {
             $this->sources->release($source);
         }
@@ -96,7 +120,7 @@ class CcdVerifiedAssociationService
      * Vuelve a analizar dentro de una transacción y bajo bloqueo de la CCD;
      * así un segundo proceso no puede confirmar otra cuenta al mismo tiempo.
      *
-     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string}
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
      */
     public function apply(CcdCliente $ccd): array
     {
@@ -142,7 +166,7 @@ class CcdVerifiedAssociationService
             $link->fill([
                 'estado' => CcdClienteCuenta::ESTADO_CONFIRMADA,
                 'metodo_verificacion' => 'operacion_pdf_automatica',
-                'evidencia' => 'Proceso automático ccd:associate-verified; '.$analysis['evidence'].'; DNI documental exacto; fuente '.$analysis['source'].'.',
+                'evidencia' => 'Proceso automático ccd:associate-verified; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.',
                 'confirmado_por_user_id' => null,
                 'confirmado_at' => now(),
             ])->save();
@@ -186,12 +210,28 @@ class CcdVerifiedAssociationService
         return null;
     }
 
-    private function documentContainsDni(string $text, string $dni): bool
+    private function confirmedAssociationForCcd(int $ccdId): ?CcdClienteCuenta
+    {
+        return CcdClienteCuenta::query()
+            ->with('clienteCuenta:id,operacion')
+            ->where('ccd_cliente_id', $ccdId)
+            ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Corrobora la identidad sólo con una etiqueta documental explícita o con
+     * encabezados históricos de destinatario. Los extractores PDF no siempre
+     * conservan los saltos de línea, por eso estos encabezados no dependen de
+     * estar al inicio del texto, pero sí atan el DNI al formato completo.
+     */
+    private function documentDniEvidence(string $text, string $dni): ?string
     {
         $digits = preg_replace('/[ \t.\-]+/', '', trim($dni));
 
         if ($digits === null || ! preg_match('/^[0-9]{6,15}$/D', $digits)) {
-            return false;
+            return null;
         }
 
         $pattern = implode('[ \\t.\\-]?', str_split($digits));
@@ -199,18 +239,29 @@ class CcdVerifiedAssociationService
         $explicitIdentity = '/\b(?:DNI|DOCUMENTO(?:\s+DE\s+IDENTIDAD)?|DOC(?:UMENTO)?\.?\s*(?:DE\s+IDENTIDAD)?)\s*(?:N(?:RO)?\.?|[º°])?\s*[:#\-]?\s*'.$bounded.'/iu';
 
         if (preg_match($explicitIdentity, $text) === 1) {
-            return true;
+            return 'dni_documental_etiquetado';
         }
 
-        // Formato histórico de destinatario BBVA: documento en la misma
-        // línea del encabezado, aunque no se imprima la etiqueta DNI.
-        $recipientHeading = '/(?mi)^\s*(?:SEÑOR(?:\(A\)|A)?|SR(?:A)?\.?|DESTINATARIO|CLIENTE|TITULAR)\s*:?[^0-9\r\n]{0,140}?'.$bounded.'(?=[^0-9]|$)/u';
+        // Formato histórico BBVA, por ejemplo:
+        // "Estimado(a) Sr.(a): NOMBRE DEL CLIENTE - 05378290".
+        $bbvaRecipient = '/\bESTIMADO\s*(?:\(\s*A\s*\)|A)?\s+(?:SR\.?\s*(?:\(\s*A\s*\)|A)?|SEÑOR\s*(?:\(\s*A\s*\)|A)?)\s*:?[^0-9\r\n]{0,140}?'.$bounded.'(?=[^0-9]|$)/iu';
 
-        return preg_match($recipientHeading, $text) === 1;
+        if (preg_match($bbvaRecipient, $text) === 1) {
+            return 'dni_destinatario_bbva_estimado_sr';
+        }
+
+        // Formato histórico de CONFIANZA: "Referencia: <DNI> Señor(a):".
+        // El saludo posterior evita que una referencia numérica aislada sea
+        // tomada como identidad; "cliente" o "titular" a solas no bastan.
+        $confianzaRecipient = '/\bREFERENCIA\s*:\s*'.$bounded.'\s+(?:SEÑOR\s*(?:\(\s*A\s*\)|A)?|SR\.?\s*(?:\(\s*A\s*\)|A)?|SRA\.?)\s*:?/iu';
+
+        return preg_match($confianzaRecipient, $text) === 1
+            ? 'dni_destinatario_confianza_referencia_senor'
+            : null;
     }
 
-    /** @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string} */
-    private function result(string $status, string $source, ?int $accountId, ?string $operation, string $evidence, string $reason): array
+    /** @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string} */
+    private function result(string $status, string $source, ?int $accountId, ?string $operation, string $evidence, string $reason, string $dniEvidence = 'no_evaluada'): array
     {
         return [
             'status' => $status,
@@ -220,6 +271,7 @@ class CcdVerifiedAssociationService
             'evidence' => $evidence,
             'method' => 'operacion_pdf_automatica',
             'reason' => $reason,
+            'dni_evidence' => $dniEvidence,
         ];
     }
 

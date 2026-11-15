@@ -87,6 +87,7 @@ class AssociateVerifiedCcd extends Command
                 'resultado',
                 'motivo',
                 'evidencia',
+                'evidencia_dni',
                 'metodo_verificacion',
                 'modo',
             ]);
@@ -102,6 +103,7 @@ class AssociateVerifiedCcd extends Command
                         'account_id' => null,
                         'operacion' => null,
                         'evidence' => 'procesamiento_tecnico',
+                        'dni_evidence' => 'no_evaluada',
                         'method' => 'operacion_pdf_automatica',
                         'reason' => 'procesamiento_tecnico',
                     ];
@@ -116,6 +118,7 @@ class AssociateVerifiedCcd extends Command
                     $result['status'],
                     $result['reason'],
                     $result['evidence'],
+                    $result['dni_evidence'],
                     $result['method'],
                     $options['apply'] ? 'aplicacion' : 'simulacion',
                 ]));
