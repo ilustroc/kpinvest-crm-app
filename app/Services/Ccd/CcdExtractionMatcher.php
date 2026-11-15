@@ -29,9 +29,15 @@ class CcdExtractionMatcher
         }
 
         $candidates = $this->associations->candidatesFor($ccd);
+        $usesGenericConfianza = false;
 
         if ($candidates->isEmpty()) {
-            return $this->result('sin_coincidencia', null, 'sin_cuenta_compatible_por_dni_y_cosecha', 0);
+            $candidates = $this->associations->genericConfianzaCandidatesFor($ccd);
+            $usesGenericConfianza = $candidates->isNotEmpty();
+
+            if ($candidates->isEmpty()) {
+                return $this->result('sin_coincidencia', null, 'sin_cuenta_compatible_por_dni_y_cosecha', 0);
+            }
         }
 
         $operations = array_map(fn (string $operation): string => $this->normalize($operation), $extraction['operaciones']);
@@ -40,11 +46,21 @@ class CcdExtractionMatcher
             ->values();
 
         if ($operationMatches->count() === 1) {
-            return $this->result('coincidencia_exacta', (string) $operationMatches->first()->operacion, 'operacion_documental_exacta', $candidates->count());
+            return $this->result(
+                'coincidencia_exacta',
+                (string) $operationMatches->first()->operacion,
+                $usesGenericConfianza ? 'operacion_documental_confianza_cosecha_generica' : 'operacion_documental_exacta',
+                $candidates->count(),
+            );
         }
 
         if ($operationMatches->count() > 1) {
-            return $this->result('ambigua', null, 'operacion_documental_corresponde_a_varias_cuentas', $candidates->count());
+            return $this->result(
+                'ambigua',
+                null,
+                $usesGenericConfianza ? 'operaciones_documentales_confianza_cosecha_generica' : 'operacion_documental_corresponde_a_varias_cuentas',
+                $candidates->count(),
+            );
         }
 
         // Algunos PDF BBVA contienen la operación sin la etiqueta esperada.
@@ -62,7 +78,7 @@ class CcdExtractionMatcher
             return $this->result(
                 'coincidencia_exacta',
                 (string) $textOperationMatches->first()->operacion,
-                'operacion_candidata_en_texto_pdf',
+                $usesGenericConfianza ? 'operacion_documental_confianza_cosecha_generica' : 'operacion_candidata_en_texto_pdf',
                 $candidates->count(),
             );
         }
@@ -71,7 +87,16 @@ class CcdExtractionMatcher
             return $this->result(
                 'ambigua',
                 null,
-                'operaciones_candidatas_en_texto_pdf',
+                $usesGenericConfianza ? 'operaciones_documentales_confianza_cosecha_generica' : 'operaciones_candidatas_en_texto_pdf',
+                $candidates->count(),
+            );
+        }
+
+        if ($usesGenericConfianza) {
+            return $this->result(
+                'sin_coincidencia',
+                null,
+                'confianza_cosecha_generica_sin_operacion_documental',
                 $candidates->count(),
             );
         }

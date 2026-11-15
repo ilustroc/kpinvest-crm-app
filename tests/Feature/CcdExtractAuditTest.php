@@ -181,6 +181,118 @@ class CcdExtractAuditTest extends TestCase
         $this->assertStringContainsString('operacion_documental_exacta', $csv);
     }
 
+    public function test_ccd_23550_style_confianza_document_matches_generic_crm_harvest_only_by_operation(): void
+    {
+        $dni = '00003862';
+        $operation = '6878399';
+        $this->createAccount($dni, $operation, 'CONFIANZA', '3303632', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createPrivateCcd($dni, 'CONFIANZA1', "DNI: {$dni}\n{$operation}DEUDAACTUAL");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-23550-confianza-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-23550-confianza-test.csv');
+
+        $this->assertStringContainsString('coincidencia_exacta', $csv);
+        $this->assertStringContainsString($operation, $csv);
+        $this->assertStringContainsString('operacion_documental_confianza_cosecha_generica', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_generic_confianza_harvest_with_multiple_documented_operations_is_ambiguous(): void
+    {
+        $dni = '00003862';
+        $this->createAccount($dni, '6878399', 'CONFIANZA', '3303632', 'FINANCIERA CONFIANZA');
+        $this->createAccount($dni, '6878400', 'CONFIANZA', '3303633', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createPrivateCcd($dni, 'CONFIANZA1', "DNI: {$dni}\n6878399DEUDA\n6878400DEUDA");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-confianza-ambiguous-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-confianza-ambiguous-test.csv');
+
+        $this->assertStringContainsString('ambigua', $csv);
+        $this->assertStringContainsString('operaciones_documentales_confianza_cosecha_generica', $csv);
+    }
+
+    public function test_generic_confianza_harvest_without_full_document_operation_stays_unmatched(): void
+    {
+        $dni = '00003862';
+        $this->createAccount($dni, '6878399', 'CONFIANZA', '3303632', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createPrivateCcd($dni, 'CONFIANZA1', "DNI: {$dni}\n687839DEUDAACTUAL");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-confianza-partial-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-confianza-partial-test.csv');
+
+        $this->assertStringContainsString('sin_coincidencia', $csv);
+        $this->assertStringContainsString('confianza_cosecha_generica_sin_operacion_documental', $csv);
+    }
+
+    public function test_generic_confianza_harvest_does_not_accept_another_entity(): void
+    {
+        $dni = '00003862';
+        $this->createAccount($dni, '6878399', 'CONFIANZA', '3303632', 'OTRA FINANCIERA');
+        $ccd = $this->createPrivateCcd($dni, 'CONFIANZA1', "DNI: {$dni}\n6878399DEUDAACTUAL");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-confianza-other-entity-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-confianza-other-entity-test.csv');
+
+        $this->assertStringContainsString('sin_cuenta_compatible_por_dni_y_cosecha', $csv);
+    }
+
+    public function test_specific_confianza_harvest_keeps_priority_over_generic_homologation(): void
+    {
+        $dni = '00003862';
+        $operation = '6878399';
+        $this->createAccount($dni, $operation, 'CONFIANZA1', '3303632', 'FINANCIERA CONFIANZA');
+        $ccd = $this->createPrivateCcd($dni, 'CONFIANZA1', "DNI: {$dni}\nOperación: {$operation}");
+
+        $this->artisan('ccd:extract-audit', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-confianza-specific-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-confianza-specific-test.csv');
+
+        $this->assertStringContainsString('operacion_documental_exacta', $csv);
+        $this->assertStringNotContainsString('cosecha_generica', $csv);
+    }
+
+    public function test_every_configured_confianza_zip_harvest_can_use_the_generic_crm_harvest_with_documentary_operation(): void
+    {
+        $cosechas = [
+            'CONFIANZA1', 'CONFIANZA2', 'CONFIANZA4', 'CONFIANZA5', 'CONFIANZA6', 'CONFIANZA7',
+            'CONFIANZA8', 'CONFIANZA9', 'CONFIANZA10', 'CONFIANZA11', 'CONFIANZA12',
+        ];
+
+        foreach ($cosechas as $index => $cosecha) {
+            $dni = str_pad((string) (3800 + $index), 8, '0', STR_PAD_LEFT);
+            $operation = (string) (6_878_399 + $index);
+            $this->createAccount($dni, $operation, 'CONFIANZA', 'CTA-CONFIANZA-'.$index, 'FINANCIERA CONFIANZA');
+            $ccd = $this->createPrivateCcd($dni, $cosecha, "DNI: {$dni}\n{$operation}DEUDAACTUAL");
+
+            $this->artisan('ccd:extract-audit', [
+                '--ccd-id' => $ccd->id,
+                '--output' => "ccd-{$cosecha}-generic-test.csv",
+            ])->assertExitCode(0);
+
+            $csv = Storage::disk((string) config('ccd.private_disk'))->get("audits/ccd-{$cosecha}-generic-test.csv");
+            $this->assertStringContainsString('operacion_documental_confianza_cosecha_generica', $csv);
+        }
+    }
+
     public function test_extract_audit_does_not_resolve_a_shared_account_without_an_operation(): void
     {
         $dni = '80201928'; // Caso de referencia CCD 23303.
@@ -485,7 +597,7 @@ class CcdExtractAuditTest extends TestCase
         return compact('root', 'temporary');
     }
 
-    private function createAccount(string $dni, string $operation, string $cosecha, string $account): int
+    private function createAccount(string $dni, string $operation, string $cosecha, string $account, string $entity = 'Caja AQP'): int
     {
         return (int) DB::table('clientes_cuentas')->insertGetId([
             'numdoc' => $dni,
@@ -493,7 +605,7 @@ class CcdExtractAuditTest extends TestCase
             'nombre' => 'Cliente CCD Extractor',
             'dpto' => 'Arequipa',
             'operacion' => $operation,
-            'entidad' => 'Caja AQP',
+            'entidad' => $entity,
             'producto' => 'Producto CCD',
             'cosecha' => $cosecha,
             'moneda' => 'PEN',

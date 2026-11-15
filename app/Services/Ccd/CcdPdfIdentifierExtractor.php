@@ -31,9 +31,7 @@ class CcdPdfIdentifierExtractor
             'cuentas' => $this->matches($text, [
                 '/\b(?:N[ÚU]MERO\s+DE\s+CUENTA|NRO\.?\s*CUENTA|CUENTA(?:\s+(?:DE\s+)?(?:CR[ÉE]DITO|DEUDA))?)\s*[:#º°\-]?\s*([A-Z0-9][A-Z0-9 -]{2,49})\b/ui',
             ]),
-            'operaciones' => $this->matches($text, [
-                '/\b(?:N[ÚU]MERO\s+DE\s+OPERACI[ÓO]N|NRO\.?\s*OPERACI[ÓO]N|OPERACI[ÓO]N|OP\.)\s*[:#º°\-]?\s*([A-Z0-9][A-Z0-9 -]{2,49})\b/ui',
-            ]),
+            'operaciones' => $this->operationMatches($text),
             'entidades' => $this->matches($text, [
                 '/\b(?:ENTIDAD(?:\s+FINANCIERA)?|BANCO|CAJA)\s*[:#º°\-]?\s*([A-ZÁÉÍÓÚÑ0-9][A-ZÁÉÍÓÚÑ0-9 .&-]{2,79})\b/ui',
             ]),
@@ -62,6 +60,25 @@ class CcdPdfIdentifierExtractor
         }
 
         return array_values(array_unique($matches));
+    }
+
+    /** @return array<int,string> */
+    private function operationMatches(string $text): array
+    {
+        $operations = $this->matches($text, [
+            '/\b(?:N[ÚU]MERO\s+DE\s+OPERACI[ÓO]N|NRO\.?\s*OPERACI[ÓO]N|OPERACI[ÓO]N|OP\.)\s*[:#º°\-]?\s*([A-Z0-9][A-Z0-9 -]{2,49})\b/ui',
+        ]);
+
+        // Algunos formatos concatenan una referencia numérica y una palabra,
+        // por ejemplo "6878399DEUDAACTUAL". Se extrae sólo la secuencia
+        // numérica explícita, sin unir fragmentos separados del documento.
+        preg_match_all('/(?<![0-9])([0-9]{6,})(?=[A-ZÁÉÍÓÚÑ])/u', $text, $found);
+
+        foreach ($found[1] ?? [] as $reference) {
+            $operations[] = $reference;
+        }
+
+        return array_values(array_unique($operations));
     }
 
     /** @return array{status:string,text_length:int,dnis:array<int,string>,cuentas:array<int,string>,operaciones:array<int,string>,entidades:array<int,string>,text:string,evidence:string} */

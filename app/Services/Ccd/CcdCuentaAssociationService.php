@@ -95,6 +95,31 @@ class CcdCuentaAssociationService
             ->values();
     }
 
+    /**
+     * Homologación excepcional y de sólo lectura para las cartas CONFIANZA1
+     * a CONFIANZA12 cuyo CRM histórico usa la cosecha genérica CONFIANZA.
+     * Nunca sustituye candidatesFor(): el comparador sólo la invoca cuando
+     * la cosecha específica no produjo candidatas.
+     *
+     * @return Collection<int, ClienteCuenta>
+     */
+    public function genericConfianzaCandidatesFor(CcdCliente $ccd): Collection
+    {
+        $numdoc = trim((string) $ccd->numdoc);
+
+        if ($numdoc === '' || ! $this->isSpecificConfianzaCosecha((string) $ccd->cosecha)) {
+            return collect();
+        }
+
+        return ClienteCuenta::query()
+            ->where('numdoc', $numdoc)
+            ->orderBy('id')
+            ->get(['id', 'numdoc', 'cuenta', 'operacion', 'entidad', 'producto', 'cosecha'])
+            ->filter(fn (ClienteCuenta $account): bool => $this->normalizeEntity((string) $account->entidad) === 'FINANCIERA CONFIANZA'
+                && $this->normalizeCosecha((string) $account->cosecha, false) === 'CONFIANZA')
+            ->values();
+    }
+
     public function normalizeCosecha(?string $cosecha, bool $fromClienteCuenta = true): string
     {
         $value = trim((string) $cosecha);
@@ -104,6 +129,16 @@ class CcdCuentaAssociationService
         }
 
         return preg_replace('/[^A-Z0-9]+/', '', strtoupper($value)) ?: '';
+    }
+
+    private function isSpecificConfianzaCosecha(string $cosecha): bool
+    {
+        return preg_match('/^CONFIANZA(?:[1-9]|1[0-2])$/', strtoupper(trim($cosecha))) === 1;
+    }
+
+    private function normalizeEntity(string $entity): string
+    {
+        return preg_replace('/\s+/u', ' ', strtoupper(trim($entity))) ?: '';
     }
 
     private function confirmationCandidate(Collection $candidates, ?string $operation): ?ClienteCuenta
