@@ -27,6 +27,25 @@ class CcdVerifiedAssociationService
      */
     public function analyze(CcdCliente $ccd): array
     {
+        return $this->analyzeDocument($ccd, false);
+    }
+
+    /**
+     * Simulación de sólo lectura para medir evidencias documentales candidatas
+     * que todavía no están autorizadas para una confirmación automática.
+     *
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
+     */
+    public function analyzeForDniValidation(CcdCliente $ccd): array
+    {
+        return $this->analyzeDocument($ccd, true);
+    }
+
+    /**
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
+     */
+    private function analyzeDocument(CcdCliente $ccd, bool $allowAqpCandidateEvidence): array
+    {
         $source = $this->sources->resolve($ccd);
 
         if ($source['status'] !== 'ok' || $source['path'] === null) {
@@ -58,9 +77,12 @@ class CcdVerifiedAssociationService
                     default => 'no_evaluada',
                 };
 
-                $status = match ($match['clasificacion']) {
-                    'ambigua' => 'revision',
-                    'error' => 'error',
+                $isAqpIdentityConflict = in_array(strtoupper(trim((string) $ccd->cosecha)), ['AQP4', 'AQP5'], true)
+                    && in_array($match['evidence'], ['dni_documental_no_coincide', 'dni_documental_contradictorio'], true);
+                $status = match (true) {
+                    $isAqpIdentityConflict => 'revision',
+                    $match['clasificacion'] === 'ambigua' => 'revision',
+                    $match['clasificacion'] === 'error' => 'error',
                     default => 'no_elegible',
                 };
 
@@ -99,6 +121,39 @@ class CcdVerifiedAssociationService
                 return $this->result('revision', (string) $source['source'], null, (string) $account->operacion, $match['evidence'], 'dni_cuenta_no_coincide');
             }
 
+            $aqpEvidence = $this->dniRecognizer->aqpCustomerCodeEvidence(
+                (string) $extraction['text'],
+                (string) $ccd->numdoc,
+                (string) $ccd->cosecha,
+            );
+
+            if (in_array($aqpEvidence, [
+                CcdDocumentDniRecognizer::AQP_CODE_MISMATCH,
+                CcdDocumentDniRecognizer::AQP_CODE_CONTRADICTORY,
+            ], true)) {
+                if (($confirmed = $this->confirmedAssociationForCcd((int) $ccd->id)) !== null) {
+                    return $this->result(
+                        'conflicto',
+                        (string) $source['source'],
+                        (int) $confirmed->cliente_cuenta_id,
+                        $confirmed->clienteCuenta?->operacion,
+                        $match['evidence'],
+                        'codigo_cliente_aqp_contradice_confirmacion_existente',
+                        (string) $aqpEvidence,
+                    );
+                }
+
+                return $this->result(
+                    'revision',
+                    (string) $source['source'],
+                    null,
+                    (string) $match['operacion_candidata'],
+                    $match['evidence'],
+                    'dni_documental_no_corrobable',
+                    (string) $aqpEvidence,
+                );
+            }
+
             $existing = $this->existingState((int) $ccd->id, (int) $account->id);
 
             if ($existing !== null) {
@@ -107,7 +162,33 @@ class CcdVerifiedAssociationService
 
             $dniEvidence = $this->dniRecognizer->evidence((string) $extraction['text'], (string) $ccd->numdoc);
 
-            if ($dniEvidence === null) {
+            if ($dniEvidence !== null) {
+                return $this->result(
+                    'elegible',
+                    (string) $source['source'],
+                    (int) $account->id,
+                    (string) $account->operacion,
+                    $match['evidence'],
+                    'operacion_y_dni_documentales_verificados',
+                    $dniEvidence,
+                );
+            }
+
+            if ($aqpEvidence === CcdDocumentDniRecognizer::AQP_CODE_VERIFIED) {
+                return $this->result(
+                    $allowAqpCandidateEvidence ? 'elegible' : 'revision',
+                    (string) $source['source'],
+                    $allowAqpCandidateEvidence ? (int) $account->id : null,
+                    (string) $account->operacion,
+                    $match['evidence'],
+                    $allowAqpCandidateEvidence
+                        ? 'operacion_y_codigo_cliente_aqp_documentales_verificados'
+                        : 'dni_codigo_cliente_aqp_pendiente_validacion_ampliada',
+                    $aqpEvidence,
+                );
+            }
+
+            if ($aqpEvidence === CcdDocumentDniRecognizer::AQP_CODE_INSUFFICIENT_CONTEXT) {
                 return $this->result(
                     'revision',
                     (string) $source['source'],
@@ -115,18 +196,18 @@ class CcdVerifiedAssociationService
                     (string) $match['operacion_candidata'],
                     $match['evidence'],
                     'dni_documental_no_corrobable',
-                    $this->dniRecognizer->missingEvidenceDiagnostic((string) $extraction['text'], (string) $ccd->numdoc),
+                    $aqpEvidence,
                 );
             }
 
             return $this->result(
-                'elegible',
+                'revision',
                 (string) $source['source'],
-                (int) $account->id,
+                null,
                 (string) $account->operacion,
                 $match['evidence'],
-                'operacion_y_dni_documentales_verificados',
-                $dniEvidence,
+                'dni_documental_no_corrobable',
+                $this->dniRecognizer->missingEvidenceDiagnostic((string) $extraction['text'], (string) $ccd->numdoc),
             );
         } finally {
             $this->sources->release($source);

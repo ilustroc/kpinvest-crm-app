@@ -4,6 +4,14 @@ namespace App\Services\Ccd;
 
 class CcdDocumentDniRecognizer
 {
+    public const AQP_CODE_VERIFIED = 'dni_codigo_cliente_aqp_verificado';
+
+    public const AQP_CODE_MISMATCH = 'dni_codigo_cliente_aqp_no_coincide';
+
+    public const AQP_CODE_CONTRADICTORY = 'dni_codigo_cliente_aqp_contradictorio';
+
+    public const AQP_CODE_INSUFFICIENT_CONTEXT = 'dni_codigo_cliente_aqp_contexto_insuficiente';
+
     private const DNI_LABEL = 'D\s*\.?\s*N\s*\.?\s*I\s*\.?';
 
     private const DNI_NUMBER_QUALIFIER = '(?:N\s*[º°]|NRO\.?|N[ÚU]MERO)';
@@ -65,6 +73,40 @@ class CcdDocumentDniRecognizer
             : null;
     }
 
+    /**
+     * Reconoce el código de cliente de Caja Arequipa sólo cuando forma parte
+     * del encabezado de destinatario observado en AQP4/AQP5. La evidencia se
+     * mantiene separada del DNI genérico para poder medirla sin autorizarla
+     * todavía como confirmación automática.
+     */
+    public function aqpCustomerCodeEvidence(string $text, string $dni, string $cosecha): ?string
+    {
+        if (! in_array(strtoupper(trim($cosecha)), ['AQP4', 'AQP5'], true)) {
+            return null;
+        }
+
+        $expected = $this->normalize($dni);
+
+        if ($expected === null) {
+            return null;
+        }
+
+        $labelledCodes = $this->aqpCustomerCodes($text, false);
+        $recipientCodes = $this->aqpCustomerCodes($text, true);
+
+        if (count($labelledCodes) > 1) {
+            return self::AQP_CODE_CONTRADICTORY;
+        }
+
+        if ($recipientCodes === []) {
+            return $labelledCodes === [] ? null : self::AQP_CODE_INSUFFICIENT_CONTEXT;
+        }
+
+        return $recipientCodes[0] === $expected
+            ? self::AQP_CODE_VERIFIED
+            : self::AQP_CODE_MISMATCH;
+    }
+
     public function missingEvidenceDiagnostic(string $text, string $dni): string
     {
         $digits = $this->normalize($dni);
@@ -98,6 +140,28 @@ class CcdDocumentDniRecognizer
     private function capturedValuePattern(): string
     {
         return '((?<![0-9])[0-9](?:[ \t.\-]?[0-9]){5,14}(?![0-9]))';
+    }
+
+    /** @return array<int,string> */
+    private function aqpCustomerCodes(string $text, bool $requireRecipientHeading): array
+    {
+        $value = $this->capturedValuePattern();
+        $recipient = $requireRecipientHeading
+            ? '(?=[^0-9]{0,240}?\bSE(?:Ñ|N)OR\s*\(\s*A\s*\)\s*:)'
+            : '';
+        $pattern = '/(?<![\pL0-9])C[ÓO]DIGO\s+DEL\s+CLIENTE\s*(?:[:#\-]\s*)?'.$value.$recipient.'/iu';
+        preg_match_all($pattern, $text, $matches);
+        $codes = [];
+
+        foreach ($matches[1] ?? [] as $match) {
+            $normalized = $this->normalize((string) $match);
+
+            if ($normalized !== null) {
+                $codes[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($codes));
     }
 
     private function boundedExpectedValue(string $digits): string

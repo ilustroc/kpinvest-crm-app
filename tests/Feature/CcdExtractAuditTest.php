@@ -365,6 +365,198 @@ class CcdExtractAuditTest extends TestCase
         $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', [$eligible->id, $review->id])->count());
     }
 
+    #[DataProvider('aqpValidationHarvests')]
+    public function test_aqp_customer_code_is_detected_but_remains_blocked_for_automatic_association(string $cosecha, string $label): void
+    {
+        $dni = '00123456';
+        $operation = $cosecha === 'AQP4' ? '4400123456' : '5500123456';
+        $this->createAccount($dni, $operation, $cosecha, 'CTA-'.$cosecha);
+        $ccd = $this->createPrivateCcd(
+            $dni,
+            $cosecha,
+            "{$label}: {$dni}\n\nSEÑOR (A):\nCLIENTE DE PRUEBA\nOperación: {$operation}",
+        );
+        $output = 'ccd-aqp-candidate-'.Str::lower($cosecha).'-test.csv';
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => $output,
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/'.$output);
+        $this->assertStringContainsString('revision', $csv);
+        $this->assertStringContainsString('dni_codigo_cliente_aqp_pendiente_validacion_ampliada', $csv);
+        $this->assertStringContainsString('dni_codigo_cliente_aqp_verificado', $csv);
+        $this->assertStringNotContainsString(',elegible,', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+
+        $applyResult = app(CcdVerifiedAssociationService::class)->apply($ccd->fresh());
+        $this->assertSame('revision', $applyResult['status']);
+        $this->assertSame('dni_codigo_cliente_aqp_pendiente_validacion_ampliada', $applyResult['reason']);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public static function aqpValidationHarvests(): array
+    {
+        return [
+            'AQP4 con tilde' => ['AQP4', 'CÓDIGO DEL CLIENTE'],
+            'AQP5 sin tilde' => ['AQP5', 'CODIGO DEL CLIENTE'],
+        ];
+    }
+
+    #[DataProvider('unsafeAqpCustomerCodeCases')]
+    public function test_unsafe_aqp_customer_codes_stay_in_review(string $documentaryHeader, string $expectedEvidence): void
+    {
+        $dni = '00123456';
+        $operation = '4400123456';
+        $this->createAccount($dni, $operation, 'AQP4', 'CTA-AQP4-UNSAFE');
+        $ccd = $this->createPrivateCcd($dni, 'AQP4', "{$documentaryHeader}\nOperación: {$operation}");
+        $output = 'ccd-aqp-unsafe-'.Str::lower(Str::random(8)).'.csv';
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => $output,
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/'.$output);
+        $this->assertStringContainsString('revision', $csv);
+        $this->assertStringContainsString($expectedEvidence, $csv);
+        $this->assertStringNotContainsString(',elegible,', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public static function unsafeAqpCustomerCodeCases(): array
+    {
+        return [
+            'código incorrecto' => ["CÓDIGO DEL CLIENTE: 87654321\nSEÑOR (A): CLIENTE", 'dni_codigo_cliente_aqp_no_coincide'],
+            'código parcial' => ["CÓDIGO DEL CLIENTE: 0123456\nSEÑOR (A): CLIENTE", 'dni_codigo_cliente_aqp_no_coincide'],
+            'código incrustado' => ["CÓDIGO DEL CLIENTE: 9001234561\nSEÑOR (A): CLIENTE", 'dni_codigo_cliente_aqp_no_coincide'],
+            'dos códigos diferentes' => ["CÓDIGO DEL CLIENTE: 00123456\nSEÑOR (A): CLIENTE\nCÓDIGO DEL CLIENTE: 87654321\nSEÑOR (A): OTRO", 'dni_codigo_cliente_aqp_contradictorio'],
+            'sin encabezado de destinatario' => ['Texto CÓDIGO DEL CLIENTE: 00123456 dentro del cuerpo.', 'dni_codigo_cliente_aqp_contexto_insuficiente'],
+        ];
+    }
+
+    public function test_explicit_contradictory_dni_overrides_a_valid_aqp_customer_code(): void
+    {
+        $dni = '00123456';
+        $operation = '4400123456';
+        $this->createAccount($dni, $operation, 'AQP4', 'CTA-AQP4-DNI-CONTRARIO');
+        $ccd = $this->createPrivateCcd(
+            $dni,
+            'AQP4',
+            "CÓDIGO DEL CLIENTE: {$dni}\nSEÑOR (A): CLIENTE\nDNI: 87654321\nOperación: {$operation}",
+        );
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => 'ccd-aqp-explicit-dni-conflict-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-aqp-explicit-dni-conflict-test.csv');
+        $this->assertStringContainsString('revision', $csv);
+        $this->assertStringContainsString('dni_documental_no_coincide', $csv);
+        $this->assertStringNotContainsString(',elegible,', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_existing_explicit_dni_evidence_remains_authorized_in_an_aqp_document(): void
+    {
+        $dni = '00123456';
+        $operation = '4400123456';
+        $this->createAccount($dni, $operation, 'AQP4', 'CTA-AQP4-DNI-EXPLICITO');
+        $ccd = $this->createPrivateCcd(
+            $dni,
+            'AQP4',
+            "DNI: {$dni}\nCÓDIGO DEL CLIENTE: {$dni}\nSEÑOR (A): CLIENTE\nOperación: {$operation}",
+        );
+
+        $result = app(CcdVerifiedAssociationService::class)->analyze($ccd);
+
+        $this->assertSame('elegible', $result['status']);
+        $this->assertSame('dni_documental_etiquetado', $result['dni_evidence']);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_aqp_customer_code_does_not_activate_for_other_harvest_or_ambiguous_operations(): void
+    {
+        $dni = '00123456';
+        $operation = '3300123456';
+        $this->createAccount($dni, $operation, 'AQP3', 'CTA-AQP3');
+        $otherHarvest = $this->createPrivateCcd(
+            $dni,
+            'AQP3',
+            "CÓDIGO DEL CLIENTE: {$dni}\nSEÑOR (A): CLIENTE\nOperación: {$operation}",
+        );
+        $otherResult = app(CcdVerifiedAssociationService::class)->analyzeForDniValidation($otherHarvest);
+        $this->assertSame('revision', $otherResult['status']);
+        $this->assertSame('dni_documental_no_corrobable', $otherResult['reason']);
+        $this->assertNotSame('dni_codigo_cliente_aqp_verificado', $otherResult['dni_evidence']);
+
+        $first = '4400123456';
+        $second = '4400654321';
+        $this->createAccount($dni, $first, 'AQP4', 'CTA-AQP4-A');
+        $this->createAccount($dni, $second, 'AQP4', 'CTA-AQP4-B');
+        $ambiguous = $this->createPrivateCcd(
+            $dni,
+            'AQP4',
+            "CÓDIGO DEL CLIENTE: {$dni}\nSEÑOR (A): CLIENTE\n{$first}\n{$second}",
+        );
+        $ambiguousResult = app(CcdVerifiedAssociationService::class)->analyzeForDniValidation($ambiguous);
+        $this->assertSame('revision', $ambiguousResult['status']);
+        $this->assertStringContainsString('operaciones_candidatas', $ambiguousResult['evidence']);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', [$otherHarvest->id, $ambiguous->id])->count());
+    }
+
+    public function test_dni_recheck_measures_aqp_candidates_with_harvest_filter_without_writes(): void
+    {
+        $documents = [];
+
+        foreach (['AQP4' => '4400123456', 'AQP5' => '5500123456', 'AQP3' => '3300123456'] as $cosecha => $operation) {
+            $dni = '00123456';
+            $this->createAccount($dni, $operation, $cosecha, 'CTA-RECHECK-'.$cosecha);
+            $documents[$cosecha] = $this->createPrivateCcd(
+                $dni,
+                $cosecha,
+                "CÓDIGO DEL CLIENTE: {$dni}\nSEÑOR (A): CLIENTE\nOperación: {$operation}",
+            );
+        }
+
+        $conflictDni = '00123457';
+        $conflictOperation = '4400123457';
+        $this->createAccount($conflictDni, $conflictOperation, 'AQP4', 'CTA-RECHECK-AQP4-CONFLICT');
+        $documents['AQP4-conflict'] = $this->createPrivateCcd(
+            $conflictDni,
+            'AQP4',
+            "CÓDIGO DEL CLIENTE: 87654321\nSEÑOR (A): CLIENTE\nOperación: {$conflictOperation}",
+        );
+
+        $prior = [
+            'ccd_id,cliente_cuenta_id,operacion,fuente,resultado,motivo,evidencia,evidencia_dni,metodo_verificacion,modo',
+        ];
+
+        foreach ($documents as $document) {
+            $prior[] = "{$document->id},,,privado,revision,dni_documental_no_corrobable,operacion_documental_exacta,dni_documental_no_corrobable,operacion_pdf_automatica,simulacion";
+        }
+
+        Storage::disk((string) config('ccd.private_disk'))->put('audits/ccd-aqp-prior-reviews-test.csv', implode("\n", $prior)."\n");
+
+        $this->artisan('ccd:recheck-dni', [
+            '--input' => ['ccd-aqp-prior-reviews-test.csv'],
+            '--cosecha' => ['AQP4', 'AQP5'],
+            '--limit' => 10,
+            '--output' => 'ccd-aqp-recheck-comparison-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-aqp-recheck-comparison-test.csv');
+        $this->assertStringContainsString("{$documents['AQP4']->id},revision,dni_documental_no_corrobable,elegible,ahora_elegible", $csv);
+        $this->assertStringContainsString("{$documents['AQP5']->id},revision,dni_documental_no_corrobable,elegible,ahora_elegible", $csv);
+        $this->assertStringContainsString("{$documents['AQP4-conflict']->id},revision,dni_documental_no_corrobable,revision,contradiccion", $csv);
+        $this->assertStringContainsString('dni_codigo_cliente_aqp_verificado', $csv);
+        $this->assertStringContainsString('dni_codigo_cliente_aqp_no_coincide', $csv);
+        $this->assertStringNotContainsString("\n{$documents['AQP3']->id},", "\n{$csv}");
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', collect($documents)->pluck('id'))->count());
+    }
+
     public function test_verified_association_keeps_a_manual_confirmation_for_the_same_operation_when_identity_is_not_reparseable(): void
     {
         $dni = '05378290';

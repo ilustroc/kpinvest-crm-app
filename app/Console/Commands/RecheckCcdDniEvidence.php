@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\CcdCliente;
+use App\Services\Ccd\CcdDocumentDniRecognizer;
 use App\Services\Ccd\CcdVerifiedAssociationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,7 @@ class RecheckCcdDniEvidence extends Command
 {
     protected $signature = 'ccd:recheck-dni
         {--input=* : CSV privados previos, por nombre dentro de audits/}
+        {--cosecha=* : Limita la muestra a cosechas exactas, por ejemplo AQP4 o AQP5}
         {--limit=100 : Máximo de CCD a volver a simular, entre 1 y 1000}
         {--after-id=0 : Procesa sólo CCD con ID mayor al indicado}
         {--output= : Nombre del CSV privado de comparación, sin ruta}';
@@ -29,7 +31,13 @@ class RecheckCcdDniEvidence extends Command
         }
 
         $disk = Storage::disk((string) config('ccd.private_disk'));
-        $ids = $this->reviewIds($disk, $options['inputs'], $options['after_id'], $options['limit']);
+        $ids = $this->reviewIds(
+            $disk,
+            $options['inputs'],
+            $options['after_id'],
+            $options['limit'],
+            $options['cosechas'],
+        );
 
         if ($ids === null) {
             return self::FAILURE;
@@ -77,6 +85,7 @@ class RecheckCcdDniEvidence extends Command
             'evidencia_operacion',
             'evidencia_dni',
             'fuente',
+            'cosecha',
         ]);
 
         $counts = [
@@ -99,7 +108,7 @@ class RecheckCcdDniEvidence extends Command
                 $result = $this->technicalResult('ccd_no_encontrada');
             } else {
                 try {
-                    $result = $associations->analyze($ccd);
+                    $result = $associations->analyzeForDniValidation($ccd);
                 } catch (Throwable $exception) {
                     Log::error('CCD DNI recheck failed.', [
                         'exception_class' => $exception::class,
@@ -121,6 +130,7 @@ class RecheckCcdDniEvidence extends Command
                 $result['evidence'],
                 $result['dni_evidence'],
                 $result['source'],
+                $ccd?->cosecha,
             ]));
         }
 
@@ -147,7 +157,7 @@ class RecheckCcdDniEvidence extends Command
         return self::SUCCESS;
     }
 
-    /** @return array{inputs:array<int,string>,limit:int,after_id:int,output:string}|null */
+    /** @return array{inputs:array<int,string>,cosechas:array<int,string>,limit:int,after_id:int,output:string}|null */
     private function validatedOptions(): ?array
     {
         $inputs = array_values(array_unique(array_filter(array_map(
@@ -156,6 +166,10 @@ class RecheckCcdDniEvidence extends Command
         ))));
         $limit = filter_var($this->option('limit'), FILTER_VALIDATE_INT);
         $afterId = filter_var($this->option('after-id'), FILTER_VALIDATE_INT);
+        $cosechas = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $value): string => strtoupper(trim((string) $value)),
+            (array) $this->option('cosecha'),
+        ))));
 
         if ($inputs === []) {
             $this->error('Debe indicar al menos un CSV privado mediante --input=archivo.csv.');
@@ -177,6 +191,14 @@ class RecheckCcdDniEvidence extends Command
             return null;
         }
 
+        foreach ($cosechas as $cosecha) {
+            if (! preg_match('/^[A-Z0-9_-]+$/D', $cosecha)) {
+                $this->error('Cada --cosecha debe contener únicamente letras, números, guion o guion bajo.');
+
+                return null;
+            }
+        }
+
         $requestedOutput = trim((string) $this->option('output'));
         $output = $requestedOutput !== ''
             ? $requestedOutput
@@ -190,14 +212,19 @@ class RecheckCcdDniEvidence extends Command
 
         return [
             'inputs' => $inputs,
+            'cosechas' => $cosechas,
             'limit' => $limit,
             'after_id' => $afterId,
             'output' => $output,
         ];
     }
 
-    /** @param mixed $disk @param array<int,string> $inputs @return array<int,int>|null */
-    private function reviewIds(mixed $disk, array $inputs, int $afterId, int $limit): ?array
+    /**
+     * @param  array<int,string>  $inputs
+     * @param  array<int,string>  $cosechas
+     * @return array<int,int>|null
+     */
+    private function reviewIds(mixed $disk, array $inputs, int $afterId, int $limit, array $cosechas): ?array
     {
         $ids = [];
 
@@ -248,7 +275,7 @@ class RecheckCcdDniEvidence extends Command
 
                     $ids[(int) $id] = (int) $id;
 
-                    if (count($ids) >= $limit) {
+                    if ($cosechas === [] && count($ids) >= $limit) {
                         break 2;
                     }
                 }
@@ -259,7 +286,34 @@ class RecheckCcdDniEvidence extends Command
 
         ksort($ids);
 
-        return array_values($ids);
+        if ($cosechas === []) {
+            return array_slice(array_values($ids), 0, $limit);
+        }
+
+        $filtered = [];
+
+        foreach (array_chunk(array_values($ids), 500) as $chunk) {
+            $rows = CcdCliente::query()
+                ->whereIntegerInRaw('id', $chunk)
+                ->get(['id', 'cosecha'])
+                ->keyBy('id');
+
+            foreach ($chunk as $id) {
+                $cosecha = strtoupper(trim((string) $rows->get($id)?->cosecha));
+
+                if (! in_array($cosecha, $cosechas, true)) {
+                    continue;
+                }
+
+                $filtered[] = $id;
+
+                if (count($filtered) >= $limit) {
+                    return $filtered;
+                }
+            }
+        }
+
+        return $filtered;
     }
 
     /** @param array{status:string,evidence:string,dni_evidence:string,reason:string,source:string} $result */
@@ -270,7 +324,12 @@ class RecheckCcdDniEvidence extends Command
         }
 
         if ($result['status'] === 'conflicto'
-            || in_array($result['dni_evidence'], ['dni_documental_no_coincide', 'dni_documental_contradictorio'], true)) {
+            || in_array($result['dni_evidence'], [
+                'dni_documental_no_coincide',
+                'dni_documental_contradictorio',
+                CcdDocumentDniRecognizer::AQP_CODE_MISMATCH,
+                CcdDocumentDniRecognizer::AQP_CODE_CONTRADICTORY,
+            ], true)) {
             return 'contradiccion';
         }
 

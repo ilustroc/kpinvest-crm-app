@@ -67,4 +67,63 @@ class CcdDocumentDniRecognizerTest extends TestCase
             $recognizer->extract("DNI: 05378290\nDocumento de identidad: 87654321"),
         );
     }
+
+    #[DataProvider('validAqpCustomerCodeHeaders')]
+    public function test_it_recognizes_contextual_aqp_customer_code_headers(string $text, string $cosecha): void
+    {
+        $recognizer = new CcdDocumentDniRecognizer;
+
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_VERIFIED,
+            $recognizer->aqpCustomerCodeEvidence($text, '00123456', $cosecha),
+        );
+    }
+
+    public static function validAqpCustomerCodeHeaders(): array
+    {
+        return [
+            'AQP4 con acento' => ["CÓDIGO DEL CLIENTE: 00123456\n\nSEÑOR (A):\nCLIENTE", 'AQP4'],
+            'AQP5 sin acento y espacios' => ["CODIGO   DEL CLIENTE :\n00123456\nSEÑOR(A): CLIENTE", 'AQP5'],
+            'AQP4 con cero separado' => ["CÓDIGO DEL CLIENTE: 00-123-456\nSEÑOR ( A ): CLIENTE", ' aqp4 '],
+        ];
+    }
+
+    public function test_it_rejects_unsafe_or_contradictory_aqp_customer_codes(): void
+    {
+        $recognizer = new CcdDocumentDniRecognizer;
+        $recipient = static fn (string $code): string => "CÓDIGO DEL CLIENTE: {$code}\nSEÑOR (A): CLIENTE";
+
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_MISMATCH,
+            $recognizer->aqpCustomerCodeEvidence($recipient('87654321'), '00123456', 'AQP4'),
+        );
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_MISMATCH,
+            $recognizer->aqpCustomerCodeEvidence($recipient('0123456'), '00123456', 'AQP4'),
+        );
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_MISMATCH,
+            $recognizer->aqpCustomerCodeEvidence($recipient('9001234561'), '00123456', 'AQP4'),
+        );
+
+        $multiple = $recipient('00123456')."\n".$recipient('87654321');
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_CONTRADICTORY,
+            $recognizer->aqpCustomerCodeEvidence($multiple, '00123456', 'AQP5'),
+        );
+    }
+
+    public function test_aqp_customer_code_requires_recipient_context_and_exact_harvest(): void
+    {
+        $recognizer = new CcdDocumentDniRecognizer;
+        $withoutRecipient = 'Texto arbitrario CÓDIGO DEL CLIENTE: 00123456 dentro del cuerpo.';
+        $validHeader = "CÓDIGO DEL CLIENTE: 00123456\nSEÑOR (A): CLIENTE";
+
+        $this->assertSame(
+            CcdDocumentDniRecognizer::AQP_CODE_INSUFFICIENT_CONTEXT,
+            $recognizer->aqpCustomerCodeEvidence($withoutRecipient, '00123456', 'AQP4'),
+        );
+        $this->assertNull($recognizer->aqpCustomerCodeEvidence($validHeader, '00123456', 'AQP3'));
+        $this->assertNull($recognizer->aqpCustomerCodeEvidence($validHeader, '00123456', 'BBVA1'));
+    }
 }
