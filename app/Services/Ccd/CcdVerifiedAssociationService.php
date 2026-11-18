@@ -157,7 +157,15 @@ class CcdVerifiedAssociationService
             $existing = $this->existingState((int) $ccd->id, (int) $account->id);
 
             if ($existing !== null) {
-                return $this->result($existing['status'], (string) $source['source'], (int) $account->id, (string) $account->operacion, $match['evidence'], $existing['reason']);
+                return $this->result(
+                    $existing['status'],
+                    (string) $source['source'],
+                    (int) $account->id,
+                    (string) $account->operacion,
+                    $match['evidence'],
+                    $existing['reason'],
+                    $aqpEvidence ?? 'no_evaluada',
+                );
             }
 
             $dniEvidence = $this->dniRecognizer->evidence((string) $extraction['text'], (string) $ccd->numdoc);
@@ -222,12 +230,64 @@ class CcdVerifiedAssociationService
      */
     public function apply(CcdCliente $ccd): array
     {
-        return DB::transaction(function () use ($ccd): array {
+        return $this->applyVerified($ccd, false, null);
+    }
+
+    /**
+     * Esta vía se usa únicamente desde el comando AQP controlado. Mantiene
+     * bloqueada la ruta genérica y exige una huella de auditoría V3 válida.
+     *
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
+     */
+    public function applyAqpAudited(CcdCliente $ccd, string $auditSha256): array
+    {
+        if (! preg_match('/^[a-f0-9]{64}$/D', $auditSha256)) {
+            return $this->result('revision', 'no_disponible', null, null, 'auditoria_v3_invalida', 'huella_auditoria_v3_invalida');
+        }
+
+        return $this->applyVerified($ccd, true, $auditSha256);
+    }
+
+    /**
+     * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
+     */
+    private function applyVerified(CcdCliente $ccd, bool $allowAqpCandidateEvidence, ?string $auditSha256): array
+    {
+        return DB::transaction(function () use ($ccd, $allowAqpCandidateEvidence, $auditSha256): array {
             $lockedCcd = CcdCliente::query()->lockForUpdate()->findOrFail($ccd->id);
-            $analysis = $this->analyze($lockedCcd);
+            $analysis = $allowAqpCandidateEvidence
+                ? $this->analyzeDocument($lockedCcd, true)
+                : $this->analyze($lockedCcd);
 
             if ($analysis['status'] !== 'elegible' || $analysis['account_id'] === null) {
-                return $analysis;
+                if (! $allowAqpCandidateEvidence || $analysis['status'] !== 'ya_confirmada'
+                    || $analysis['dni_evidence'] === CcdDocumentDniRecognizer::AQP_CODE_VERIFIED) {
+                    return $analysis;
+                }
+
+                return $this->result(
+                    'revision',
+                    $analysis['source'],
+                    null,
+                    $analysis['operacion'],
+                    $analysis['evidence'],
+                    'evidencia_aqp_no_autorizada',
+                    $analysis['dni_evidence'],
+                );
+            }
+
+            if ($allowAqpCandidateEvidence
+                && ($analysis['dni_evidence'] !== CcdDocumentDniRecognizer::AQP_CODE_VERIFIED
+                    || ! in_array(strtoupper(trim((string) $lockedCcd->cosecha)), ['AQP4', 'AQP5'], true))) {
+                return $this->result(
+                    'revision',
+                    $analysis['source'],
+                    null,
+                    $analysis['operacion'],
+                    $analysis['evidence'],
+                    'evidencia_aqp_no_autorizada',
+                    $analysis['dni_evidence'],
+                );
             }
 
             $account = ClienteCuenta::query()->lockForUpdate()->find($analysis['account_id']);
@@ -263,13 +323,25 @@ class CcdVerifiedAssociationService
 
             $link->fill([
                 'estado' => CcdClienteCuenta::ESTADO_CONFIRMADA,
-                'metodo_verificacion' => 'operacion_pdf_automatica',
-                'evidencia' => 'Proceso automático ccd:associate-verified; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.',
+                'metodo_verificacion' => $allowAqpCandidateEvidence
+                    ? 'operacion_pdf_aqp_auditada_v3'
+                    : 'operacion_pdf_automatica',
+                'evidencia' => $allowAqpCandidateEvidence
+                    ? 'Proceso controlado AQP V4; auditoria_v3_sha256:'.$auditSha256.'; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.'
+                    : 'Proceso automático ccd:associate-verified; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.',
                 'confirmado_por_user_id' => null,
                 'confirmado_at' => now(),
             ])->save();
 
-            return $this->result('confirmada', $analysis['source'], (int) $account->id, (string) $account->operacion, $analysis['evidence'], 'confirmacion_automatica_aplicada', $analysis['dni_evidence']);
+            return $this->result(
+                'confirmada',
+                $analysis['source'],
+                (int) $account->id,
+                (string) $account->operacion,
+                $analysis['evidence'],
+                $allowAqpCandidateEvidence ? 'confirmacion_aqp_auditada_aplicada' : 'confirmacion_automatica_aplicada',
+                $analysis['dni_evidence'],
+            );
         }, 3);
     }
 
