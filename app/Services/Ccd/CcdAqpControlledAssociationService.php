@@ -16,7 +16,7 @@ class CcdAqpControlledAssociationService
     ) {}
 
     /**
-     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string}  $audit
+     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string,human_review_sha256:string,human_stratum:string}  $audit
      * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string,document_sha256:?string}
      */
     public function analyze(CcdCliente $ccd, array $audit): array
@@ -42,7 +42,7 @@ class CcdAqpControlledAssociationService
     }
 
     /**
-     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string}  $audit
+     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string,human_review_sha256:string,human_stratum:string}  $audit
      * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string,document_sha256:?string}
      */
     public function apply(CcdCliente $ccd, array $audit): array
@@ -63,7 +63,11 @@ class CcdAqpControlledAssociationService
                 return $this->result('error', $before['evidence']);
             }
 
-            $analysis = $this->associations->applyAqpAudited($locked, $audit['source_sha256']);
+            $analysis = $this->associations->applyAqpAudited(
+                $locked,
+                $audit['source_sha256'],
+                $audit['human_review_sha256'],
+            );
             $after = $this->documentFingerprint($locked);
 
             if ($after['status'] !== 'ok' || ! hash_equals((string) $before['sha256'], (string) $after['sha256'])) {
@@ -75,7 +79,7 @@ class CcdAqpControlledAssociationService
     }
 
     /**
-     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string}  $audit
+     * @param  array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string,human_review_sha256:string,human_stratum:string}  $audit
      */
     private function auditMismatch(CcdCliente $ccd, array $audit): ?string
     {
@@ -91,6 +95,11 @@ class CcdAqpControlledAssociationService
 
         if (! preg_match('/^[a-f0-9]{64}$/D', $audit['source_sha256'])) {
             return 'huella_auditoria_v3_invalida';
+        }
+
+        if (! preg_match('/^[a-f0-9]{64}$/D', $audit['human_review_sha256'])
+            || ! in_array($audit['human_stratum'], ['Q1', 'Q2', 'Q3', 'Q4'], true)) {
+            return 'evidencia_revision_humana_invalida';
         }
 
         return null;

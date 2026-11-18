@@ -239,21 +239,25 @@ class CcdVerifiedAssociationService
      *
      * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
      */
-    public function applyAqpAudited(CcdCliente $ccd, string $auditSha256): array
+    public function applyAqpAudited(CcdCliente $ccd, string $auditSha256, string $humanReviewSha256): array
     {
         if (! preg_match('/^[a-f0-9]{64}$/D', $auditSha256)) {
             return $this->result('revision', 'no_disponible', null, null, 'auditoria_v3_invalida', 'huella_auditoria_v3_invalida');
         }
 
-        return $this->applyVerified($ccd, true, $auditSha256);
+        if (! hash_equals(CcdAqpHumanReviewReader::APPROVED_SHA256, $humanReviewSha256)) {
+            return $this->result('revision', 'no_disponible', null, null, 'revision_humana_invalida', 'huella_revision_humana_no_aprobada');
+        }
+
+        return $this->applyVerified($ccd, true, $auditSha256, $humanReviewSha256);
     }
 
     /**
      * @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string}
      */
-    private function applyVerified(CcdCliente $ccd, bool $allowAqpCandidateEvidence, ?string $auditSha256): array
+    private function applyVerified(CcdCliente $ccd, bool $allowAqpCandidateEvidence, ?string $auditSha256, ?string $humanReviewSha256 = null): array
     {
-        return DB::transaction(function () use ($ccd, $allowAqpCandidateEvidence, $auditSha256): array {
+        return DB::transaction(function () use ($ccd, $allowAqpCandidateEvidence, $auditSha256, $humanReviewSha256): array {
             $lockedCcd = CcdCliente::query()->lockForUpdate()->findOrFail($ccd->id);
             $analysis = $allowAqpCandidateEvidence
                 ? $this->analyzeDocument($lockedCcd, true)
@@ -327,7 +331,7 @@ class CcdVerifiedAssociationService
                     ? 'operacion_pdf_aqp_auditada_v3'
                     : 'operacion_pdf_automatica',
                 'evidencia' => $allowAqpCandidateEvidence
-                    ? 'Proceso controlado AQP V4; auditoria_v3_sha256:'.$auditSha256.'; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.'
+                    ? 'Proceso controlado AQP V4.1; auditoria_v3_sha256:'.$auditSha256.'; revision_humana_sha256:'.$humanReviewSha256.'; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.'
                     : 'Proceso automático ccd:associate-verified; '.$analysis['evidence'].'; '.$analysis['dni_evidence'].'; fuente '.$analysis['source'].'.',
                 'confirmado_por_user_id' => null,
                 'confirmado_at' => now(),

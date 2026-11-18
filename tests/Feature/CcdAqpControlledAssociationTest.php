@@ -6,6 +6,7 @@ use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
 use App\Services\Ccd\CcdAqpAssociationApplyGuard;
 use App\Services\Ccd\CcdAqpControlledAssociationService;
+use App\Services\Ccd\CcdAqpHumanReviewReader;
 use App\Services\Ccd\CcdAqpV3AuditReader;
 use App\Services\Ccd\CcdAutoAssociationApplyGuard;
 use App\Services\Ccd\CcdVerifiedAssociationService;
@@ -32,25 +33,35 @@ class CcdAqpControlledAssociationTest extends TestCase
 
     public function test_controlled_command_dry_run_revalidates_v3_candidates_without_writes(): void
     {
-        $aqp4 = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
-        $aqp5 = $this->createEligibleCcd('00123457', '5500123457', 'AQP5');
-        $this->writeAuditCsv('aqp-v3-complete-test.csv', [$aqp4, $aqp5]);
+        $fixture = $this->createPilotFixture('aqp-v3-complete-test.csv', 'aqp-human-complete-test.csv');
 
-        $this->artisan('ccd:associate-aqp-audited', $this->commandOptions('aqp-v4-dry-run-test.csv', 2, 1, 1, 1))
+        $this->artisan('ccd:associate-aqp-audited', $this->commandOptions(
+            'aqp-v4-dry-run-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-complete-test.csv',
+            'aqp-human-complete-test.csv',
+            $fixture['human_sha256'],
+        ))
             ->assertExitCode(0);
 
         $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/aqp-v4-dry-run-test.csv');
-        $this->assertSame(2, substr_count($csv, ',elegible,'));
-        $this->assertSame(2, substr_count($csv, ',dni_codigo_cliente_aqp_verificado,'));
+        $this->assertSame(8, substr_count($csv, ',elegible,'));
+        $this->assertSame(8, substr_count($csv, ',dni_codigo_cliente_aqp_verificado,'));
+        $this->assertSame(8, substr_count($csv, $fixture['human_sha256']));
         $this->assertStringContainsString(',dry-run', $csv);
-        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', [$aqp4->id, $aqp5->id])->count());
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', collect($fixture['documents'])->pluck('id'))->count());
     }
 
     public function test_controlled_service_can_confirm_once_and_is_idempotent_in_testing_transaction(): void
     {
         $ccd = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
         $this->writeAuditCsv('aqp-v3-apply-service-test.csv', [$ccd]);
-        $candidate = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-apply-service-test.csv'])['candidates'][$ccd->id];
+        $candidate = $this->withHumanApproval(
+            app(CcdAqpV3AuditReader::class)->read(['aqp-v3-apply-service-test.csv'])['candidates'][$ccd->id],
+        );
         $service = app(CcdAqpControlledAssociationService::class);
 
         $first = $service->apply($ccd, $candidate);
@@ -63,14 +74,138 @@ class CcdAqpControlledAssociationTest extends TestCase
             'estado' => 'confirmada',
             'metodo_verificacion' => 'operacion_pdf_aqp_auditada_v3',
         ]);
+        $this->assertStringContainsString(
+            'revision_humana_sha256:'.CcdAqpHumanReviewReader::APPROVED_SHA256,
+            (string) DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->value('evidencia'),
+        );
         $this->assertSame(1, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_application_service_rejects_a_non_approved_human_review_fingerprint(): void
+    {
+        $ccd = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
+
+        $result = app(CcdVerifiedAssociationService::class)->applyAqpAudited(
+            $ccd,
+            str_repeat('a', 64),
+            str_repeat('b', 64),
+        );
+
+        $this->assertSame('revision', $result['status']);
+        $this->assertSame('huella_revision_humana_no_aprobada', $result['reason']);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public function test_ccd_id_processes_only_an_approved_human_review_record(): void
+    {
+        $fixture = $this->createPilotFixture('aqp-v3-single-test.csv', 'aqp-human-single-test.csv');
+        $approved = $fixture['documents'][3];
+        $options = $this->commandOptions(
+            'aqp-v4-single-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-single-test.csv',
+            'aqp-human-single-test.csv',
+            $fixture['human_sha256'],
+        );
+        $options['--ccd-id'] = $approved->id;
+
+        $this->artisan('ccd:associate-aqp-audited', $options)->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/aqp-v4-single-test.csv');
+        $this->assertSame(1, substr_count($csv, ',elegible,'));
+        $this->assertStringContainsString("\n{$approved->id},", $csv);
+        $this->assertSame(1, substr_count($csv, $fixture['human_sha256']));
+
+        $outside = $this->createEligibleCcd('00999999', '4499999999', 'AQP4');
+        $options['--ccd-id'] = $outside->id;
+        $options['--output'] = 'aqp-v4-outside-test.csv';
+
+        $this->artisan('ccd:associate-aqp-audited', $options)->assertExitCode(1);
+        $this->assertFalse(Storage::disk((string) config('ccd.private_disk'))->exists('audits/aqp-v4-outside-test.csv'));
+    }
+
+    public function test_human_review_rejects_wrong_hash_and_altered_file(): void
+    {
+        $fixture = $this->createPilotFixture('aqp-v3-hash-test.csv', 'aqp-human-hash-test.csv');
+        $options = $this->commandOptions(
+            'aqp-v4-human-hash-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-hash-test.csv',
+            'aqp-human-hash-test.csv',
+            str_repeat('0', 64),
+        );
+
+        $this->artisan('ccd:associate-aqp-audited', $options)->assertExitCode(1);
+
+        $disk = Storage::disk((string) config('ccd.private_disk'));
+        $path = 'audits/aqp-human-hash-test.csv';
+        $disk->put($path, $disk->get($path)."\n");
+        $options['--human-review-sha256'] = $fixture['human_sha256'];
+
+        $this->artisan('ccd:associate-aqp-audited', $options)->assertExitCode(1);
+        $this->assertFalse($disk->exists('audits/aqp-v4-human-hash-test.csv'));
+    }
+
+    public function test_human_review_rejects_duplicates_unapproved_rows_and_audit_fingerprint_mismatch(): void
+    {
+        foreach (['duplicate', 'unapproved', 'audit-mismatch', 'observation'] as $case) {
+            $auditName = "aqp-v3-human-{$case}-test.csv";
+            $humanName = "aqp-human-{$case}-test.csv";
+            $documents = $this->createPilotDocuments();
+            $this->writeAuditCsv($auditName, $documents);
+            $humanSha = $this->writeHumanReviewCsv(
+                $humanName,
+                $documents,
+                $auditName,
+                static function (array $rows) use ($case): array {
+                    if ($case === 'duplicate') {
+                        $rows[1]['ccd_id'] = $rows[0]['ccd_id'];
+                    } elseif ($case === 'unapproved') {
+                        $rows[0]['resultado_manual'] = 'RECHAZADO';
+                    } elseif ($case === 'audit-mismatch') {
+                        $rows[0]['auditoria_v3_sha256'] = str_repeat('a', 64);
+                    } else {
+                        $rows[0]['observacion'] = 'La operación no coincide';
+                    }
+
+                    return $rows;
+                },
+            );
+
+            $this->artisan('ccd:associate-aqp-audited', $this->commandOptions(
+                "aqp-v4-human-{$case}-test.csv",
+                8,
+                1,
+                4,
+                4,
+                $auditName,
+                $humanName,
+                $humanSha,
+            ))->assertExitCode(1);
+
+            $this->assertFalse(Storage::disk((string) config('ccd.private_disk'))->exists("audits/aqp-v4-human-{$case}-test.csv"));
+        }
     }
 
     public function test_apply_command_requires_both_environment_guards_and_both_tokens(): void
     {
-        $ccd = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
-        $this->writeAuditCsv('aqp-v3-guard-test.csv', [$ccd]);
-        $base = $this->commandOptions('aqp-v4-guard-test.csv', 1, 1, 1, 0, 'aqp-v3-guard-test.csv');
+        $fixture = $this->createPilotFixture('aqp-v3-guard-test.csv', 'aqp-human-guard-test.csv');
+        $base = $this->commandOptions(
+            'aqp-v4-guard-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-guard-test.csv',
+            'aqp-human-guard-test.csv',
+            $fixture['human_sha256'],
+        );
 
         $this->artisan('ccd:associate-aqp-audited', array_merge($base, ['--apply' => true]))
             ->assertExitCode(1);
@@ -81,7 +216,7 @@ class CcdAqpControlledAssociationTest extends TestCase
             '--confirmation' => 'REVALIDAR_PDF_Y_CONFIRMAR_AQP',
         ]))->assertExitCode(1);
 
-        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', collect($fixture['documents'])->pluck('id'))->count());
     }
 
     public function test_aqp_apply_guard_requires_general_specific_and_human_approval_flags(): void
@@ -157,10 +292,10 @@ class CcdAqpControlledAssociationTest extends TestCase
         $audit = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-safety-test.csv']);
         $service = app(CcdAqpControlledAssociationService::class);
 
-        $wrongResult = $service->analyze($wrongCode, $audit['candidates'][$wrongCode->id]);
-        $wrongDniResult = $service->analyze($wrongDni, $audit['candidates'][$wrongDni->id]);
-        $ambiguousResult = $service->analyze($ambiguous, $audit['candidates'][$ambiguous->id]);
-        $conflictResult = $service->analyze($conflicted, $audit['candidates'][$conflicted->id]);
+        $wrongResult = $service->analyze($wrongCode, $this->withHumanApproval($audit['candidates'][$wrongCode->id]));
+        $wrongDniResult = $service->analyze($wrongDni, $this->withHumanApproval($audit['candidates'][$wrongDni->id]));
+        $ambiguousResult = $service->analyze($ambiguous, $this->withHumanApproval($audit['candidates'][$ambiguous->id]));
+        $conflictResult = $service->analyze($conflicted, $this->withHumanApproval($audit['candidates'][$conflicted->id]));
 
         $this->assertSame('revision', $wrongResult['status']);
         $this->assertSame('dni_codigo_cliente_aqp_no_coincide', $wrongResult['dni_evidence']);
@@ -182,8 +317,8 @@ class CcdAqpControlledAssociationTest extends TestCase
         $audit = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-file-integrity-test.csv']);
         $service = app(CcdAqpControlledAssociationService::class);
 
-        $changedResult = $service->analyze($changed, $audit['candidates'][$changed->id]);
-        $missingResult = $service->analyze($missing, $audit['candidates'][$missing->id]);
+        $changedResult = $service->analyze($changed, $this->withHumanApproval($audit['candidates'][$changed->id]));
+        $missingResult = $service->analyze($missing, $this->withHumanApproval($audit['candidates'][$missing->id]));
 
         $this->assertSame('error', $changedResult['status']);
         $this->assertSame('archivo_privado_sha256_no_coincide', $changedResult['reason']);
@@ -195,7 +330,9 @@ class CcdAqpControlledAssociationTest extends TestCase
     {
         $ccd = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
         $this->writeAuditCsv('aqp-v3-rollback-test.csv', [$ccd]);
-        $candidate = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-rollback-test.csv'])['candidates'][$ccd->id];
+        $candidate = $this->withHumanApproval(
+            app(CcdAqpV3AuditReader::class)->read(['aqp-v3-rollback-test.csv'])['candidates'][$ccd->id],
+        );
         $accountId = (int) DB::table('clientes_cuentas')->where('numdoc', '00123456')->value('id');
         $verified = Mockery::mock(CcdVerifiedAssociationService::class);
         $verified->shouldReceive('applyAqpAudited')->once()->andReturnUsing(function () use ($ccd, $accountId): array {
@@ -223,22 +360,30 @@ class CcdAqpControlledAssociationTest extends TestCase
 
     public function test_controlled_command_rejects_concurrent_ccd_process(): void
     {
-        $ccd = $this->createEligibleCcd('00123456', '4400123456', 'AQP4');
-        $this->writeAuditCsv('aqp-v3-lock-test.csv', [$ccd]);
+        $fixture = $this->createPilotFixture('aqp-v3-lock-test.csv', 'aqp-human-lock-test.csv');
         $path = storage_path('framework/ccd-associate-bulk.lock');
         $handle = fopen($path, 'c+');
         $this->assertIsResource($handle);
         $this->assertTrue(flock($handle, LOCK_EX | LOCK_NB));
 
         try {
-            $this->artisan('ccd:associate-aqp-audited', $this->commandOptions('aqp-v4-lock-test.csv', 1, 1, 1, 0, 'aqp-v3-lock-test.csv'))
+            $this->artisan('ccd:associate-aqp-audited', $this->commandOptions(
+                'aqp-v4-lock-test.csv',
+                8,
+                1,
+                4,
+                4,
+                'aqp-v3-lock-test.csv',
+                'aqp-human-lock-test.csv',
+                $fixture['human_sha256'],
+            ))
                 ->assertExitCode(1);
         } finally {
             flock($handle, LOCK_UN);
             fclose($handle);
         }
 
-        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', collect($fixture['documents'])->pluck('id'))->count());
     }
 
     public function test_human_sample_is_stratified_and_contains_no_personal_or_financial_fields(): void
@@ -276,16 +421,113 @@ class CcdAqpControlledAssociationTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function commandOptions(string $output, int $total, int $inputs, int $aqp4, int $aqp5, string $input = 'aqp-v3-complete-test.csv'): array
+    private function commandOptions(
+        string $output,
+        int $total,
+        int $inputs,
+        int $aqp4,
+        int $aqp5,
+        string $input = 'aqp-v3-complete-test.csv',
+        string $humanReview = 'aqp-human-complete-test.csv',
+        string $humanReviewSha256 = '',
+    ): array
     {
         return [
             '--input' => [$input],
+            '--human-review' => $humanReview,
+            '--human-review-sha256' => $humanReviewSha256,
+            '--expected-human-total' => 8,
+            '--expected-human-aqp4' => 4,
+            '--expected-human-aqp5' => 4,
+            '--expected-human-per-stratum' => 1,
             '--limit' => $total,
             '--expected-total' => $total,
             '--expected-inputs' => $inputs,
             '--expected-aqp4' => $aqp4,
             '--expected-aqp5' => $aqp5,
             '--output' => $output,
+        ];
+    }
+
+    /** @return array{documents:array<int,CcdCliente>,human_sha256:string} */
+    private function createPilotFixture(string $auditName, string $humanName): array
+    {
+        $documents = $this->createPilotDocuments();
+        $this->writeAuditCsv($auditName, $documents);
+
+        return [
+            'documents' => $documents,
+            'human_sha256' => $this->writeHumanReviewCsv($humanName, $documents, $auditName),
+        ];
+    }
+
+    /** @return array<int,CcdCliente> */
+    private function createPilotDocuments(): array
+    {
+        $documents = [];
+
+        foreach (['AQP4' => '44', 'AQP5' => '55'] as $harvest => $prefix) {
+            foreach (range(1, 4) as $index) {
+                $dni = str_pad((string) (($harvest === 'AQP4' ? 1_000 : 2_000) + $index), 8, '0', STR_PAD_LEFT);
+                $documents[] = $this->createEligibleCcd($dni, $prefix.str_pad((string) $index, 8, '0', STR_PAD_LEFT), $harvest);
+            }
+        }
+
+        return $documents;
+    }
+
+    /**
+     * @param  array<int,CcdCliente>  $documents
+     * @param  (callable(array<int,array<string,string>>):array<int,array<string,string>>)|null  $mutate
+     */
+    private function writeHumanReviewCsv(string $name, array $documents, string $auditName, ?callable $mutate = null): string
+    {
+        $disk = Storage::disk((string) config('ccd.private_disk'));
+        $auditSha256 = hash_file('sha256', $disk->path('audits/'.$auditName));
+        $this->assertIsString($auditSha256);
+        $indices = ['AQP4' => 0, 'AQP5' => 0];
+        $rows = [];
+
+        foreach ($documents as $ccd) {
+            $indices[$ccd->cosecha]++;
+            $rows[] = [
+                'ccd_id' => (string) $ccd->id,
+                'cosecha' => $ccd->cosecha,
+                'tramo_historico' => 'Q'.$indices[$ccd->cosecha],
+                'auditoria_v3_sha256' => $auditSha256,
+                'identidad_revisada' => 'SI',
+                'operacion_revisada' => 'SI',
+                'resultado_manual' => 'APROBADO',
+                'observacion' => '',
+            ];
+        }
+
+        if ($mutate !== null) {
+            $rows = $mutate($rows);
+        }
+
+        $header = ['ccd_id', 'cosecha', 'tramo_historico', 'auditoria_v3_sha256', 'identidad_revisada', 'operacion_revisada', 'resultado_manual', 'observacion'];
+        $stream = fopen($disk->path('audits/'.$name), 'wb');
+        $this->assertIsResource($stream);
+        fputcsv($stream, $header);
+
+        foreach ($rows as $row) {
+            fputcsv($stream, array_map(static fn (string $column): string => $row[$column], $header));
+        }
+
+        fclose($stream);
+        $sha256 = hash_file('sha256', $disk->path('audits/'.$name));
+        $this->assertIsString($sha256);
+
+        return $sha256;
+    }
+
+    /** @param array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string} $candidate */
+    private function withHumanApproval(array $candidate): array
+    {
+        return $candidate + [
+            'human_review_sha256' => CcdAqpHumanReviewReader::APPROVED_SHA256,
+            'human_stratum' => 'Q1',
         ];
     }
 
