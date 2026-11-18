@@ -23,8 +23,9 @@ Antes de seleccionar un CCD, `ccd:associate-aqp-audited` ahora exige:
 3. Cinco CCD en cada combinación AQP4/AQP5 y Q1/Q2/Q3/Q4.
 4. `identidad_revisada=SI`, `operacion_revisada=SI` y
    `resultado_manual=APROBADO` en cada fila.
-5. Observación vacía o inequívocamente neutral (`SIN OBSERVACIONES`, `NINGUNA`
-   u `OK`). Cualquier otra observación detiene el proceso.
+5. Observación vacía o inequívocamente neutral (`SIN OBSERVACIONES`, `NINGUNA`,
+   `OK` o la observación conforme oficial `Revision visual declarada conforme por el responsable - 2026-11-18`).
+   Cualquier otra observación detiene el proceso.
 6. Existencia del CCD en uno de los doce CSV V3 proporcionados.
 7. Coincidencia exacta de cosecha y de la huella SHA-256 del CSV V3 que contiene
    ese CCD.
@@ -70,7 +71,7 @@ cd /home/u480021566/apps/kpinvest-crm-pruebas
 set -euo pipefail
 umask 077
 
-AUDIT_DIR="storage/app/private/audits"
+AUDIT_DIR="storage/app/private/ccd/audits"
 HUMAN_REVIEW="ccd-aqp-revision-humana-20261118-211134-aprobada.csv"
 HUMAN_SHA="2ebbfa12df1e0dad537c8fdb57d60075c5b4cb995b97d71d56b4e67c9cb80942"
 HUMAN_PATH="${AUDIT_DIR}/${HUMAN_REVIEW}"
@@ -226,13 +227,18 @@ huellas V3 y humana, verificables mediante su SHA-256 sin imprimirla completa.
 ## Pruebas ejecutadas
 
 ```text
-Prueba focalizada V4.1: 14 aprobadas, 94 aserciones.
-Regresión CCD: 111 aprobadas, 532 aserciones.
+Prueba focalizada V4.1: 16 aprobadas, 108 aserciones.
+Regresión CCD: 113 aprobadas, 546 aserciones.
 Suite Laravel: 241 aprobadas, 2 omitidas, 1622 aserciones.
 npm run build: correcto (Vite 5.4.21, 38 módulos transformados).
 git diff --check: correcto.
 Pint --test en archivos modificados: correcto.
 ```
+
+Se validó además la corrección puntual para la observación oficial
+`Revision visual declarada conforme por el responsable - 2026-11-18` y el rechazo
+estricto de observaciones arbitrarias, así como la corrección de la ruta física
+`AUDIT_DIR` a `storage/app/private/ccd/audits`.
 
 Las dos pruebas omitidas dependen de datos locales opcionales y no corresponden
 al módulo CCD. Los mensajes de error observados durante la suite pertenecen a

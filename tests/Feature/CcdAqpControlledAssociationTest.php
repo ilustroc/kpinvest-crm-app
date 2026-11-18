@@ -193,6 +193,88 @@ class CcdAqpControlledAssociationTest extends TestCase
         }
     }
 
+    public function test_human_review_accepts_approved_real_observation_text(): void
+    {
+        $fixture = $this->createPilotFixture(
+            'aqp-v3-real-observation-test.csv',
+            'aqp-human-real-observation-test.csv',
+            static function (array $rows): array {
+                foreach ($rows as $index => $row) {
+                    $rows[$index]['observacion'] = CcdAqpHumanReviewReader::APPROVED_OBSERVATION;
+                }
+
+                return $rows;
+            },
+        );
+
+        $this->artisan('ccd:associate-aqp-audited', $this->commandOptions(
+            'aqp-v4-real-observation-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-real-observation-test.csv',
+            'aqp-human-real-observation-test.csv',
+            $fixture['human_sha256'],
+        ))->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/aqp-v4-real-observation-test.csv');
+        $this->assertSame(8, substr_count($csv, ',elegible,'));
+        $this->assertSame(8, substr_count($csv, $fixture['human_sha256']));
+
+        $audit = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-real-observation-test.csv']);
+        $readResult = app(CcdAqpHumanReviewReader::class)->read(
+            'aqp-human-real-observation-test.csv',
+            $fixture['human_sha256'],
+            $audit,
+            8,
+            4,
+            4,
+            1,
+        );
+        $this->assertCount(8, $readResult['approved']);
+    }
+
+    public function test_human_review_rejects_unapproved_different_observation(): void
+    {
+        $fixture = $this->createPilotFixture(
+            'aqp-v3-different-obs-test.csv',
+            'aqp-human-different-obs-test.csv',
+            static function (array $rows): array {
+                $rows[0]['observacion'] = 'Revision visual con discrepancia no autorizada';
+
+                return $rows;
+            },
+        );
+
+        $this->artisan('ccd:associate-aqp-audited', $this->commandOptions(
+            'aqp-v4-different-obs-test.csv',
+            8,
+            1,
+            4,
+            4,
+            'aqp-v3-different-obs-test.csv',
+            'aqp-human-different-obs-test.csv',
+            $fixture['human_sha256'],
+        ))->assertExitCode(1);
+
+        $this->assertFalse(Storage::disk((string) config('ccd.private_disk'))->exists('audits/aqp-v4-different-obs-test.csv'));
+
+        $audit = app(CcdAqpV3AuditReader::class)->read(['aqp-v3-different-obs-test.csv']);
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('La revisión humana contiene una fila no aprobada o inconsistente');
+
+        app(CcdAqpHumanReviewReader::class)->read(
+            'aqp-human-different-obs-test.csv',
+            $fixture['human_sha256'],
+            $audit,
+            8,
+            4,
+            4,
+            1,
+        );
+    }
+
     public function test_apply_command_requires_both_environment_guards_and_both_tokens(): void
     {
         $fixture = $this->createPilotFixture('aqp-v3-guard-test.csv', 'aqp-human-guard-test.csv');
@@ -430,8 +512,7 @@ class CcdAqpControlledAssociationTest extends TestCase
         string $input = 'aqp-v3-complete-test.csv',
         string $humanReview = 'aqp-human-complete-test.csv',
         string $humanReviewSha256 = '',
-    ): array
-    {
+    ): array {
         return [
             '--input' => [$input],
             '--human-review' => $humanReview,
@@ -449,15 +530,18 @@ class CcdAqpControlledAssociationTest extends TestCase
         ];
     }
 
-    /** @return array{documents:array<int,CcdCliente>,human_sha256:string} */
-    private function createPilotFixture(string $auditName, string $humanName): array
+    /**
+     * @param  (callable(array<int,array<string,string>>):array<int,array<string,string>>)|null  $mutateHuman
+     * @return array{documents:array<int,CcdCliente>,human_sha256:string}
+     */
+    private function createPilotFixture(string $auditName, string $humanName, ?callable $mutateHuman = null): array
     {
         $documents = $this->createPilotDocuments();
         $this->writeAuditCsv($auditName, $documents);
 
         return [
             'documents' => $documents,
-            'human_sha256' => $this->writeHumanReviewCsv($humanName, $documents, $auditName),
+            'human_sha256' => $this->writeHumanReviewCsv($humanName, $documents, $auditName, $mutateHuman),
         ];
     }
 

@@ -20,6 +20,8 @@ class CcdAqpHumanReviewReader
 
     public const APPROVED_PER_STRATUM = 5;
 
+    public const APPROVED_OBSERVATION = 'Revision visual declarada conforme por el responsable - 2026-11-18';
+
     private const REQUIRED_COLUMNS = [
         'ccd_id',
         'cosecha',
@@ -31,7 +33,13 @@ class CcdAqpHumanReviewReader
         'observacion',
     ];
 
-    private const NEUTRAL_OBSERVATIONS = ['', 'SIN OBSERVACIONES', 'NINGUNA', 'OK'];
+    private const NEUTRAL_OBSERVATIONS = [
+        '',
+        'SIN OBSERVACIONES',
+        'NINGUNA',
+        'OK',
+        'REVISION VISUAL DECLARADA CONFORME POR EL RESPONSABLE - 2026-11-18',
+    ];
 
     /**
      * @param  array{candidates:array<int,array{ccd_id:int,cosecha:string,source_report:string,source_sha256:string}>}  $audit
