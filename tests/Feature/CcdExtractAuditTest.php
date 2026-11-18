@@ -11,11 +11,12 @@ use App\Services\Ccd\CcdVerifiedAssociationService;
 use Dompdf\Dompdf;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -227,6 +228,72 @@ class CcdExtractAuditTest extends TestCase
 
         $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-accidental-dni-test.csv');
         $this->assertStringContainsString('dni_documental_no_corrobable', $csv);
+        $this->assertStringContainsString('dni_etiqueta_documental_no_reconocida', $csv);
+    }
+
+    #[DataProvider('additionalDocumentaryDniFormats')]
+    public function test_verified_association_accepts_additional_explicit_documentary_dni_formats(string $documentaryIdentity): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-FORMATO', 'BBVA');
+        $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', "{$documentaryIdentity}\n{$operation}");
+        $output = 'ccd-verified-dni-format-'.Str::lower(Str::random(8)).'.csv';
+
+        $this->artisan('ccd:associate-verified', [
+            '--ccd-id' => $ccd->id,
+            '--output' => $output,
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/'.$output);
+        $this->assertStringContainsString('elegible', $csv);
+        $this->assertStringContainsString('dni_documental_etiquetado', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+    }
+
+    public static function additionalDocumentaryDniFormats(): array
+    {
+        return [
+            'D.N.I.' => ['D.N.I.: 05378290'],
+            'DNI N°' => ['DNI N° 05378290'],
+            'DNI Nro.' => ['DNI Nro. 05378290'],
+            'Nro. de documento' => ['Nro. de documento: 05378290'],
+            'Número de documento' => ['Número de documento: 05378290'],
+            'Documento de identidad' => ['Documento de identidad: 05378290'],
+            'Documento Nacional de Identidad' => ['Documento Nacional de Identidad: 05378290'],
+            'cero inicial con separadores' => ['D.N.I.: 05.378.290'],
+            'etiqueta y valor en líneas separadas' => ["Número de\ndocumento:\n05378290"],
+        ];
+    }
+
+    public function test_verified_association_distinguishes_unlabelled_absent_and_contradictory_documentary_dni(): void
+    {
+        $dni = '05378290';
+        $operation = '00110301995001707769';
+        $this->createAccount($dni, $operation, 'BBVA1', 'CTA-BBVA-DIAGNOSTICO', 'BBVA');
+        $cases = [
+            'presente' => ["Código {$dni}\n{$operation}", 'dni_presente_sin_etiqueta_verificable'],
+            'ausente' => ["Sin identidad documental\n{$operation}", 'dni_ausente_texto_extraido'],
+            'incorrecto' => ["DNI: 87654321\n{$operation}", 'dni_documental_no_coincide'],
+            'contradictorio' => ["DNI: {$dni}\nDocumento de identidad: 87654321\n{$operation}", 'dni_documental_contradictorio'],
+            'incrustado' => ["DNI: 9{$dni}1\n{$operation}", 'dni_documental_no_coincide'],
+            'parcial' => ["DNI: 5378290\n{$operation}", 'dni_documental_no_coincide'],
+        ];
+
+        foreach ($cases as $name => [$text, $expectedEvidence]) {
+            $ccd = $this->createPrivateCcd($dni, 'BBVA_1_2', $text);
+            $output = "ccd-verified-dni-diagnostic-{$name}-test.csv";
+
+            $this->artisan('ccd:associate-verified', [
+                '--ccd-id' => $ccd->id,
+                '--output' => $output,
+            ])->assertExitCode(0);
+
+            $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/'.$output);
+            $this->assertStringContainsString($expectedEvidence, $csv);
+            $this->assertStringNotContainsString(',elegible,', $csv);
+            $this->assertSame(0, DB::table('ccd_cliente_cuenta')->where('ccd_cliente_id', $ccd->id)->count());
+        }
     }
 
     public function test_verified_association_accepts_historical_bbva_recipient_heading_identity(): void
@@ -265,6 +332,37 @@ class CcdExtractAuditTest extends TestCase
         $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-confianza-recipient-dni-test.csv');
         $this->assertStringContainsString('elegible', $csv);
         $this->assertStringContainsString('dni_destinatario_confianza_referencia_senor', $csv);
+    }
+
+    public function test_dni_recheck_command_compares_prior_reviews_without_writing_associations(): void
+    {
+        $eligibleDni = '05378290';
+        $eligibleOperation = '00110301995001707769';
+        $this->createAccount($eligibleDni, $eligibleOperation, 'BBVA1', 'CTA-RECHECK-ELEGIBLE', 'BBVA');
+        $eligible = $this->createPrivateCcd($eligibleDni, 'BBVA_1_2', "D.N.I.: {$eligibleDni}\n{$eligibleOperation}");
+
+        $reviewDni = '05378291';
+        $reviewOperation = '00110301995001707770';
+        $this->createAccount($reviewDni, $reviewOperation, 'BBVA1', 'CTA-RECHECK-REVISION', 'BBVA');
+        $review = $this->createPrivateCcd($reviewDni, 'BBVA_1_2', "Código {$reviewDni}\n{$reviewOperation}");
+        $prior = implode("\n", [
+            'ccd_id,cliente_cuenta_id,operacion,fuente,resultado,motivo,evidencia,evidencia_dni,metodo_verificacion,modo',
+            "{$eligible->id},,,privado,revision,dni_documental_no_corrobable,operacion_candidata_en_texto_pdf,dni_documental_no_corrobable,operacion_pdf_automatica,simulacion",
+            "{$review->id},,,privado,revision,dni_documental_no_corrobable,operacion_candidata_en_texto_pdf,dni_documental_no_corrobable,operacion_pdf_automatica,simulacion",
+        ])."\n";
+        Storage::disk((string) config('ccd.private_disk'))->put('audits/ccd-prior-reviews-test.csv', $prior);
+
+        $this->artisan('ccd:recheck-dni', [
+            '--input' => ['ccd-prior-reviews-test.csv'],
+            '--limit' => 10,
+            '--output' => 'ccd-recheck-comparison-test.csv',
+        ])->assertExitCode(0);
+
+        $csv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-recheck-comparison-test.csv');
+        $this->assertStringContainsString("{$eligible->id},revision,dni_documental_no_corrobable,elegible,ahora_elegible", $csv);
+        $this->assertStringContainsString("{$review->id},revision,dni_documental_no_corrobable,revision,sigue_revision", $csv);
+        $this->assertStringContainsString('dni_presente_sin_etiqueta_verificable', $csv);
+        $this->assertSame(0, DB::table('ccd_cliente_cuenta')->whereIn('ccd_cliente_id', [$eligible->id, $review->id])->count());
     }
 
     public function test_verified_association_keeps_a_manual_confirmation_for_the_same_operation_when_identity_is_not_reparseable(): void
@@ -374,6 +472,7 @@ class CcdExtractAuditTest extends TestCase
         $textlessCsv = Storage::disk((string) config('ccd.private_disk'))->get('audits/ccd-verified-review-1-test.csv');
         $this->assertStringContainsString('revision', $multipleCsv);
         $this->assertStringContainsString('no_elegible', $textlessCsv);
+        $this->assertStringContainsString('dni_no_evaluable_sin_texto', $textlessCsv);
     }
 
     public function test_verified_association_marks_repeated_operation_in_two_candidate_accounts_for_review(): void
@@ -687,7 +786,8 @@ class CcdExtractAuditTest extends TestCase
             'link' => 'https://storage.kpinvest.pe/ccd/legacy.zip',
         ]);
 
-        config(['ccd.zip_v12_source_provider' => new class($pdfPath) implements CcdZipV12PdfSourceProvider {
+        config(['ccd.zip_v12_source_provider' => new class($pdfPath) implements CcdZipV12PdfSourceProvider
+        {
             public function __construct(private readonly string $path) {}
 
             public function sourcePath(CcdCliente $ccd): ?string
@@ -820,7 +920,8 @@ class CcdExtractAuditTest extends TestCase
         $environment = $this->configureZipV12([
             $pdfName => $this->pdf('DNI: 05378290'),
         ]);
-        app()->bind(CcdPdfIdentifierExtractor::class, static fn (): CcdPdfIdentifierExtractor => new class extends CcdPdfIdentifierExtractor {
+        app()->bind(CcdPdfIdentifierExtractor::class, static fn (): CcdPdfIdentifierExtractor => new class extends CcdPdfIdentifierExtractor
+        {
             public function extract(string $path): array
             {
                 throw new \RuntimeException('Fallo recuperable de extracción de prueba.');
@@ -923,7 +1024,7 @@ class CcdExtractAuditTest extends TestCase
         $this->temporaryDirectories[] = $root;
 
         if ($createZip) {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             $this->assertTrue($zip->open($root.DIRECTORY_SEPARATOR.'CONFIANZA1.zip', ZipArchive::CREATE) === true);
 
             foreach ($entries as $name => $contents) {
@@ -971,7 +1072,7 @@ class CcdExtractAuditTest extends TestCase
 
     private function pdf(string $text): string
     {
-        $dompdf = new Dompdf();
+        $dompdf = new Dompdf;
         $dompdf->loadHtml('<html><body><pre>'.e($text).'</pre></body></html>');
         $dompdf->render();
 

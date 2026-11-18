@@ -24,8 +24,14 @@ class CcdExtractionMatcher
         $expectedDni = $this->normalize($ccd->numdoc);
         $extractedDnis = array_map(fn (string $dni): string => $this->normalize($dni), $extraction['dnis']);
 
-        if ($extractedDnis !== [] && ! in_array($expectedDni, $extractedDnis, true)) {
-            return $this->result('sin_coincidencia', null, 'dni_documental_no_coincide', 0);
+        if ($extractedDnis !== []) {
+            if (! in_array($expectedDni, $extractedDnis, true)) {
+                return $this->result('sin_coincidencia', null, 'dni_documental_no_coincide', 0);
+            }
+
+            if (count(array_unique($extractedDnis)) > 1) {
+                return $this->result('sin_coincidencia', null, 'dni_documental_contradictorio', 0);
+            }
         }
 
         $candidates = $this->associations->candidatesFor($ccd);

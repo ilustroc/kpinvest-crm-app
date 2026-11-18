@@ -7,11 +7,19 @@ use Throwable;
 
 class CcdPdfIdentifierExtractor
 {
+    private CcdDocumentDniRecognizer $dniRecognizer;
+
+    public function __construct(
+        ?CcdDocumentDniRecognizer $dniRecognizer = null,
+    ) {
+        $this->dniRecognizer = $dniRecognizer ?? new CcdDocumentDniRecognizer;
+    }
+
     /** @return array{status:string,text_length:int,dnis:array<int,string>,cuentas:array<int,string>,operaciones:array<int,string>,entidades:array<int,string>,text:string,evidence:string} */
     public function extract(string $path): array
     {
         try {
-            $text = (new Parser())->parseFile($path)->getText();
+            $text = (new Parser)->parseFile($path)->getText();
         } catch (Throwable) {
             return $this->failed('error', 'pdf_ilegible');
         }
@@ -25,9 +33,7 @@ class CcdPdfIdentifierExtractor
         return [
             'status' => 'ok',
             'text_length' => mb_strlen($text),
-            'dnis' => $this->matches($text, [
-                '/\b(?:DNI|DOCUMENTO(?:\s+DE\s+IDENTIDAD)?|DOC(?:UMENTO)?\.?\s*(?:DE\s+IDENTIDAD)?)\s*[:#º°\-]?\s*([0-9][0-9\s-]{6,16})\b/ui',
-            ], true),
+            'dnis' => $this->dniRecognizer->extract($text),
             'cuentas' => $this->matches($text, [
                 '/\b(?:N[ÚU]MERO\s+DE\s+CUENTA|NRO\.?\s*CUENTA|CUENTA(?:\s+(?:DE\s+)?(?:CR[ÉE]DITO|DEUDA))?)\s*[:#º°\-]?\s*([A-Z0-9][A-Z0-9 -]{2,49})\b/ui',
             ]),
@@ -41,7 +47,7 @@ class CcdPdfIdentifierExtractor
     }
 
     /** @param array<int,string> $patterns @return array<int,string> */
-    private function matches(string $text, array $patterns, bool $digitsOnly = false): array
+    private function matches(string $text, array $patterns): array
     {
         $matches = [];
 
@@ -49,9 +55,7 @@ class CcdPdfIdentifierExtractor
             preg_match_all($pattern, $text, $found);
 
             foreach ($found[1] ?? [] as $value) {
-                $value = $digitsOnly
-                    ? preg_replace('/\D+/', '', (string) $value)
-                    : preg_replace('/\s+/', '', strtoupper(trim((string) $value)));
+                $value = preg_replace('/\s+/', '', strtoupper(trim((string) $value)));
 
                 if ($value !== null && $value !== '') {
                     $matches[] = $value;

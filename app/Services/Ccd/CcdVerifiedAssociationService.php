@@ -19,6 +19,7 @@ class CcdVerifiedAssociationService
         private readonly CcdPdfIdentifierExtractor $extractor,
         private readonly CcdExtractionMatcher $matcher,
         private readonly CcdCuentaAssociationService $accounts,
+        private readonly CcdDocumentDniRecognizer $dniRecognizer,
     ) {}
 
     /**
@@ -37,7 +38,7 @@ class CcdVerifiedAssociationService
             $match = $this->matcher->classify($ccd, $extraction);
 
             if ($match['clasificacion'] !== 'coincidencia_exacta' || $match['operacion_candidata'] === null) {
-                if ($match['evidence'] === 'dni_documental_no_coincide'
+                if (in_array($match['evidence'], ['dni_documental_no_coincide', 'dni_documental_contradictorio'], true)
                     && ($confirmed = $this->confirmedAssociationForCcd((int) $ccd->id)) !== null) {
                     return $this->result(
                         'conflicto',
@@ -46,17 +47,31 @@ class CcdVerifiedAssociationService
                         $confirmed->clienteCuenta?->operacion,
                         $match['evidence'],
                         'dni_documental_contradice_confirmacion_existente',
-                        'dni_documental_contradictorio',
+                        $match['evidence'],
                     );
                 }
 
+                $dniEvidence = match ($match['evidence']) {
+                    'dni_documental_no_coincide', 'dni_documental_contradictorio' => $match['evidence'],
+                    'sin_texto' => 'dni_no_evaluable_sin_texto',
+                    'pdf_ilegible' => 'dni_no_evaluable_error_extraccion',
+                    default => 'no_evaluada',
+                };
+
+                $status = match ($match['clasificacion']) {
+                    'ambigua' => 'revision',
+                    'error' => 'error',
+                    default => 'no_elegible',
+                };
+
                 return $this->result(
-                    $match['clasificacion'] === 'ambigua' ? 'revision' : 'no_elegible',
+                    $status,
                     (string) $source['source'],
                     null,
                     null,
                     $match['evidence'],
                     $match['clasificacion'],
+                    $dniEvidence,
                 );
             }
 
@@ -90,7 +105,7 @@ class CcdVerifiedAssociationService
                 return $this->result($existing['status'], (string) $source['source'], (int) $account->id, (string) $account->operacion, $match['evidence'], $existing['reason']);
             }
 
-            $dniEvidence = $this->documentDniEvidence((string) $extraction['text'], (string) $ccd->numdoc);
+            $dniEvidence = $this->dniRecognizer->evidence((string) $extraction['text'], (string) $ccd->numdoc);
 
             if ($dniEvidence === null) {
                 return $this->result(
@@ -100,7 +115,7 @@ class CcdVerifiedAssociationService
                     (string) $match['operacion_candidata'],
                     $match['evidence'],
                     'dni_documental_no_corrobable',
-                    'dni_documental_no_corrobable',
+                    $this->dniRecognizer->missingEvidenceDiagnostic((string) $extraction['text'], (string) $ccd->numdoc),
                 );
             }
 
@@ -220,46 +235,6 @@ class CcdVerifiedAssociationService
             ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
             ->orderBy('id')
             ->first();
-    }
-
-    /**
-     * Corrobora la identidad sólo con una etiqueta documental explícita o con
-     * encabezados históricos de destinatario. Los extractores PDF no siempre
-     * conservan los saltos de línea, por eso estos encabezados no dependen de
-     * estar al inicio del texto, pero sí atan el DNI al formato completo.
-     */
-    private function documentDniEvidence(string $text, string $dni): ?string
-    {
-        $digits = preg_replace('/[ \t.\-]+/', '', trim($dni));
-
-        if ($digits === null || ! preg_match('/^[0-9]{6,15}$/D', $digits)) {
-            return null;
-        }
-
-        $pattern = implode('[ \\t.\\-]?', str_split($digits));
-        $bounded = '(?<![0-9])'.$pattern.'(?![0-9])';
-        $explicitIdentity = '/\b(?:DNI|DOCUMENTO(?:\s+DE\s+IDENTIDAD)?|DOC(?:UMENTO)?\.?\s*(?:DE\s+IDENTIDAD)?)\s*(?:N(?:RO)?\.?|[º°])?\s*[:#\-]?\s*'.$bounded.'/iu';
-
-        if (preg_match($explicitIdentity, $text) === 1) {
-            return 'dni_documental_etiquetado';
-        }
-
-        // Formato histórico BBVA, por ejemplo:
-        // "Estimado(a) Sr.(a): NOMBRE DEL CLIENTE - 05378290".
-        $bbvaRecipient = '/\bESTIMADO\s*(?:\(\s*A\s*\)|A)?\s+(?:SR\.?\s*(?:\(\s*A\s*\)|A)?|SEÑOR\s*(?:\(\s*A\s*\)|A)?)\s*:?[^0-9\r\n]{0,140}?'.$bounded.'(?=[^0-9]|$)/iu';
-
-        if (preg_match($bbvaRecipient, $text) === 1) {
-            return 'dni_destinatario_bbva_estimado_sr';
-        }
-
-        // Formato histórico de CONFIANZA: "Referencia: <DNI> Señor(a):".
-        // El saludo posterior evita que una referencia numérica aislada sea
-        // tomada como identidad; "cliente" o "titular" a solas no bastan.
-        $confianzaRecipient = '/\bREFERENCIA\s*:\s*'.$bounded.'\s+(?:SEÑOR\s*(?:\(\s*A\s*\)|A)?|SR\.?\s*(?:\(\s*A\s*\)|A)?|SRA\.?)\s*:?/iu';
-
-        return preg_match($confianzaRecipient, $text) === 1
-            ? 'dni_destinatario_confianza_referencia_senor'
-            : null;
     }
 
     /** @return array{status:string,source:string,account_id:?int,operacion:?string,evidence:string,method:string,reason:string,dni_evidence:string} */
