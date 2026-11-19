@@ -19,6 +19,7 @@
     </source>
     <php>
         <server name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_KEY" value="base64:G2wM+FkO9k5fW8u8j7eR6/fX8B+U2wV3t4r5y6z7A8B=" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="BROADCAST_DRIVER" value="null" force="true"/>

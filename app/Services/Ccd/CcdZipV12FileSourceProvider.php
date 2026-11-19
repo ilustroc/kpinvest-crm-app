@@ -133,8 +133,11 @@ class CcdZipV12FileSourceProvider implements CcdTemporaryPdfSourceProvider, CcdZ
     public function releaseTemporarySource(string $path): void
     {
         $root = $this->root('ccd.zip_v12_temp_root');
+        $baseName = basename($path);
+        $hasValidPrefix = str_starts_with($baseName, 'ccd-zip-')
+            || (DIRECTORY_SEPARATOR === '\\' && str_starts_with($baseName, 'ccd'));
 
-        if ($root === null || ! is_file($path) || ! str_starts_with(basename($path), 'ccd-zip-')) {
+        if ($root === null || ! is_file($path) || ! $hasValidPrefix) {
             return;
         }
 
