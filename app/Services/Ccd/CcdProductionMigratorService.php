@@ -189,7 +189,7 @@ class CcdProductionMigratorService
         $associationsMigrated = $this->migrateAssociations($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal);
 
         $logger('Ejecutando auditoría integral post-migración...');
-        $audit = $this->auditTarget($targetPdo, $targetStorage, $skipFiles);
+        $audit = $this->auditTarget($targetPdo, $targetStorage, $skipFiles, $expectedTotal);
 
         $manifestSha256 = null;
         if ($manifestPath !== null) {
@@ -247,9 +247,93 @@ class CcdProductionMigratorService
             'has_ccd_archivos' => $hasArchivos,
             'has_ccd_cliente_cuenta' => $hasAssoc,
             'has_ccd_archivo_id_col' => $hasArchivoIdCol,
+            'has_ccd_archivo_id_column' => $hasArchivoIdCol,
             'pending_migrations' => $pendingMigrations,
             'is_ready_for_apply' => $hasArchivos && $hasAssoc && $hasArchivoIdCol,
         ];
+    }
+
+    /**
+     * Instala y valida exclusivamente los archivos de migración selectivos en destino
+     * antes de ejecutar 'php artisan migrate --path=...'.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public function installMigrationFiles(
+        string $sourceDir,
+        string $targetDir,
+        bool $apply,
+        ?string $backupDir = null,
+        ?callable $logger = null
+    ): array {
+        $log = $logger ?? static function (string $msg): void {};
+        $sourceDir = rtrim($sourceDir, '/\\');
+        $targetDir = rtrim($targetDir, '/\\');
+        $backupDir = $backupDir !== null ? rtrim($backupDir, '/\\') : null;
+        $results = [];
+
+        $migrationFiles = [
+            'database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php',
+            'database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php',
+        ];
+
+        foreach ($migrationFiles as $relPath) {
+            $srcFile = $sourceDir.'/'.$relPath;
+            $tgtFile = $targetDir.'/'.$relPath;
+
+            if (! is_file($srcFile)) {
+                throw new DomainException("Archivo de migración fuente requerido no existe: {$srcFile}");
+            }
+
+            $this->assertPhpSyntax($srcFile);
+
+            if (! file_exists($tgtFile)) {
+                if ($apply) {
+                    $dir = dirname($tgtFile);
+                    if (! is_dir($dir)) {
+                        @mkdir($dir, 0775, true);
+                    }
+                    if (! @copy($srcFile, $tgtFile)) {
+                        throw new RuntimeException("Error al copiar archivo de migración: {$tgtFile}");
+                    }
+                    @chmod($tgtFile, 0664);
+                    $this->assertPhpSyntax($tgtFile);
+                    $log("Instalado archivo de migración conforme: {$relPath}");
+                    $results[$relPath] = ['status' => 'installed', 'message' => 'Archivo de migración instalado'];
+                } else {
+                    $log("[DRY-RUN] Archivo de migración pendiente de instalación: {$relPath}");
+                    $results[$relPath] = ['status' => 'pending_install', 'message' => 'Migración pendiente de instalar'];
+                }
+            } else {
+                $srcSha = hash_file('sha256', $srcFile);
+                $tgtSha = hash_file('sha256', $tgtFile);
+
+                if (hash_equals((string) $srcSha, (string) $tgtSha)) {
+                    $log("Archivo de migración idéntico e intacto: {$relPath}");
+                    $results[$relPath] = ['status' => 'identical', 'message' => 'Migración idéntica ya presente'];
+                } else {
+                    if ($apply) {
+                        if ($backupDir !== null) {
+                            $bakFile = $backupDir.'/modified_files/'.$relPath;
+                            @mkdir(dirname($bakFile), 0775, true);
+                            @copy($tgtFile, $bakFile);
+                        }
+                        if (! @copy($srcFile, $tgtFile)) {
+                            throw new RuntimeException("Error al actualizar archivo de migración con respaldo: {$tgtFile}");
+                        }
+                        @chmod($tgtFile, 0664);
+                        $this->assertPhpSyntax($tgtFile);
+                        $log("Actualizado archivo de migración con respaldo individual: {$relPath}");
+                        $results[$relPath] = ['status' => 'updated_with_backup', 'message' => 'Migración actualizada con respaldo'];
+                    } else {
+                        $log("[DRY-RUN] Archivo de migración difiere en destino; se respaldará individualmente en --apply: {$relPath}");
+                        $results[$relPath] = ['status' => 'differs', 'message' => 'Migración difiere, elegible para actualización'];
+                    }
+                }
+            }
+        }
+
+        return $results;
     }
 
     /**
@@ -921,8 +1005,12 @@ class CcdProductionMigratorService
     /**
      * @return array<string, mixed>
      */
-    public function auditTarget(PDO $targetPdo, string $targetStorage, bool $skipFiles = false): array
-    {
+    public function auditTarget(
+        PDO $targetPdo,
+        string $targetStorage,
+        bool $skipFiles = false,
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+    ): array {
         $archivosCount = (int) $this->fetchScalar($targetPdo, 'SELECT COUNT(*) FROM ccd_archivos');
         $linkedCcdCount = (int) $this->fetchScalar($targetPdo, 'SELECT COUNT(*) FROM ccd_clientes WHERE ccd_archivo_id IS NOT NULL');
         $unlinkedCcdCount = (int) $this->fetchScalar($targetPdo, 'SELECT COUNT(*) FROM ccd_clientes WHERE ccd_archivo_id IS NULL');
@@ -979,26 +1067,38 @@ class CcdProductionMigratorService
         );
 
         $anomalies = [];
-        if ($archivosCount !== self::EXPECTED_AQP_TOTAL) {
-            $anomalies[] = "ccd_archivos total ({$archivosCount}) difiere de ".self::EXPECTED_AQP_TOTAL;
-        }
-        if ($linkedCcdCount !== self::EXPECTED_AQP_TOTAL) {
-            $anomalies[] = "ccd_clientes vinculados ({$linkedCcdCount}) difiere de ".self::EXPECTED_AQP_TOTAL;
-        }
-        if ($assocConfirmed !== self::EXPECTED_AQP_TOTAL) {
-            $anomalies[] = "Asociaciones confirmadas ({$assocConfirmed}) difiere de ".self::EXPECTED_AQP_TOTAL;
-        }
-        if ($assocAqp4 !== self::EXPECTED_AQP4_TOTAL) {
-            $anomalies[] = "Asociaciones AQP4 ({$assocAqp4}) difiere de ".self::EXPECTED_AQP4_TOTAL;
-        }
-        if ($assocAqp5 !== self::EXPECTED_AQP5_TOTAL) {
-            $anomalies[] = "Asociaciones AQP5 ({$assocAqp5}) difiere de ".self::EXPECTED_AQP5_TOTAL;
-        }
-        if ($assocV3 !== self::EXPECTED_V3_METHOD_TOTAL) {
-            $anomalies[] = "Asociaciones método v3 ({$assocV3}) difiere de ".self::EXPECTED_V3_METHOD_TOTAL;
-        }
-        if ($assocV5 !== self::EXPECTED_V5_METHOD_TOTAL) {
-            $anomalies[] = "Asociaciones método v5 ({$assocV5}) difiere de ".self::EXPECTED_V5_METHOD_TOTAL;
+        if ($expectedTotal !== null && $expectedTotal !== self::EXPECTED_AQP_TOTAL) {
+            if ($archivosCount !== $expectedTotal) {
+                $anomalies[] = "ccd_archivos total ({$archivosCount}) difiere de {$expectedTotal}";
+            }
+            if ($linkedCcdCount !== $expectedTotal) {
+                $anomalies[] = "ccd_clientes vinculados ({$linkedCcdCount}) difiere de {$expectedTotal}";
+            }
+            if ($assocConfirmed !== $expectedTotal) {
+                $anomalies[] = "Asociaciones confirmadas ({$assocConfirmed}) difiere de {$expectedTotal}";
+            }
+        } elseif ($expectedTotal === self::EXPECTED_AQP_TOTAL) {
+            if ($archivosCount !== self::EXPECTED_AQP_TOTAL) {
+                $anomalies[] = "ccd_archivos total ({$archivosCount}) difiere de ".self::EXPECTED_AQP_TOTAL;
+            }
+            if ($linkedCcdCount !== self::EXPECTED_AQP_TOTAL) {
+                $anomalies[] = "ccd_clientes vinculados ({$linkedCcdCount}) difiere de ".self::EXPECTED_AQP_TOTAL;
+            }
+            if ($assocConfirmed !== self::EXPECTED_AQP_TOTAL) {
+                $anomalies[] = "Asociaciones confirmadas ({$assocConfirmed}) difiere de ".self::EXPECTED_AQP_TOTAL;
+            }
+            if ($assocAqp4 !== self::EXPECTED_AQP4_TOTAL) {
+                $anomalies[] = "Asociaciones AQP4 ({$assocAqp4}) difiere de ".self::EXPECTED_AQP4_TOTAL;
+            }
+            if ($assocAqp5 !== self::EXPECTED_AQP5_TOTAL) {
+                $anomalies[] = "Asociaciones AQP5 ({$assocAqp5}) difiere de ".self::EXPECTED_AQP5_TOTAL;
+            }
+            if ($assocV3 !== self::EXPECTED_V3_METHOD_TOTAL) {
+                $anomalies[] = "Asociaciones método v3 ({$assocV3}) difiere de ".self::EXPECTED_V3_METHOD_TOTAL;
+            }
+            if ($assocV5 !== self::EXPECTED_V5_METHOD_TOTAL) {
+                $anomalies[] = "Asociaciones método v5 ({$assocV5}) difiere de ".self::EXPECTED_V5_METHOD_TOTAL;
+            }
         }
         if ($duplicateAssoc > 0) {
             $anomalies[] = "Se detectaron {$duplicateAssoc} asociaciones duplicadas por ccd_cliente_id.";
@@ -1049,6 +1149,11 @@ class CcdProductionMigratorService
             'orphan_archivos' => $orphanArchivos,
             'files_verified_target' => $filesVerifiedTarget,
             'anomalies' => $anomalies,
+            // Alias canónicos para compatibilidad de contrato
+            'success' => empty($anomalies),
+            'errors' => $anomalies,
+            'total_archivos' => $archivosCount,
+            'total_asociaciones' => $assocConfirmed,
         ];
     }
 

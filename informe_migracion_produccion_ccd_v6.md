@@ -1,8 +1,8 @@
-# KP INVEST — Informe de Migración a Producción CCD V6.2 (Adaptación a Producción LEGACY)
+# KP INVEST — Informe de Migración a Producción CCD V6.2.1 (Corrección de Errores de Ejecución y Adaptación LEGACY)
 
 ## 1. Resumen Ejecutivo y Objetivos
 
-El presente documento describe la arquitectura técnica, controles de integridad, compatibilidad de hosting, protección de credenciales, plan de contingencia y el procedimiento de ejecución del desplegador y migrador **V6.2** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**, adaptado específicamente a la **arquitectura LEGACY** instalada en Hostinger.
+El presente documento describe la arquitectura técnica, controles de integridad, compatibilidad de hosting, protección de credenciales, plan de contingencia y el procedimiento de ejecución del desplegador y migrador **V6.2.1** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**, adaptado específicamente a la **arquitectura LEGACY** instalada en Hostinger y con las correcciones operativas identificadas en la revisión de despliegue.
 
 ### Datos de Entornos
 
@@ -86,6 +86,18 @@ El método `verifyAndIntegrateComponents()` detecta automáticamente la arquitec
 - **Prevención de Manipulación de Parámetros:** Verifica estrictamente que el documento pertenezca al DNI indicado en la URL mediante `hash_equals((string) $ccdCliente->numdoc, $targetDoc)`. Si un usuario intenta modificar la URL para solicitar el documento de otro DNI, recibe inmediatamente un error `404 Not Found`.
 - **Streaming Privado e Inmutable:** Transmite los PDFs desde el disco `ccd-private` con cabeceras `inline`, `Content-Type: application/pdf`, `Cache-Control: private, no-store, no-cache` y `X-Content-Type-Options: nosniff`.
 
+### 3.6. Correcciones Críticas de Ejecución Implementadas en V6.2.1
+1. **Instalación Previa de Migraciones Selectivas en Fase 2:**
+   - En la versión previa, `php artisan migrate --path=database/migrations/...` fallaba en la Fase 2 debido a que los archivos físicos de migración solo eran copiados durante la Fase 4.
+   - Se incorporó el método `CcdProductionMigratorService::installMigrationFiles()` que se ejecuta al inicio de la Fase 2, copiando exclusivamente los 2 archivos de migración hacia `$PROD_DIR/database/migrations/` y validando su sintaxis PHP previamente mediante `proc_open()`.
+   - Tras ejecutar las migraciones, la Fase 2 valida que `inspectTargetSchema()` confirme `is_ready_for_apply === true`.
+2. **Unificación de Claves en `inspectTargetSchema()`:**
+   - Se resolvió la discrepancia entre el script desplegador (`has_ccd_archivo_id_column`) y el servicio migrador (`has_ccd_archivo_id_col`), retornando ambas claves con valores estrictamente idénticos y agregando una prueba automatizada que previene regresiones.
+3. **Contrato de Auditoría Final y Aborto Estricto ante Anomalías en Fase 5:**
+   - Se armonizó el contrato de `auditTarget()`, asegurando que retorne las claves primarias (`passed`, `anomalies`, `archivos_count`, `assoc_confirmed`) junto con sus alias canónicos (`success`, `errors`, `total_archivos`, `total_asociaciones`).
+   - Se adaptó `auditTarget()` para soportar universos de prueba (`$expectedTotal`), evitando falsos positivos o rechazos incorrectos durante ejecuciones de prueba o fixtures aislados.
+   - En el desplegador Bash, la condición evalúa `if (! $audit["passed"] || ! empty($audit["anomalies"]))`, imprimiendo cada anomalía a `stderr` y abortando con código de salida `1`.
+
 ---
 
 ## 4. Separación del Proceso en 5 Fases Controladas
@@ -94,10 +106,10 @@ El proceso de despliegue se organiza en cinco fases secuenciales e independiente
 
 ```mermaid
 flowchart TD
-    Fase1["Fase 1: Validaciones y Respaldo<br/>(Preflight, SHA-256 cruzado, espacio >= 5 GiB, mysqldump)"] --> Fase2["Fase 2: Instalación de Tablas CCD<br/>(Migraciones selectivas 2026_10_30 y 2026_11_13)"]
+    Fase1["Fase 1: Validaciones y Respaldo<br/>(Preflight, SHA-256 cruzado, espacio >= 5 GiB, mysqldump)"] --> Fase2["Fase 2: Instalación de Tablas CCD<br/>(Instalación previa de archivos y migraciones selectivas)"]
     Fase2 --> Fase3["Fase 3: Migración de PDFs y Datos<br/>(Transferencia 10,224 PDFs a ccd-private y asociaciones)"]
     Fase3 --> Fase4["Fase 4: Integración Interfaz CRM<br/>(Inyección aditiva en routes/web.php, ClienteController, show.blade.php)"]
-    Fase4 --> Fase5["Fase 5: Auditoría Funcional Final<br/>(Verificación total de catálogos, rutas y limpieza de caché)"]
+    Fase4 --> Fase5["Fase 5: Auditoría Funcional Final<br/>(Verificación total de catálogos, integridad física y limpieza)"]
 ```
 
 ### Detalle de Fases
@@ -113,10 +125,13 @@ flowchart TD
    - Verifica espacio en disco >= 5 GiB.
    - En `--apply`, crea respaldo completo de base de datos (`mysqldump`) y archivos de configuración.
 2. **Fase 2: Instalación de Tablas CCD**
-   - En `--dry-run`: inspecciona el esquema destino y reporta migraciones pendientes sin modificar nada.
-   - En `--apply`: ejecuta exclusivamente las 2 migraciones selectivas CCD:
-     - `2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php`
-     - `2026_11_13_000001_create_ccd_cliente_cuenta_table.php`
+   - En `--dry-run`: inspecciona el esquema destino y reporta migraciones y archivos pendientes sin modificar nada.
+   - En `--apply`:
+     - 2.1 Invoca `installMigrationFiles()` para copiar y validar sintaxis de las 2 migraciones selectivas en `$PROD_DIR/database/migrations/`.
+     - 2.2 Ejecuta exclusivamente las 2 migraciones selectivas CCD ya presentes:
+       - `2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php`
+       - `2026_11_13_000001_create_ccd_cliente_cuenta_table.php`
+     - 2.3 Valida que `inspectTargetSchema()` confirme la presencia de `ccd_archivos`, `ccd_cliente_cuenta` y `ccd_clientes.ccd_archivo_id`.
 3. **Fase 3: Migración de los 10,224 PDFs y Asociaciones**
    - Ejecuta `php artisan ccd:migrate-aqp-production-v6`.
    - Transfiere y cataloga los 10,224 PDFs en `storage/app/private/ccd/`.
@@ -130,6 +145,7 @@ flowchart TD
    - Valida sintaxis PHP de todos los archivos mediante `proc_open`.
 5. **Fase 5: Auditoría Funcional Final**
    - Ejecuta `auditTarget()` en producción verificando integridad física y lógica de los 10,224 PDFs.
+   - Aborta inmediatamente si se detectan anomalías (`! $audit["passed"] || ! empty($audit["anomalies"])`).
    - Limpia cachés de Laravel (`config:clear`, `route:clear`, `view:clear`).
 
 ---
@@ -150,7 +166,7 @@ El script `revertir_ccd_aqp_produccion_v6.sh`:
 
 Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
 
-- **Pruebas de Integración V6.2 (`tests/Feature/CcdAqpProductionMigrationV6Test.php`):**
+- **Pruebas de Integración V6.2.1 (`tests/Feature/CcdAqpProductionMigrationV6Test.php`):**
   - `test_dry_run_on_clean_target_with_no_ccd_tables_executes_zero_writes_and_reports_pending_migrations`: PASS
   - `test_apply_fails_if_target_schema_lacks_ccd_tables`: PASS
   - `test_selective_migrations_create_only_ccd_tables_and_columns`: PASS
@@ -169,10 +185,15 @@ Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
   - `test_verify_and_integrate_components_legacy_architecture_routes_controller_and_view`: PASS
   - `test_legacy_controller_ccd_confirmed_matches_operation_specifically_without_cross_pollution`: PASS
   - `test_ccd_document_controller_authorizes_legacy_and_modern_and_prevents_parameter_tampering`: PASS
-  - **Total:** 16 pruebas pasadas, 122 aserciones.
+  - `test_inspect_target_schema_unifies_column_keys_and_detects_discrepancies`: PASS
+  - `test_install_migration_files_copies_and_validates_syntax_before_migration`: PASS
+  - `test_audit_target_contract_and_anomaly_abort`: PASS
+  - `test_five_phases_end_to_end_legacy_flow_with_isolated_mysql_databases`: PASS
+  - **Total:** 20 pruebas pasadas, 223 aserciones.
 
-- **Suite General CCD:** 131 pruebas pasadas (685 aserciones).
+- **Suite General CCD:** 135 pruebas pasadas (786 aserciones).
 - **Estándar de Código (Laravel Pint):** 100% de conformidad sin advertencias.
+- **Validación de Sintaxis Bash (`bash -n`):** 100% de conformidad sin errores.
 
 ---
 

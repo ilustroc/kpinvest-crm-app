@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KP INVEST — Desplegador Automatizado CCD AQP V6.2 a Producción LEGACY
+# KP INVEST — Desplegador Automatizado CCD AQP V6.2.1 a Producción LEGACY
 # ==============================================================================
 # Uso:
 #   ./desplegar_ccd_aqp_produccion_v6.sh --dry-run   # Simulación sin escrituras
@@ -11,7 +11,7 @@ set -euo pipefail
 umask 077
 
 echo "=============================================================================="
-echo "  KP INVEST — DESPLEGADOR CCD AQP V6.2 A PRODUCCIÓN LEGACY"
+echo "  KP INVEST — DESPLEGADOR CCD AQP V6.2.1 A PRODUCCIÓN LEGACY"
 echo "=============================================================================="
 
 # Rutas estándar del entorno Hostinger
@@ -357,6 +357,52 @@ echo "==> [Fase 2/5] Comprobación e instalación de esquema CCD (migraciones se
 if [ "$MODE" = "dry-run" ]; then
   php -r '
     require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $svc = new App\Services\Ccd\CcdProductionMigratorService();
+    $svc->installMigrationFiles(
+        "'"$STAGING_DIR"'",
+        "'"$PROD_DIR"'",
+        false, // dry-run
+        null,
+        function (string $msg) { echo "  {$msg}\n"; }
+    );
+    $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+    $c = $creds["target"];
+    $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
+    $schema = $svc->inspectTargetSchema($pdo);
+    echo "  [DRY-RUN] Tabla ccd_archivos: " . ($schema["has_ccd_archivos"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+    echo "  [DRY-RUN] Tabla ccd_cliente_cuenta: " . ($schema["has_ccd_cliente_cuenta"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+    echo "  [DRY-RUN] Columna ccd_clientes.ccd_archivo_id: " . ($schema["has_ccd_archivo_id_column"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+  '
+else
+  # En modo apply:
+  # 2.1 Copiar y validar primero los archivos de migración hacia producción
+  echo "  Instalando archivos de migración selectivos en destino..."
+  php -r '
+    require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $svc = new App\Services\Ccd\CcdProductionMigratorService();
+    $svc->installMigrationFiles(
+        "'"$STAGING_DIR"'",
+        "'"$PROD_DIR"'",
+        true, // apply
+        "'"$BACKUP_DIR"'",
+        function (string $msg) { echo "  {$msg}\n"; }
+    );
+  '
+
+  # 2.2 Ejecutar las 2 migraciones selectivas CCD ya presentes y verificadas en destino
+  echo "  Ejecutando migraciones selectivas..."
+  (
+    cd "$PROD_DIR"
+    php artisan migrate --path=database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php --force
+    php artisan migrate --path=database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php --force
+  )
+  echo "  Migraciones selectivas ejecutadas exitosamente."
+
+  # 2.3 Validar que el esquema destino ahora posea las tablas y columnas necesarias
+  php -r '
+    require "'"$STAGING_DIR"'/vendor/autoload.php";
     $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
     $c = $creds["target"];
     $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
@@ -364,18 +410,12 @@ if [ "$MODE" = "dry-run" ]; then
     ]);
     $svc = new App\Services\Ccd\CcdProductionMigratorService();
     $schema = $svc->inspectTargetSchema($pdo);
-    echo "  [DRY-RUN] Tabla ccd_archivos: " . ($schema["has_ccd_archivos"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
-    echo "  [DRY-RUN] Tabla ccd_cliente_cuenta: " . ($schema["has_ccd_cliente_cuenta"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
-    echo "  [DRY-RUN] Columna ccd_clientes.ccd_archivo_id: " . ($schema["has_ccd_archivo_id_column"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+    if (! $schema["is_ready_for_apply"]) {
+        fwrite(STDERR, "ERROR: El esquema destino sigue incompleto tras ejecutar migraciones.\n");
+        exit(1);
+    }
+    echo "  Esquema destino validado: ccd_archivos, ccd_cliente_cuenta y ccd_archivo_id presentes.\n";
   '
-else
-  # En modo apply: ejecutar las 2 migraciones selectivas CCD
-  (
-    cd "$PROD_DIR"
-    php artisan migrate --path=database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php --force
-    php artisan migrate --path=database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php --force
-  )
-  echo "  Migraciones selectivas ejecutadas exitosamente."
 fi
 
 # ==============================================================================
@@ -441,9 +481,10 @@ if [ "$MODE" = "dry-run" ]; then
   echo "  [DRY-RUN] Simulando auditoría final post-migración: conforme."
   echo ""
   echo "=============================================================================="
-  echo "  SIMULACIÓN DRY-RUN V6.2 COMPLETADA SATISFACTORIAMENTE"
+  echo "  SIMULACIÓN DRY-RUN V6.2.1 COMPLETADA SATISFACTORIAMENTE"
   echo "  - CERO escrituras realizadas en base de datos de producción."
   echo "  - CERO directorios o archivos modificados en el CRM de producción."
+  echo "  - Migraciones e interfaz probadas y listas para instalación previa."
   echo "  - Integración compatible comprobada con arquitectura LEGACY de producción."
   echo "  - Puede proceder con --apply cuando cuente con la debida autorización."
   echo "=============================================================================="
@@ -459,11 +500,14 @@ else
     ]);
     $svc = new App\Services\Ccd\CcdProductionMigratorService();
     $audit = $svc->auditTarget($pdo, "'"$PROD_DIR"'/storage/app/private/ccd", false);
-    if (!$audit["success"]) {
-        fwrite(STDERR, "ERROR en auditoría post-migración:\n" . implode("\n", $audit["errors"]) . "\n");
+    if (! $audit["passed"] || ! empty($audit["anomalies"])) {
+        fwrite(STDERR, "ERROR en auditoría post-migración: se detectaron " . count($audit["anomalies"]) . " anomalías:\n");
+        foreach ($audit["anomalies"] as $anomaly) {
+            fwrite(STDERR, "  - {$anomaly}\n");
+        }
         exit(1);
     }
-    echo "  Auditoría conforme: {$audit["total_archivos"]} archivos catalogados, {$audit["total_asociaciones"]} asociaciones confirmadas.\n";
+    echo "  Auditoría conforme: {$audit["archivos_count"]} archivos catalogados, {$audit["assoc_confirmed"]} asociaciones confirmadas.\n";
   '
 
   # Limpieza de cachés de Laravel en producción
@@ -476,7 +520,7 @@ else
 
   echo ""
   echo "=============================================================================="
-  echo "  DESPLIEGUE CCD AQP V6.2 A PRODUCCIÓN LEGACY COMPLETADO CON ÉXITO"
+  echo "  DESPLIEGUE CCD AQP V6.2.1 A PRODUCCIÓN LEGACY COMPLETADO CON ÉXITO"
   echo "  Respaldo previo: $BACKUP_DIR"
   echo "  Manifiesto:      $MANIFEST_PATH"
   if [ -f "$MANIFEST_PATH" ]; then

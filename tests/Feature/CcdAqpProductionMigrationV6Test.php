@@ -948,6 +948,392 @@ BLADE;
         $this->assertTrue(in_array($responseGuest->getStatusCode(), [302, 401], true));
     }
 
+    public function test_inspect_target_schema_unifies_column_keys_and_detects_discrepancies(): void
+    {
+        $service = new CcdProductionMigratorService();
+
+        // 1. Estado inicial de producción legacy: sin ccd_archivos, sin ccd_cliente_cuenta, sin ccd_archivo_id
+        $cleanSchema = $service->inspectTargetSchema($this->targetPdo);
+        $this->assertFalse($cleanSchema['has_ccd_archivos']);
+        $this->assertFalse($cleanSchema['has_ccd_cliente_cuenta']);
+        $this->assertFalse($cleanSchema['has_ccd_archivo_id_col']);
+        $this->assertFalse($cleanSchema['has_ccd_archivo_id_column']);
+        $this->assertSame($cleanSchema['has_ccd_archivo_id_col'], $cleanSchema['has_ccd_archivo_id_column']);
+        $this->assertFalse($cleanSchema['is_ready_for_apply']);
+        $this->assertCount(2, $cleanSchema['pending_migrations']);
+
+        // 2. Estado tras aplicar la primera migración (solo ccd_archivos y columna ccd_archivo_id)
+        $this->targetPdo->exec('CREATE TABLE IF NOT EXISTS ccd_archivos (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            disk VARCHAR(50) NOT NULL,
+            path VARCHAR(500) NOT NULL UNIQUE,
+            sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+            size_bytes BIGINT UNSIGNED NOT NULL,
+            mime_type VARCHAR(100) NOT NULL,
+            nombre_original VARCHAR(500) NOT NULL,
+            verified_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP NULL,
+            updated_at TIMESTAMP NULL
+        ) ENGINE=InnoDB');
+        $this->targetPdo->exec('ALTER TABLE ccd_clientes ADD COLUMN ccd_archivo_id BIGINT UNSIGNED NULL AFTER codigo');
+        $this->targetPdo->exec("INSERT INTO migrations (migration, batch) VALUES ('2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes', 1)");
+
+        $partialSchema = $service->inspectTargetSchema($this->targetPdo);
+        $this->assertTrue($partialSchema['has_ccd_archivos']);
+        $this->assertFalse($partialSchema['has_ccd_cliente_cuenta']);
+        $this->assertTrue($partialSchema['has_ccd_archivo_id_col']);
+        $this->assertTrue($partialSchema['has_ccd_archivo_id_column']);
+        $this->assertSame($partialSchema['has_ccd_archivo_id_col'], $partialSchema['has_ccd_archivo_id_column']);
+        $this->assertFalse($partialSchema['is_ready_for_apply']);
+        $this->assertCount(1, $partialSchema['pending_migrations']);
+
+        // 3. Estado tras aplicar la segunda migración (ccd_cliente_cuenta)
+        $this->targetPdo->exec("CREATE TABLE IF NOT EXISTS ccd_cliente_cuenta (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            ccd_cliente_id BIGINT UNSIGNED NOT NULL,
+            cliente_cuenta_id BIGINT UNSIGNED NOT NULL,
+            estado ENUM('candidata', 'confirmada', 'en_revision') DEFAULT 'candidata',
+            metodo_verificacion VARCHAR(100) NULL,
+            evidencia TEXT NULL,
+            confirmado_por_user_id BIGINT UNSIGNED NULL,
+            confirmado_at TIMESTAMP NULL,
+            created_at TIMESTAMP NULL,
+            updated_at TIMESTAMP NULL,
+            UNIQUE KEY ccd_cliente_cuenta_unique (ccd_cliente_id, cliente_cuenta_id)
+        ) ENGINE=InnoDB");
+        $this->targetPdo->exec("INSERT INTO migrations (migration, batch) VALUES ('2026_11_13_000001_create_ccd_cliente_cuenta_table', 1)");
+
+        $readySchema = $service->inspectTargetSchema($this->targetPdo);
+        $this->assertTrue($readySchema['has_ccd_archivos']);
+        $this->assertTrue($readySchema['has_ccd_cliente_cuenta']);
+        $this->assertTrue($readySchema['has_ccd_archivo_id_col']);
+        $this->assertTrue($readySchema['has_ccd_archivo_id_column']);
+        $this->assertSame($readySchema['has_ccd_archivo_id_col'], $readySchema['has_ccd_archivo_id_column']);
+        $this->assertTrue($readySchema['is_ready_for_apply']);
+        $this->assertEmpty($readySchema['pending_migrations']);
+    }
+
+    public function test_install_migration_files_copies_and_validates_syntax_before_migration(): void
+    {
+        $service = new CcdProductionMigratorService();
+        $sourceDir = storage_path('framework/testing/test_source_app_mig');
+        $targetDir = storage_path('framework/testing/test_target_app_mig');
+        $backupDir = storage_path('framework/testing/test_backup_mig');
+
+        File::ensureDirectoryExists($sourceDir.'/database/migrations');
+        File::ensureDirectoryExists($targetDir.'/database/migrations');
+        File::ensureDirectoryExists($backupDir);
+
+        $mig1 = 'database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php';
+        $mig2 = 'database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php';
+
+        $validContent1 = "<?php\nuse Illuminate\Database\Migrations\Migration;\nreturn new class extends Migration { public function up(): void {} };\n";
+        $validContent2 = "<?php\nuse Illuminate\Database\Migrations\Migration;\nreturn new class extends Migration { public function up(): void {} };\n";
+
+        file_put_contents($sourceDir.'/'.$mig1, $validContent1);
+        file_put_contents($sourceDir.'/'.$mig2, $validContent2);
+
+        try {
+            // 1. Dry run: reporta pending_install y CERO escrituras en destino
+            $dryRunRes = $service->installMigrationFiles($sourceDir, $targetDir, false);
+            $this->assertSame('pending_install', $dryRunRes[$mig1]['status']);
+            $this->assertSame('pending_install', $dryRunRes[$mig2]['status']);
+            $this->assertFileDoesNotExist($targetDir.'/'.$mig1);
+            $this->assertFileDoesNotExist($targetDir.'/'.$mig2);
+
+            // 2. Apply: instala archivos y valida sintaxis PHP
+            $applyRes = $service->installMigrationFiles($sourceDir, $targetDir, true, $backupDir);
+            $this->assertSame('installed', $applyRes[$mig1]['status']);
+            $this->assertSame('installed', $applyRes[$mig2]['status']);
+            $this->assertFileExists($targetDir.'/'.$mig1);
+            $this->assertFileExists($targetDir.'/'.$mig2);
+
+            // 3. Re-ejecución apply con archivos idénticos: reporta identical sin tocar nada
+            $idempotentRes = $service->installMigrationFiles($sourceDir, $targetDir, true, $backupDir);
+            $this->assertSame('identical', $idempotentRes[$mig1]['status']);
+            $this->assertSame('identical', $idempotentRes[$mig2]['status']);
+
+            // 4. Modificación en destino: si difiere, apply crea backup y actualiza con validación
+            file_put_contents($targetDir.'/'.$mig1, "<?php\n// Modificado previamente en destino\n");
+            $diffRes = $service->installMigrationFiles($sourceDir, $targetDir, true, $backupDir);
+            $this->assertSame('updated_with_backup', $diffRes[$mig1]['status']);
+            $this->assertFileExists($backupDir.'/modified_files/'.$mig1);
+
+            // 5. Archivo con error de sintaxis PHP en fuente: aborta con DomainException antes de copiar
+            file_put_contents($sourceDir.'/'.$mig2, "<?php\nthis is invalid php syntax {;");
+            try {
+                $service->installMigrationFiles($sourceDir, $targetDir, true, $backupDir);
+                $this->fail('Se esperaba DomainException por error de sintaxis');
+            } catch (DomainException $e) {
+                $this->assertStringContainsString('Error de sintaxis PHP', $e->getMessage());
+            }
+        } finally {
+            File::deleteDirectory($sourceDir);
+            File::deleteDirectory($targetDir);
+            File::deleteDirectory($backupDir);
+        }
+    }
+
+    public function test_audit_target_contract_and_anomaly_abort(): void
+    {
+        $service = new CcdProductionMigratorService();
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        // Sembrar 1 registro coherente en destino
+        $content = '%PDF-1.4 Simulated Clean Audit Target Content';
+        $sha256 = hash('sha256', $content);
+        $size = strlen($content);
+        $relPath = "sha256/33/44/{$sha256}.pdf";
+        $targetFile = $this->targetStorage.'/'.$relPath;
+        File::ensureDirectoryExists(dirname($targetFile));
+        file_put_contents($targetFile, $content);
+
+        $this->targetPdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at)
+                                VALUES (1, 'ccd-private', '{$relPath}', '{$sha256}', {$size}, 'application/pdf', 'doc.pdf', NOW(), NOW(), NOW())");
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id)
+                                VALUES (1, '77889900', 'doc.pdf', 'AQP4', 1)");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                VALUES (1, '77889900', 'CTA-AUD-1', 'OP-AUD-1', 'Caja AQP', 'CAJAAQP4')");
+        $this->targetPdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at)
+                                VALUES (1, 1, 1, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'Verificado OK', NOW())");
+
+        // 1. Auditoría exitosa: validar contrato de claves primarias y alias canónicos
+        $cleanAudit = $service->auditTarget($this->targetPdo, $this->targetStorage, false, 1);
+
+        // Claves primarias
+        $this->assertArrayHasKey('passed', $cleanAudit);
+        $this->assertArrayHasKey('anomalies', $cleanAudit);
+        $this->assertArrayHasKey('archivos_count', $cleanAudit);
+        $this->assertArrayHasKey('assoc_confirmed', $cleanAudit);
+
+        // Alias canónicos del contrato
+        $this->assertArrayHasKey('success', $cleanAudit);
+        $this->assertArrayHasKey('errors', $cleanAudit);
+        $this->assertArrayHasKey('total_archivos', $cleanAudit);
+        $this->assertArrayHasKey('total_asociaciones', $cleanAudit);
+
+        // Equivalencia estricta
+        $this->assertTrue($cleanAudit['passed']);
+        $this->assertTrue($cleanAudit['success']);
+        $this->assertSame($cleanAudit['passed'], $cleanAudit['success']);
+        $this->assertEmpty($cleanAudit['anomalies']);
+        $this->assertEmpty($cleanAudit['errors']);
+        $this->assertSame($cleanAudit['archivos_count'], $cleanAudit['total_archivos']);
+        $this->assertSame($cleanAudit['assoc_confirmed'], $cleanAudit['total_asociaciones']);
+        $this->assertSame(1, $cleanAudit['archivos_count']);
+        $this->assertSame(1, $cleanAudit['assoc_confirmed']);
+
+        // 2. Simular anomalías: archivo físico ausente, ccd_cliente sin ccd_archivo_id y asociación huérfana
+        unlink($targetFile); // Borrar archivo físico del almacenamiento
+
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id)
+                                VALUES (2, '77889901', 'doc2.pdf', 'AQP5', NULL)"); // Sin archivo vinculado
+        $this->targetPdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        $this->targetPdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at)
+                                VALUES (2, 999999, 1, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'Huérfana', NOW())"); // ccd_cliente inexistente
+        $this->targetPdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+        $corruptAudit = $service->auditTarget($this->targetPdo, $this->targetStorage, false, 1);
+
+        $this->assertFalse($corruptAudit['passed']);
+        $this->assertFalse($corruptAudit['success']);
+        $this->assertSame($corruptAudit['passed'], $corruptAudit['success']);
+        $this->assertNotEmpty($corruptAudit['anomalies']);
+        $this->assertNotEmpty($corruptAudit['errors']);
+        $this->assertSame($corruptAudit['anomalies'], $corruptAudit['errors']);
+
+        // Validar lógica del script bash: if (! $audit["passed"] || ! empty($audit["anomalies"]))
+        $bashAbortCondition = (! $corruptAudit['passed'] || ! empty($corruptAudit['anomalies']));
+        $this->assertTrue($bashAbortCondition, 'El script bash debe abortar inmediatamente si detecta anomalías en la auditoría');
+    }
+
+    public function test_five_phases_end_to_end_legacy_flow_with_isolated_mysql_databases(): void
+    {
+        $service = new CcdProductionMigratorService();
+        $sourceAppDir = base_path();
+        $targetAppDir = storage_path('framework/testing/e2e_target_app_'.uniqid());
+        $backupDir = storage_path('framework/testing/e2e_backup_app_'.uniqid());
+
+        File::ensureDirectoryExists($targetAppDir.'/database/migrations');
+        File::ensureDirectoryExists($targetAppDir.'/routes');
+        File::ensureDirectoryExists($targetAppDir.'/app/Http/Controllers');
+        File::ensureDirectoryExists($targetAppDir.'/resources/views/clientes');
+        File::ensureDirectoryExists($targetAppDir.'/app/Models');
+        File::ensureDirectoryExists($targetAppDir.'/config');
+        File::ensureDirectoryExists($backupDir);
+
+        try {
+            // Preparar archivos legacy en targetAppDir
+            file_put_contents($targetAppDir.'/routes/web.php', "<?php\nuse Illuminate\Support\Facades\Route;\nRoute::get('/clientes/{dni}', 'ClienteController@show');\n");
+            file_put_contents($targetAppDir.'/app/Http/Controllers/ClienteController.php', "<?php\nnamespace App\Http\Controllers;\nclass ClienteController {\n    public function show(\$dni) {\n        \$cuentas = collect();\n        \$ccdDocs = collect();\n        return view('clientes.show', compact('cuentas', 'ccdDocs'));\n    }\n}\n");
+            file_put_contents($targetAppDir.'/resources/views/clientes/show.blade.php', "<table><tr><td>OP</td>{{-- === CELDA CCD === --}}\n<td class=\"text-nowrap\"><span>—</span></td>\n{{-- === /CELDA CCD === --}}</tr></table>");
+            file_put_contents($targetAppDir.'/app/Models/ClienteCuenta.php', "<?php\nnamespace App\Models;\nuse Illuminate\Database\Eloquent\Model;\nclass ClienteCuenta extends Model {}\n");
+            file_put_contents($targetAppDir.'/app/Models/CcdCliente.php', "<?php\nnamespace App\Models;\nuse Illuminate\Database\Eloquent\Model;\nclass CcdCliente extends Model {}\n");
+            file_put_contents($targetAppDir.'/config/filesystems.php', "<?php\nreturn ['disks' => ['local' => []]];\n");
+
+            // Sembrar 2 registros en origen (AQP4 y AQP5)
+            $contentAqp4 = '%PDF-1.4 Simulated E2E AQP4 Content';
+            $shaAqp4 = hash('sha256', $contentAqp4);
+            $sizeAqp4 = strlen($contentAqp4);
+            $relAqp4 = "sha256/aa/bb/{$shaAqp4}.pdf";
+            $srcAqp4 = $this->sourceStorage.'/'.$relAqp4;
+            File::ensureDirectoryExists(dirname($srcAqp4));
+            file_put_contents($srcAqp4, $contentAqp4);
+
+            $contentAqp5 = '%PDF-1.4 Simulated E2E AQP5 Content';
+            $shaAqp5 = hash('sha256', $contentAqp5);
+            $sizeAqp5 = strlen($contentAqp5);
+            $relAqp5 = "sha256/cc/dd/{$shaAqp5}.pdf";
+            $srcAqp5 = $this->sourceStorage.'/'.$relAqp5;
+            File::ensureDirectoryExists(dirname($srcAqp5));
+            file_put_contents($srcAqp5, $contentAqp5);
+
+            $this->sourcePdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at)
+                                    VALUES (10, 'ccd-private', '{$relAqp4}', '{$shaAqp4}', {$sizeAqp4}, 'application/pdf', 'aqp4.pdf', NOW(), NOW(), NOW()),
+                                           (20, 'ccd-private', '{$relAqp5}', '{$shaAqp5}', {$sizeAqp5}, 'application/pdf', 'aqp5.pdf', NOW(), NOW(), NOW())");
+
+            $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id)
+                                    VALUES (100, '55667788', 'aqp4.pdf', 'AQP4', 10),
+                                           (200, '66778899', 'aqp5.pdf', 'AQP5', 20)");
+
+            $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                    VALUES (1000, '55667788', 'CTA-55', 'OP-55', 'Caja AQP', 'CAJAAQP4'),
+                                           (2000, '66778899', 'CTA-66', 'OP-66', 'Caja AQP', 'CAJAAQP5')");
+
+            $this->sourcePdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at)
+                                    VALUES (1, 100, 1000, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'E2E AQP4 Hash OK', NOW()),
+                                           (2, 200, 2000, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'E2E AQP5 Hash OK', NOW())");
+
+            // Sembrar destino con estado inicial LEGACY (clientes y cuentas existen, pero sin ccd_archivo_id ni tablas de archivos/asociaciones)
+            $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha)
+                                    VALUES (100, '55667788', 'aqp4.pdf', 'AQP4'),
+                                           (200, '66778899', 'aqp5.pdf', 'AQP5')");
+
+            $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                    VALUES (1000, '55667788', 'CTA-55', 'OP-55', 'Caja AQP', 'CAJAAQP4'),
+                                           (2000, '66778899', 'CTA-66', 'OP-66', 'Caja AQP', 'CAJAAQP5')");
+
+            // ==============================================================================
+            // FASE 1: PREFLIGHT Y VALIDACIÓN DE FIRMAS SHA-256
+            // ==============================================================================
+            $shaCcdSource = $service->calculateCcdAqpSha256($this->sourcePdo);
+            $shaCcdTarget = $service->calculateCcdAqpSha256($this->targetPdo);
+            $this->assertSame($shaCcdSource, $shaCcdTarget);
+
+            $shaCuentasSource = $service->calculateCuentasSha256($this->sourcePdo);
+            $shaCuentasTarget = $service->calculateCuentasSha256($this->targetPdo);
+            $this->assertSame($shaCuentasSource, $shaCuentasTarget);
+
+            // Preflight dry-run del esquema destino: detecta esquema legacy no listo
+            $preSchema = $service->inspectTargetSchema($this->targetPdo);
+            $this->assertFalse($preSchema['is_ready_for_apply']);
+            $this->assertFalse($preSchema['has_ccd_archivo_id_column']);
+            $this->assertFalse($preSchema['has_ccd_archivo_id_col']);
+            $this->assertCount(2, $preSchema['pending_migrations']);
+
+            // ==============================================================================
+            // FASE 2: INSTALACIÓN Y EJECUCIÓN DE MIGRACIONES SELECTIVAS
+            // ==============================================================================
+            // 2.1 En dry-run: comprueba archivos sin escribir
+            $dryRunInstall = $service->installMigrationFiles($sourceAppDir, $targetAppDir, false);
+            $this->assertSame('pending_install', $dryRunInstall['database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php']['status']);
+            $this->assertFileDoesNotExist($targetAppDir.'/database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php');
+
+            // 2.2 En apply: instala archivos con validación de sintaxis
+            $applyInstall = $service->installMigrationFiles($sourceAppDir, $targetAppDir, true, $backupDir);
+            $this->assertSame('installed', $applyInstall['database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php']['status']);
+            $this->assertFileExists($targetAppDir.'/database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php');
+
+            // 2.3 Ejecutar migraciones selectivas sobre el destino
+            $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+            // 2.4 Verificar que el esquema destino ahora sí esté completamente listo
+            $postSchema = $service->inspectTargetSchema($this->targetPdo);
+            $this->assertTrue($postSchema['is_ready_for_apply']);
+            $this->assertTrue($postSchema['has_ccd_archivos']);
+            $this->assertTrue($postSchema['has_ccd_cliente_cuenta']);
+            $this->assertTrue($postSchema['has_ccd_archivo_id_column']);
+            $this->assertTrue($postSchema['has_ccd_archivo_id_col']);
+            $this->assertEmpty($postSchema['pending_migrations']);
+
+            // ==============================================================================
+            // FASE 3: MIGRACIÓN DE ARCHIVOS Y DATOS (APPLY E IDEMPOTENCIA)
+            // ==============================================================================
+            $manifestPath = $this->targetStorage.'/e2e_manifest.csv';
+
+            // 3.1 Apply de migración de datos
+            $migResult = $service->migrate([
+                'source_pdo' => $this->sourcePdo,
+                'target_pdo' => $this->targetPdo,
+                'source_storage' => $this->sourceStorage,
+                'target_storage' => $this->targetStorage,
+                'apply' => true,
+                'manifest_path' => $manifestPath,
+                'expected_total' => 2,
+            ]);
+
+            $this->assertSame('success', $migResult['status']);
+            $this->assertSame(2, $migResult['files_transferred']);
+            $this->assertSame(2, $migResult['archivos_migrated']);
+            $this->assertSame(2, $migResult['links_updated']);
+            $this->assertSame(2, $migResult['associations_migrated']);
+            $this->assertFileExists($this->targetStorage.'/'.$relAqp4);
+            $this->assertFileExists($this->targetStorage.'/'.$relAqp5);
+            $this->assertFileExists($manifestPath);
+
+            // 3.2 Idempotencia: re-ejecución sobre el mismo destino no duplica ni falla
+            $idempotentResult = $service->migrate([
+                'source_pdo' => $this->sourcePdo,
+                'target_pdo' => $this->targetPdo,
+                'source_storage' => $this->sourceStorage,
+                'target_storage' => $this->targetStorage,
+                'apply' => true,
+                'manifest_path' => $manifestPath,
+                'expected_total' => 2,
+            ]);
+            $this->assertSame('success', $idempotentResult['status']);
+            $this->assertSame(0, $idempotentResult['files_transferred']);
+            $this->assertSame(2, $idempotentResult['archivos_migrated']);
+            $this->assertSame(2, $idempotentResult['associations_migrated']);
+            $this->assertSame(2, (int) $this->targetPdo->query('SELECT COUNT(*) FROM ccd_cliente_cuenta')->fetchColumn());
+            $this->assertSame(2, (int) $this->targetPdo->query('SELECT COUNT(*) FROM ccd_archivos')->fetchColumn());
+
+            // ==============================================================================
+            // FASE 4: INTEGRACIÓN COMPATIBLE EN ARQUITECTURA LEGACY
+            // ==============================================================================
+            $intResult = $service->verifyAndIntegrateComponents($sourceAppDir, $targetAppDir, true, $backupDir);
+            $this->assertSame('additively_integrated', $intResult['routes/web.php']['status']);
+            $this->assertSame('additively_integrated', $intResult['app/Http/Controllers/ClienteController.php']['status']);
+            $this->assertSame('additively_integrated', $intResult['resources/views/clientes/show.blade.php']['status']);
+
+            // Comprobar sintaxis PHP de los componentes modificados
+            $service->assertPhpSyntax($targetAppDir.'/routes/web.php');
+            $service->assertPhpSyntax($targetAppDir.'/app/Http/Controllers/ClienteController.php');
+
+            // ==============================================================================
+            // FASE 5: AUDITORÍA FINAL POST-MIGRACIÓN Y VERIFICACIÓN DE ROLLBACK
+            // ==============================================================================
+            $finalAudit = $service->auditTarget($this->targetPdo, $this->targetStorage, false, 2);
+            $this->assertTrue($finalAudit['passed']);
+            $this->assertTrue($finalAudit['success']);
+            $this->assertEmpty($finalAudit['anomalies']);
+            $this->assertEmpty($finalAudit['errors']);
+            $this->assertSame(2, $finalAudit['archivos_count']);
+            $this->assertSame(2, $finalAudit['total_archivos']);
+            $this->assertSame(2, $finalAudit['assoc_confirmed']);
+            $this->assertSame(2, $finalAudit['total_asociaciones']);
+
+            // Verificación de aislamiento del rollback
+            $rollbackSafety = $service->validateRollbackSafety($this->targetPdo);
+            $this->assertTrue($rollbackSafety['safe']);
+            $this->assertEmpty($rollbackSafety['reasons']);
+        } finally {
+            // Limpieza de directorios temporales
+            File::deleteDirectory($targetAppDir);
+            File::deleteDirectory($backupDir);
+        }
+    }
+
     private function setupSourceSchema(PDO $pdo): void
     {
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
