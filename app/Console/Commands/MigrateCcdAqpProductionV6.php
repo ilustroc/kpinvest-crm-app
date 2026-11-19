@@ -120,6 +120,26 @@ class MigrateCcdAqpProductionV6 extends Command
             $result = $migrator->migrate([
                 'source_pdo' => $sourcePdo,
                 'target_pdo' => $targetPdo,
+                'source_credentials' => $credentials['source'],
+                'target_credentials' => $credentials['target'],
+                'source_reconnector' => function () use ($credentials) {
+                    return $this->createPdo(
+                        $credentials['source']['host'],
+                        $credentials['source']['port'],
+                        $credentials['source']['database'],
+                        $credentials['source']['username'],
+                        $credentials['source']['password']
+                    );
+                },
+                'target_reconnector' => function () use ($credentials) {
+                    return $this->createPdo(
+                        $credentials['target']['host'],
+                        $credentials['target']['port'],
+                        $credentials['target']['database'],
+                        $credentials['target']['username'],
+                        $credentials['target']['password']
+                    );
+                },
                 'source_storage' => (string) $this->option('source-storage'),
                 'target_storage' => (string) $this->option('target-storage'),
                 'apply' => $apply,

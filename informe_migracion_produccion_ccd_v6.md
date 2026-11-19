@@ -1,8 +1,8 @@
-# KP INVEST — Informe de Migración a Producción CCD V6.2.1 (Corrección de Errores de Ejecución y Adaptación LEGACY)
+# KP INVEST — Informe de Migración a Producción CCD V6.2.2 (Prevención de Error MySQL 2006, Validación Masiva por Lotes y Adaptación LEGACY)
 
 ## 1. Resumen Ejecutivo y Objetivos
 
-El presente documento describe la arquitectura técnica, controles de integridad, compatibilidad de hosting, protección de credenciales, plan de contingencia y el procedimiento de ejecución del desplegador y migrador **V6.2.1** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**, adaptado específicamente a la **arquitectura LEGACY** instalada en Hostinger y con las correcciones operativas identificadas en la revisión de despliegue.
+El presente documento describe la arquitectura técnica, controles de integridad, compatibilidad de hosting, protección de credenciales, plan de contingencia y el procedimiento de ejecución del desplegador y migrador **V6.2.2** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**, adaptado específicamente a la **arquitectura LEGACY** instalada en Hostinger, con las correcciones operativas identificadas en la ejecución real de staging/producción (prevención de desconexión `MySQL server has gone away` y optimización de validación masiva sin N+1).
 
 ### Datos de Entornos
 
@@ -98,6 +98,29 @@ El método `verifyAndIntegrateComponents()` detecta automáticamente la arquitec
    - Se adaptó `auditTarget()` para soportar universos de prueba (`$expectedTotal`), evitando falsos positivos o rechazos incorrectos durante ejecuciones de prueba o fixtures aislados.
    - En el desplegador Bash, la condición evalúa `if (! $audit["passed"] || ! empty($audit["anomalies"]))`, imprimiendo cada anomalía a `stderr` y abortando con código de salida `1`.
 
+### 3.7. Correcciones Críticas de V6.2.2: Prevención de Error MySQL 2006 y Optimización de Validación Masiva
+
+1. **Gestión de Conexiones PDO y Prevención de Desconexión (`2006 MySQL server has gone away`):**
+   - **Causa raíz diagnosticada en Hostinger:** Durante la lectura y verificación física con cálculo hash de los 10,224 PDFs (2.618 GiB), las conexiones PDO permanecían inactivas mientras se mantenía un cursor de lectura abierto en `$stmt->fetch(PDO::FETCH_ASSOC)`. Al iniciar la validación SQL subsiguiente, MySQL Server cerraba el socket por inactividad (`wait_timeout`).
+   - **Cierre Anticipado de Cursores:** En `transferAndVerifyFiles()` y `validateAssociationsPreInsert()`, la consulta de metadatos de los archivos y asociaciones se realiza con `fetchAll(PDO::FETCH_ASSOC)`, seguido inmediatamente de `$stmt->closeCursor(); unset($stmt);` antes de iniciar cualquier operación en disco. Esto libera a MySQL de esperar consumo de resultados y evita bloqueos de buffer.
+   - **Renovación Controlada Post-Filesystem:** Al concluir la verificación y/o transferencia prolongada de PDFs, el método `migrate()` invoca obligatoriamente `refreshPdoConnection()` tanto para staging como para producción (en `--dry-run` y en `--apply`). La reconexión utiliza de forma segura las credenciales privadas ya cargadas en memoria, verificando la salud del canal con un `SELECT 1` no intrusivo (`pingPdo`).
+   - **Preservación Estricta del Estado Transaccional:** `refreshPdoConnection()` valida `$pdo->inTransaction()`. Si existiera una transacción abierta, rechaza de inmediato la renovación con `DomainException` para evitar reintentos ciegos con resultados de commit inciertos.
+
+2. **Optimización de Validación Masiva por Lotes (`validateAssociationsPreInsert`):**
+   - **Erradicación del Patrón N+1:** Se eliminó el bucle que ejecutaba dos consultas SQL individuales por cada asociación (20,448 consultas en total contra MySQL en producción).
+   - **Procesamiento en Lotes con `WHERE IN`:** Se implementó división por lotes de 500 a 1,000 asociaciones, ejecutando consultas masivas indexadas para `ccd_clientes`, `clientes_cuentas` y `ccd_cliente_cuenta`.
+   - **Validación Estricta en Memoria:**
+     - Coherencia de DNI entre el cliente CCD y la cuenta asociada en origen.
+     - Existencia y concordancia exacta del DNI en `ccd_clientes` de destino.
+     - Existencia y concordancia exacta del DNI en `clientes_cuentas` de destino.
+     - Detección de colisiones: si en destino ya existe una asociación confirmada vinculada a una cuenta distinta, se aborta inmediatamente sin escribir cambios.
+     - Idempotencia garantizada: si la asociación ya existe con la misma cuenta y método, se admite sin duplicación ni error.
+
+3. **Observabilidad Mejorada y Métricas de Rendimiento:**
+   - Registro cronometrado de cada etapa crítica: preflight, transferencia de PDFs, validación masiva previa, migración de catálogos y auditoría final.
+   - Progreso reportado en bloques de 1,000 PDFs y seguimiento de lotes procesados en base de datos.
+   - Privacidad absoluta: prohibición estricta de registrar contraseñas, tokens de conexión o datos personales de clientes (PII) en consola o archivos de registro.
+
 ---
 
 ## 4. Separación del Proceso en 5 Fases Controladas
@@ -166,7 +189,7 @@ El script `revertir_ccd_aqp_produccion_v6.sh`:
 
 Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
 
-- **Pruebas de Integración V6.2.1 (`tests/Feature/CcdAqpProductionMigrationV6Test.php`):**
+- **Pruebas de Integración V6.2.2 (`tests/Feature/CcdAqpProductionMigrationV6Test.php`):**
   - `test_dry_run_on_clean_target_with_no_ccd_tables_executes_zero_writes_and_reports_pending_migrations`: PASS
   - `test_apply_fails_if_target_schema_lacks_ccd_tables`: PASS
   - `test_selective_migrations_create_only_ccd_tables_and_columns`: PASS
@@ -189,9 +212,13 @@ Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
   - `test_install_migration_files_copies_and_validates_syntax_before_migration`: PASS
   - `test_audit_target_contract_and_anomaly_abort`: PASS
   - `test_five_phases_end_to_end_legacy_flow_with_isolated_mysql_databases`: PASS
-  - **Total:** 20 pruebas pasadas, 223 aserciones.
+  - `test_refresh_pdo_connection_reconnects_after_mysql_2006_and_rejects_in_transaction`: PASS
+  - `test_validate_associations_pre_insert_batches_where_in_and_detects_conflicts`: PASS
+  - `test_transfer_and_verify_files_closes_cursor_before_filesystem_operations`: PASS
+  - `test_migrate_renews_connections_and_executes_batch_validation_end_to_end`: PASS
+  - **Total:** 24 pruebas pasadas, 249 aserciones.
 
-- **Suite General CCD:** 135 pruebas pasadas (786 aserciones).
+- **Suite General CCD:** 139 pruebas pasadas (812 aserciones).
 - **Estándar de Código (Laravel Pint):** 100% de conformidad sin advertencias.
 - **Validación de Sintaxis Bash (`bash -n`):** 100% de conformidad sin errores.
 

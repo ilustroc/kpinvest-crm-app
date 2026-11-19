@@ -48,7 +48,11 @@ class CcdProductionMigratorService
      *   skip_files?: bool,
      *   manifest_path?: ?string,
      *   expected_total?: ?int,
-     *   logger?: ?callable(string): void
+     *   logger?: ?callable(string): void,
+     *   source_reconnector?: ?callable(): PDO,
+     *   target_reconnector?: ?callable(): PDO,
+     *   source_credentials?: ?array{host?: string, port?: int|string, database?: string, username?: string, password?: string},
+     *   target_credentials?: ?array{host?: string, port?: int|string, database?: string, username?: string, password?: string}
      * }  $config
      * @return array<string, mixed>
      */
@@ -65,6 +69,13 @@ class CcdProductionMigratorService
         $expectedTotal = isset($config['expected_total']) ? (int) $config['expected_total'] : self::EXPECTED_AQP_TOTAL;
         $logger = $config['logger'] ?? static function (string $msg): void {};
 
+        $sourceReconnector = $config['source_reconnector'] ?? null;
+        $targetReconnector = $config['target_reconnector'] ?? null;
+        $sourceCredentials = $config['source_credentials'] ?? null;
+        $targetCredentials = $config['target_credentials'] ?? null;
+
+        $tMigrateStart = microtime(true);
+
         // Inspección de esquema destino
         $targetSchema = $this->inspectTargetSchema($targetPdo);
 
@@ -76,7 +87,10 @@ class CcdProductionMigratorService
         }
 
         $logger('Iniciando verificación preflight de bases de datos...');
+        $tPreStart = microtime(true);
         $preflight = $this->validatePreflight($sourcePdo, $targetPdo, $logger, $expectedTotal);
+        $tPreElapsed = round(microtime(true) - $tPreStart, 2);
+        $logger("Preflight completado conforme en {$tPreElapsed}s.");
 
         if (! $skipFiles) {
             $logger('Verificando espacio libre en disco de destino...');
@@ -102,6 +116,7 @@ class CcdProductionMigratorService
             $filesVerified = 0;
             if (! $skipFiles) {
                 $logger('  Verificando existencia e integridad de los PDFs en almacenamiento origen...');
+                $tFilesStart = microtime(true);
                 $fileResults = $this->transferAndVerifyFiles(
                     $sourcePdo,
                     $sourceStorage,
@@ -111,17 +126,27 @@ class CcdProductionMigratorService
                     $expectedTotal
                 );
                 $filesVerified = $fileResults['verified'];
-                $logger("  PDFs en origen verificados conforme: {$filesVerified}");
+                $tFilesElapsed = round(microtime(true) - $tFilesStart, 2);
+                $logger("  PDFs en origen verificados conforme: {$filesVerified} ({$tFilesElapsed}s)");
+
+                // RENOVACIÓN CONTROLADA DE AMBAS CONEXIONES TRAS OPERACIÓN PROLONGADA DE FILESYSTEM
+                $logger('  Renovando controladamente conexiones MySQL tras procesamiento prolongado de PDFs...');
+                $this->refreshPdoConnection($sourcePdo, $sourceReconnector, $sourceCredentials, $logger, 'conexión origen (staging)');
+                $this->refreshPdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino (producción)');
             }
 
             $logger('  Validando referencias y coherencia cruzada de DNI entre tablas...');
-            $this->validateAssociationsPreInsert($sourcePdo, $targetPdo, $expectedTotal);
+            $tValStart = microtime(true);
+            $this->validateAssociationsPreInsert($sourcePdo, $targetPdo, $expectedTotal, $batchSize, $logger);
+            $tValElapsed = round(microtime(true) - $tValStart, 2);
+            $logger("  Validación de asociaciones completada en {$tValElapsed}s.");
 
-            $archivosEligible = $this->migrateCcdArchivos($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal);
-            $linksEligible = $this->linkCcdArchivoId($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal);
-            $associationsEligible = $this->migrateAssociations($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal);
+            $archivosEligible = $this->migrateCcdArchivos($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
+            $linksEligible = $this->linkCcdArchivoId($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
+            $associationsEligible = $this->migrateAssociations($sourcePdo, $targetPdo, false, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
 
-            $logger('Simulación DRY-RUN completada con éxito. CERO escrituras realizadas en destino.');
+            $tTotalSim = round(microtime(true) - $tMigrateStart, 2);
+            $logger("Simulación DRY-RUN completada con éxito en {$tTotalSim}s. CERO escrituras realizadas en destino.");
 
             return [
                 'status' => 'simulated',
@@ -164,6 +189,7 @@ class CcdProductionMigratorService
 
         if (! $skipFiles) {
             $logger('Iniciando transferencia y verificación de PDFs AQP...');
+            $tFilesStart = microtime(true);
             $fileResults = $this->transferAndVerifyFiles(
                 $sourcePdo,
                 $sourceStorage,
@@ -174,22 +200,36 @@ class CcdProductionMigratorService
             );
             $filesTransferred = $fileResults['transferred'];
             $filesVerified = $fileResults['verified'];
+            $tFilesElapsed = round(microtime(true) - $tFilesStart, 2);
+            $logger("Transferencia de PDFs completada: {$filesTransferred} transferidos, {$filesVerified} verificados ({$tFilesElapsed}s).");
+
+            // RENOVACIÓN CONTROLADA DE AMBAS CONEXIONES TRAS OPERACIÓN PROLONGADA DE FILESYSTEM
+            $logger('Renovando controladamente conexiones MySQL tras transferencia y verificación prolongada de PDFs...');
+            $this->refreshPdoConnection($sourcePdo, $sourceReconnector, $sourceCredentials, $logger, 'conexión origen (staging)');
+            $this->refreshPdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino (producción)');
         }
 
+        // Validación estricta de coherencia antes de cualquier inserción en producción
+        $logger('Validando coherencia de asociaciones antes de persistencia...');
+        $tValStart = microtime(true);
+        $this->validateAssociationsPreInsert($sourcePdo, $targetPdo, $expectedTotal, $batchSize, $logger);
+        $tValElapsed = round(microtime(true) - $tValStart, 2);
+        $logger("Validación previa de asociaciones conforme en {$tValElapsed}s.");
+
         $logger('Procesando migración de registros ccd_archivos (rechazo ante discrepancia)...');
-        $archivosMigrated = $this->migrateCcdArchivos($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal);
+        $archivosMigrated = $this->migrateCcdArchivos($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
 
         $logger('Actualizando vinculación ccd_clientes.ccd_archivo_id...');
-        $linksUpdated = $this->linkCcdArchivoId($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal);
-
-        $logger('Validando coherencia de asociaciones antes de persistencia...');
-        $this->validateAssociationsPreInsert($sourcePdo, $targetPdo, $expectedTotal);
+        $linksUpdated = $this->linkCcdArchivoId($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
 
         $logger('Migrando asociaciones confirmadas a ccd_cliente_cuenta (sin sobrescritura ciega)...');
-        $associationsMigrated = $this->migrateAssociations($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal);
+        $associationsMigrated = $this->migrateAssociations($sourcePdo, $targetPdo, true, $batchSize, $logger, $expectedTotal, $targetReconnector, $targetCredentials);
 
         $logger('Ejecutando auditoría integral post-migración...');
+        $tAudStart = microtime(true);
         $audit = $this->auditTarget($targetPdo, $targetStorage, $skipFiles, $expectedTotal);
+        $tAudElapsed = round(microtime(true) - $tAudStart, 2);
+        $logger("Auditoría post-migración finalizada en {$tAudElapsed}s.");
 
         $manifestSha256 = null;
         if ($manifestPath !== null) {
@@ -198,7 +238,8 @@ class CcdProductionMigratorService
             $logger("Manifiesto generado con SHA-256: {$manifestSha256}");
         }
 
-        $logger('Proceso completado con éxito.');
+        $tTotalApply = round(microtime(true) - $tMigrateStart, 2);
+        $logger("Proceso completado con éxito en {$tTotalApply}s.");
 
         return [
             'status' => 'success',
@@ -251,6 +292,128 @@ class CcdProductionMigratorService
             'pending_migrations' => $pendingMigrations,
             'is_ready_for_apply' => $hasArchivos && $hasAssoc && $hasArchivoIdCol,
         ];
+    }
+
+    /**
+     * Crea una conexión PDO configurada de forma segura para MySQL.
+     *
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}  $creds
+     */
+    public function createPdoConnection(array $creds): PDO
+    {
+        $host = (string) ($creds['host'] ?? '127.0.0.1');
+        $port = (int) ($creds['port'] ?? 3306);
+        $database = (string) ($creds['database'] ?? '');
+        $username = (string) ($creds['username'] ?? '');
+        $password = (string) ($creds['password'] ?? '');
+
+        $dsn = "mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4";
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_TIMEOUT => 30,
+        ];
+
+        return new PDO($dsn, $username, $password, $options);
+    }
+
+    /**
+     * Comprueba si una conexión PDO está activa mediante un ping no intrusivo (SELECT 1).
+     */
+    public function pingPdo(PDO $pdo): bool
+    {
+        try {
+            $stmt = $pdo->query('SELECT 1');
+            if ($stmt instanceof \PDOStatement) {
+                $stmt->closeCursor();
+
+                return true;
+            }
+
+            return false;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Renueva controladamente una conexión PDO tras operaciones prolongadas de filesystem,
+     * utilizando un reconnector o las credenciales privadas ya cargadas en memoria.
+     * Rechaza terminantemente renovaciones a ciegas si existe una transacción abierta.
+     *
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}|null  $credentials
+     */
+    public function refreshPdoConnection(
+        PDO &$pdo,
+        ?callable $reconnector = null,
+        ?array $credentials = null,
+        ?callable $logger = null,
+        string $name = 'conexión'
+    ): PDO {
+        $log = $logger ?? static function (string $msg): void {};
+
+        // 1. Evitar reintentos ciegos dentro de transacciones con estado de commit incierto
+        try {
+            if ($pdo->inTransaction()) {
+                throw new DomainException("No se puede renovar {$name} mientras existe una transacción abierta. Se requiere reversión o aborto explícito.");
+            }
+        } catch (Throwable $e) {
+            if ($e instanceof DomainException) {
+                throw $e;
+            }
+            // Si inTransaction() falla debido a que el servidor cerró la conexión (2006/2013),
+            // no hay transacción confirmable activa en el servidor.
+        }
+
+        // 2. Si se suministró un reconnector explícito, invocarlo
+        if ($reconnector !== null) {
+            $log("Renovando controladamente {$name} tras operación prolongada...");
+            $newPdo = $reconnector();
+            if (! $newPdo instanceof PDO) {
+                throw new RuntimeException("El reconnector para {$name} no devolvió una instancia válida de PDO.");
+            }
+            $pdo = $newPdo;
+
+            return $pdo;
+        }
+
+        // 3. Si se suministraron credenciales cargadas, crear nueva instancia PDO
+        if ($credentials !== null) {
+            $log("Renovando controladamente {$name} con credenciales cargadas tras operación prolongada...");
+            $pdo = $this->createPdoConnection($credentials);
+
+            return $pdo;
+        }
+
+        // 4. Si no hay reconnector ni credenciales, verificar con ping
+        if (! $this->pingPdo($pdo)) {
+            throw new DomainException(
+                "La {$name} MySQL se ha cerrado tras una operación prolongada (error 2006/2013). "
+                .'Proporcione reconnector o credenciales cargadas para renovación automática.'
+            );
+        }
+
+        return $pdo;
+    }
+
+    /**
+     * Asegura que una conexión PDO permanezca activa antes de iniciar transacciones,
+     * renovándola controladamente si el ping detecta que se ha cerrado.
+     *
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}|null  $credentials
+     */
+    public function ensurePdoConnection(
+        PDO &$pdo,
+        ?callable $reconnector = null,
+        ?array $credentials = null,
+        ?callable $logger = null,
+        string $name = 'conexión'
+    ): PDO {
+        if (! $this->pingPdo($pdo)) {
+            return $this->refreshPdoConnection($pdo, $reconnector, $credentials, $logger, $name);
+        }
+
+        return $pdo;
     }
 
     /**
@@ -603,11 +766,23 @@ class CcdProductionMigratorService
              ORDER BY ca.id"
         );
 
+        // Desacoplar consulta de metadatos del procesamiento de filesystem: cerrar cursor de inmediato
+        $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        unset($stmt);
+
+        $totalFiles = count($files);
+        if ($expectedTotal !== null && $totalFiles !== $expectedTotal) {
+            throw new DomainException("Metadatos de archivos CCD incompletos: se encontraron {$totalFiles} registros (esperados: {$expectedTotal}).");
+        }
+
         $transferred = 0;
         $verified = 0;
         $index = 0;
+        $t0 = microtime(true);
+        $lastBatchTime = $t0;
 
-        while ($file = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        foreach ($files as $file) {
             $index++;
             $relPath = (string) $file['path'];
             $expectedSha = strtolower((string) $file['sha256']);
@@ -628,6 +803,14 @@ class CcdProductionMigratorService
                 }
                 $verified++;
 
+                if (($index % 1000 === 0 || $index === $totalFiles) && $totalFiles > 0) {
+                    $now = microtime(true);
+                    $elapsed = round($now - $t0, 2);
+                    $batchElapsed = round($now - $lastBatchTime, 2);
+                    $lastBatchTime = $now;
+                    $log("  PDFs verificados en origen: {$index}/{$totalFiles} ({$elapsed}s acumulados, último bloque en {$batchElapsed}s)");
+                }
+
                 continue;
             }
 
@@ -642,6 +825,14 @@ class CcdProductionMigratorService
                 if (hash_equals($expectedSha, (string) $tgtSha)) {
                     // Idempotente: ya existe y la firma es exacta
                     $verified++;
+
+                    if (($index % 1000 === 0 || $index === $totalFiles) && $totalFiles > 0) {
+                        $now = microtime(true);
+                        $elapsed = round($now - $t0, 2);
+                        $batchElapsed = round($now - $lastBatchTime, 2);
+                        $lastBatchTime = $now;
+                        $log("  PDFs verificados/transferidos: {$index}/{$totalFiles} ({$elapsed}s acumulados, último bloque en {$batchElapsed}s)");
+                    }
 
                     continue;
                 }
@@ -667,8 +858,12 @@ class CcdProductionMigratorService
             $transferred++;
             $verified++;
 
-            if ($index % 1000 === 0 && $expectedTotal !== null) {
-                $log("PDFs procesados: {$index}/{$expectedTotal}");
+            if (($index % 1000 === 0 || $index === $totalFiles) && $totalFiles > 0) {
+                $now = microtime(true);
+                $elapsed = round($now - $t0, 2);
+                $batchElapsed = round($now - $lastBatchTime, 2);
+                $lastBatchTime = $now;
+                $log("  PDFs transferidos/verificados: {$index}/{$totalFiles} ({$elapsed}s acumulados, último bloque en {$batchElapsed}s)");
             }
         }
 
@@ -679,15 +874,21 @@ class CcdProductionMigratorService
         return ['transferred' => $transferred, 'verified' => $verified];
     }
 
+    /**
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}|null  $targetCredentials
+     */
     public function migrateCcdArchivos(
         PDO $sourcePdo,
         PDO $targetPdo,
         bool $apply,
         int $batchSize,
         ?callable $logger = null,
-        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL,
+        ?callable $targetReconnector = null,
+        ?array $targetCredentials = null
     ): int {
         $log = $logger ?? static function (string $msg): void {};
+        $t0 = microtime(true);
 
         $stmt = $sourcePdo->query(
             "SELECT ca.id, ca.disk, ca.path, ca.sha256, ca.size_bytes, ca.mime_type, ca.nombre_original, ca.verified_at, ca.created_at, ca.updated_at
@@ -698,6 +899,8 @@ class CcdProductionMigratorService
         );
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        unset($stmt);
         $total = count($rows);
 
         if ($expectedTotal !== null && $total !== $expectedTotal) {
@@ -710,12 +913,16 @@ class CcdProductionMigratorService
 
         $migrated = 0;
         $chunks = array_chunk($rows, $batchSize);
+        $totalChunks = count($chunks);
 
         $checkSql = 'SELECT id, disk, path, sha256, size_bytes, mime_type, nombre_original FROM ccd_archivos WHERE id = ?';
         $insertSql = 'INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
-        foreach ($chunks as $chunk) {
+        foreach ($chunks as $chunkIndex => $chunk) {
+            $bNum = $chunkIndex + 1;
+            $bStart = microtime(true);
+            $this->ensurePdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino');
             $targetPdo->beginTransaction();
             try {
                 $checkStmt = $targetPdo->prepare($checkSql);
@@ -766,24 +973,36 @@ class CcdProductionMigratorService
                 if ($e instanceof DomainException) {
                     throw $e;
                 }
-                throw new RuntimeException("Fallo al insertar lote de ccd_archivos: {$e->getMessage()}", 0, $e);
+                throw new RuntimeException("Fallo en lote {$bNum}/{$totalChunks} al insertar ccd_archivos: {$e->getMessage()}", 0, $e);
+            }
+
+            $bElapsed = round(microtime(true) - $bStart, 3);
+            if ($bNum % 5 === 0 || $bNum === $totalChunks) {
+                $log("  Lote {$bNum}/{$totalChunks} ccd_archivos procesado ({$migrated}/{$total} registros, {$bElapsed}s)");
             }
         }
 
-        $log("Registros ccd_archivos verificados/migrados: {$migrated}");
+        $elapsed = round(microtime(true) - $t0, 2);
+        $log("Registros ccd_archivos verificados/migrados: {$migrated} en {$elapsed}s.");
 
         return $migrated;
     }
 
+    /**
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}|null  $targetCredentials
+     */
     public function linkCcdArchivoId(
         PDO $sourcePdo,
         PDO $targetPdo,
         bool $apply,
         int $batchSize,
         ?callable $logger = null,
-        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL,
+        ?callable $targetReconnector = null,
+        ?array $targetCredentials = null
     ): int {
         $log = $logger ?? static function (string $msg): void {};
+        $t0 = microtime(true);
 
         $stmt = $sourcePdo->query(
             "SELECT id, ccd_archivo_id, cosecha
@@ -793,6 +1012,8 @@ class CcdProductionMigratorService
         );
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        unset($stmt);
         $total = count($rows);
 
         if ($expectedTotal !== null && $total !== $expectedTotal) {
@@ -805,10 +1026,14 @@ class CcdProductionMigratorService
 
         $updated = 0;
         $chunks = array_chunk($rows, $batchSize);
+        $totalChunks = count($chunks);
         $checkSql = 'SELECT id, ccd_archivo_id FROM ccd_clientes WHERE id = ? AND cosecha = ?';
         $updateSql = 'UPDATE ccd_clientes SET ccd_archivo_id = ? WHERE id = ? AND cosecha = ?';
 
-        foreach ($chunks as $chunk) {
+        foreach ($chunks as $chunkIndex => $chunk) {
+            $bNum = $chunkIndex + 1;
+            $bStart = microtime(true);
+            $this->ensurePdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino');
             $targetPdo->beginTransaction();
             try {
                 $checkStmt = $targetPdo->prepare($checkSql);
@@ -846,11 +1071,17 @@ class CcdProductionMigratorService
                 if ($e instanceof DomainException) {
                     throw $e;
                 }
-                throw new RuntimeException("Fallo al actualizar lote de ccd_clientes.ccd_archivo_id: {$e->getMessage()}", 0, $e);
+                throw new RuntimeException("Fallo en lote {$bNum}/{$totalChunks} al actualizar ccd_clientes.ccd_archivo_id: {$e->getMessage()}", 0, $e);
+            }
+
+            $bElapsed = round(microtime(true) - $bStart, 3);
+            if ($bNum % 5 === 0 || $bNum === $totalChunks) {
+                $log("  Lote {$bNum}/{$totalChunks} vínculos ccd_archivo_id procesado ({$updated}/{$total} actualizados, {$bElapsed}s)");
             }
         }
 
-        $log("Vínculos ccd_archivo_id actualizados: {$updated}");
+        $elapsed = round(microtime(true) - $t0, 2);
+        $log("Vínculos ccd_archivo_id actualizados: {$updated} en {$elapsed}s.");
 
         return $updated;
     }
@@ -858,8 +1089,13 @@ class CcdProductionMigratorService
     public function validateAssociationsPreInsert(
         PDO $sourcePdo,
         PDO $targetPdo,
-        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL,
+        int $batchSize = 1000,
+        ?callable $logger = null
     ): void {
+        $log = $logger ?? static function (string $msg): void {};
+        $t0 = microtime(true);
+
         $stmt = $sourcePdo->query(
             "SELECT cca.ccd_cliente_id, cca.cliente_cuenta_id, cc.numdoc AS ccd_numdoc, cc.cosecha AS ccd_cosecha,
                     cu.numdoc AS cuenta_numdoc, cu.cosecha AS cuenta_cosecha
@@ -870,49 +1106,160 @@ class CcdProductionMigratorService
              ORDER BY cca.id"
         );
 
-        $count = 0;
-        $targetCcdStmt = $targetPdo->prepare('SELECT id, numdoc, cosecha FROM ccd_clientes WHERE id = ?');
-        $targetCtaStmt = $targetPdo->prepare('SELECT id, numdoc, cosecha FROM clientes_cuentas WHERE id = ?');
+        $associations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        unset($stmt);
+        $total = count($associations);
 
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $count++;
-            $ccdId = (int) $row['ccd_cliente_id'];
-            $cuentaId = (int) $row['cliente_cuenta_id'];
-            $ccdNumdoc = (string) $row['ccd_numdoc'];
-            $cuentaNumdoc = (string) $row['cuenta_numdoc'];
+        if ($expectedTotal !== null && $total !== $expectedTotal) {
+            throw new DomainException("La auditoría previa de asociaciones encontró {$total} registros (esperados: {$expectedTotal}).");
+        }
+
+        if ($total === 0) {
+            $log('No se encontraron asociaciones confirmadas para validar.');
+
+            return;
+        }
+
+        // 1. Validar coherencia de DNI en origen
+        foreach ($associations as $assoc) {
+            $ccdId = (int) $assoc['ccd_cliente_id'];
+            $cuentaId = (int) $assoc['cliente_cuenta_id'];
+            $ccdNumdoc = (string) $assoc['ccd_numdoc'];
+            $cuentaNumdoc = (string) $assoc['cuenta_numdoc'];
 
             if (! hash_equals($ccdNumdoc, $cuentaNumdoc)) {
-                throw new DomainException("Inconsistencia en DNI entre CCD {$ccdId} ({$ccdNumdoc}) y cuenta {$cuentaId} ({$cuentaNumdoc}).");
-            }
-
-            // Validar existencia y consistencia de DNI en las tablas de destino
-            $targetCcdStmt->execute([$ccdId]);
-            $tgtCcd = $targetCcdStmt->fetch(PDO::FETCH_ASSOC);
-            if ($tgtCcd === false || ! hash_equals((string) $tgtCcd['numdoc'], $ccdNumdoc)) {
-                throw new DomainException("El cliente CCD {$ccdId} no existe en destino o su DNI difiere.");
-            }
-
-            $targetCtaStmt->execute([$cuentaId]);
-            $tgtCta = $targetCtaStmt->fetch(PDO::FETCH_ASSOC);
-            if ($tgtCta === false || ! hash_equals((string) $tgtCta['numdoc'], $cuentaNumdoc)) {
-                throw new DomainException("La cuenta cliente {$cuentaId} no existe en destino o su DNI difiere.");
+                throw new DomainException("Inconsistencia en DNI entre CCD {$ccdId} ({$ccdNumdoc}) y cuenta {$cuentaId} ({$cuentaNumdoc}) en origen.");
             }
         }
 
-        if ($expectedTotal !== null && $count !== $expectedTotal) {
-            throw new DomainException("La auditoría previa de asociaciones encontró {$count} registros (esperados: {$expectedTotal}).");
+        // 2. Validación masiva por lotes (WHERE IN) eliminando consultas N+1
+        $batchSize = max(100, min(1000, $batchSize));
+        $chunks = array_chunk($associations, $batchSize);
+        $totalBatches = count($chunks);
+        $hasTargetAssocTable = $this->tableExists($targetPdo, 'ccd_cliente_cuenta');
+
+        $validatedCount = 0;
+        $batchIndex = 0;
+
+        foreach ($chunks as $chunk) {
+            $batchIndex++;
+            $bStart = microtime(true);
+
+            $chunkCcdIds = array_values(array_unique(array_map('intval', array_column($chunk, 'ccd_cliente_id'))));
+            $chunkCuentaIds = array_values(array_unique(array_map('intval', array_column($chunk, 'cliente_cuenta_id'))));
+
+            // Consultar ccd_clientes en destino
+            $ccdPlaceholders = implode(',', array_fill(0, count($chunkCcdIds), '?'));
+            $targetCcdStmt = $targetPdo->prepare("SELECT id, numdoc, cosecha FROM ccd_clientes WHERE id IN ({$ccdPlaceholders})");
+            $targetCcdStmt->execute($chunkCcdIds);
+            $targetCcdRows = $targetCcdStmt->fetchAll(PDO::FETCH_ASSOC);
+            $targetCcdStmt->closeCursor();
+
+            $targetCcdMap = [];
+            foreach ($targetCcdRows as $r) {
+                $targetCcdMap[(int) $r['id']] = $r;
+            }
+
+            // Consultar clientes_cuentas en destino
+            $ctaPlaceholders = implode(',', array_fill(0, count($chunkCuentaIds), '?'));
+            $targetCtaStmt = $targetPdo->prepare("SELECT id, numdoc, cosecha FROM clientes_cuentas WHERE id IN ({$ctaPlaceholders})");
+            $targetCtaStmt->execute($chunkCuentaIds);
+            $targetCtaRows = $targetCtaStmt->fetchAll(PDO::FETCH_ASSOC);
+            $targetCtaStmt->closeCursor();
+
+            $targetCtaMap = [];
+            foreach ($targetCtaRows as $r) {
+                $targetCtaMap[(int) $r['id']] = $r;
+            }
+
+            // Consultar asociaciones existentes en destino si la tabla existe
+            $existingAssocMap = [];
+            if ($hasTargetAssocTable) {
+                $assocPlaceholders = implode(',', array_fill(0, count($chunkCcdIds), '?'));
+                $targetAssocStmt = $targetPdo->prepare(
+                    "SELECT ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion
+                     FROM ccd_cliente_cuenta
+                     WHERE ccd_cliente_id IN ({$assocPlaceholders})"
+                );
+                $targetAssocStmt->execute($chunkCcdIds);
+                $targetAssocRows = $targetAssocStmt->fetchAll(PDO::FETCH_ASSOC);
+                $targetAssocStmt->closeCursor();
+
+                foreach ($targetAssocRows as $r) {
+                    $existingAssocMap[(int) $r['ccd_cliente_id']][] = $r;
+                }
+            }
+
+            // Validar cada asociación del lote en memoria
+            foreach ($chunk as $row) {
+                $ccdId = (int) $row['ccd_cliente_id'];
+                $cuentaId = (int) $row['cliente_cuenta_id'];
+                $ccdNumdoc = (string) $row['ccd_numdoc'];
+                $cuentaNumdoc = (string) $row['cuenta_numdoc'];
+
+                // Existencia y coherencia del cliente CCD en destino
+                if (! isset($targetCcdMap[$ccdId])) {
+                    throw new DomainException("Lote {$batchIndex}/{$totalBatches}: El cliente CCD {$ccdId} no existe en destino.");
+                }
+                $tgtCcd = $targetCcdMap[$ccdId];
+                if (! hash_equals((string) $tgtCcd['numdoc'], $ccdNumdoc)) {
+                    throw new DomainException("Lote {$batchIndex}/{$totalBatches}: El DNI del cliente CCD {$ccdId} difiere en destino.");
+                }
+
+                // Existencia y coherencia de la cuenta cliente en destino
+                if (! isset($targetCtaMap[$cuentaId])) {
+                    throw new DomainException("Lote {$batchIndex}/{$totalBatches}: La cuenta cliente {$cuentaId} no existe en destino.");
+                }
+                $tgtCta = $targetCtaMap[$cuentaId];
+                if (! hash_equals((string) $tgtCta['numdoc'], $cuentaNumdoc)) {
+                    throw new DomainException("Lote {$batchIndex}/{$totalBatches}: El DNI de la cuenta {$cuentaId} difiere en destino.");
+                }
+
+                // Coherencia cruzada en destino entre CCD y Cuenta
+                if (! hash_equals((string) $tgtCcd['numdoc'], (string) $tgtCta['numdoc'])) {
+                    throw new DomainException("Lote {$batchIndex}/{$totalBatches}: Discrepancia entre DNI de CCD {$ccdId} y cuenta {$cuentaId} en destino.");
+                }
+
+                // Ausencia de asociaciones incompatibles en destino
+                if (isset($existingAssocMap[$ccdId])) {
+                    foreach ($existingAssocMap[$ccdId] as $existing) {
+                        $existingCtaId = (int) $existing['cliente_cuenta_id'];
+                        if ($existingCtaId !== $cuentaId) {
+                            throw new DomainException(
+                                "Lote {$batchIndex}/{$totalBatches}: Conflicto de asociación incompatible en destino para ccd_cliente_id {$ccdId}. "
+                                ."Asociado en destino a cuenta {$existingCtaId}, pero en origen se asocia a cuenta {$cuentaId}."
+                            );
+                        }
+                    }
+                }
+
+                $validatedCount++;
+            }
+
+            $bElapsed = round(microtime(true) - $bStart, 3);
+            $log("  Lote {$batchIndex}/{$totalBatches} validado ({$validatedCount}/{$total} asociaciones, {$bElapsed}s)");
         }
+
+        $elapsed = round(microtime(true) - $t0, 2);
+        $log("Validación previa masiva completada conforme: {$validatedCount} asociaciones verificadas en {$elapsed}s.");
     }
 
+    /**
+     * @param  array{host?: string, port?: int|string, database?: string, username?: string, password?: string}|null  $targetCredentials
+     */
     public function migrateAssociations(
         PDO $sourcePdo,
         PDO $targetPdo,
         bool $apply,
         int $batchSize,
         ?callable $logger = null,
-        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL,
+        ?callable $targetReconnector = null,
+        ?array $targetCredentials = null
     ): int {
         $log = $logger ?? static function (string $msg): void {};
+        $t0 = microtime(true);
 
         $stmt = $sourcePdo->query(
             "SELECT cca.id, cca.ccd_cliente_id, cca.cliente_cuenta_id, cca.estado, cca.metodo_verificacion,
@@ -924,6 +1271,8 @@ class CcdProductionMigratorService
         );
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+        unset($stmt);
         $total = count($rows);
 
         if ($expectedTotal !== null && $total !== $expectedTotal) {
@@ -936,6 +1285,7 @@ class CcdProductionMigratorService
 
         $migrated = 0;
         $chunks = array_chunk($rows, $batchSize);
+        $totalChunks = count($chunks);
 
         $checkSql = 'SELECT id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia
                      FROM ccd_cliente_cuenta
@@ -944,7 +1294,10 @@ class CcdProductionMigratorService
                       (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_por_user_id, confirmado_at, created_at, updated_at)
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
-        foreach ($chunks as $chunk) {
+        foreach ($chunks as $chunkIndex => $chunk) {
+            $bNum = $chunkIndex + 1;
+            $bStart = microtime(true);
+            $this->ensurePdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino');
             $targetPdo->beginTransaction();
             try {
                 $checkStmt = $targetPdo->prepare($checkSql);
@@ -993,11 +1346,17 @@ class CcdProductionMigratorService
                 if ($e instanceof DomainException) {
                     throw $e;
                 }
-                throw new RuntimeException("Fallo al insertar lote de ccd_cliente_cuenta: {$e->getMessage()}", 0, $e);
+                throw new RuntimeException("Fallo en lote {$bNum}/{$totalChunks} al insertar ccd_cliente_cuenta: {$e->getMessage()}", 0, $e);
+            }
+
+            $bElapsed = round(microtime(true) - $bStart, 3);
+            if ($bNum % 5 === 0 || $bNum === $totalChunks) {
+                $log("  Lote {$bNum}/{$totalChunks} asociaciones procesado ({$migrated}/{$total} asociaciones, {$bElapsed}s)");
             }
         }
 
-        $log("Asociaciones migradas/verificadas en ccd_cliente_cuenta: {$migrated}");
+        $elapsed = round(microtime(true) - $t0, 2);
+        $log("Asociaciones migradas/verificadas en ccd_cliente_cuenta: {$migrated} en {$elapsed}s.");
 
         return $migrated;
     }

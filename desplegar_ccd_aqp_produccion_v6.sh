@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KP INVEST — Desplegador Automatizado CCD AQP V6.2.1 a Producción LEGACY
+# KP INVEST — Desplegador Automatizado CCD AQP V6.2.2 a Producción LEGACY
 # ==============================================================================
 # Uso:
 #   ./desplegar_ccd_aqp_produccion_v6.sh --dry-run   # Simulación sin escrituras
@@ -11,7 +11,7 @@ set -euo pipefail
 umask 077
 
 echo "=============================================================================="
-echo "  KP INVEST — DESPLEGADOR CCD AQP V6.2.1 A PRODUCCIÓN LEGACY"
+echo "  KP INVEST — DESPLEGADOR CCD AQP V6.2.2 A PRODUCCIÓN LEGACY"
 echo "=============================================================================="
 
 # Rutas estándar del entorno Hostinger
@@ -481,7 +481,7 @@ if [ "$MODE" = "dry-run" ]; then
   echo "  [DRY-RUN] Simulando auditoría final post-migración: conforme."
   echo ""
   echo "=============================================================================="
-  echo "  SIMULACIÓN DRY-RUN V6.2.1 COMPLETADA SATISFACTORIAMENTE"
+  echo "  SIMULACIÓN DRY-RUN V6.2.2 COMPLETADA SATISFACTORIAMENTE"
   echo "  - CERO escrituras realizadas en base de datos de producción."
   echo "  - CERO directorios o archivos modificados en el CRM de producción."
   echo "  - Migraciones e interfaz probadas y listas para instalación previa."
@@ -520,7 +520,7 @@ else
 
   echo ""
   echo "=============================================================================="
-  echo "  DESPLIEGUE CCD AQP V6.2.1 A PRODUCCIÓN LEGACY COMPLETADO CON ÉXITO"
+  echo "  DESPLIEGUE CCD AQP V6.2.2 A PRODUCCIÓN LEGACY COMPLETADO CON ÉXITO"
   echo "  Respaldo previo: $BACKUP_DIR"
   echo "  Manifiesto:      $MANIFEST_PATH"
   if [ -f "$MANIFEST_PATH" ]; then

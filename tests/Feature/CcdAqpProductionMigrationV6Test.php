@@ -28,6 +28,8 @@ class CcdAqpProductionMigrationV6Test extends TestCase
 
     private PDO $targetPdo;
 
+    private array $dbConfig;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,6 +45,13 @@ class CcdAqpProductionMigrationV6Test extends TestCase
         $port = (int) config('database.connections.mysql.port', 3306);
         $user = (string) config('database.connections.mysql.username', 'forge');
         $pass = (string) config('database.connections.mysql.password', '');
+
+        $this->dbConfig = [
+            'host' => $host,
+            'port' => $port,
+            'username' => $user,
+            'password' => $pass,
+        ];
 
         $this->sourcePdo = new PDO(
             "mysql:host={$host};port={$port};dbname=kp_crm_testing_source;charset=utf8mb4",
@@ -1332,6 +1341,253 @@ BLADE;
             File::deleteDirectory($targetAppDir);
             File::deleteDirectory($backupDir);
         }
+    }
+
+    public function test_refresh_pdo_connection_reconnects_after_mysql_2006_and_rejects_in_transaction(): void
+    {
+        $service = new CcdProductionMigratorService;
+
+        // 1. pingPdo retorna true en conexión activa
+        $this->assertTrue($service->pingPdo($this->targetPdo));
+
+        // 2. refreshPdoConnection con credenciales renueva la instancia PDO
+        $targetCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_target']);
+        $logs = [];
+        $logger = function (string $msg) use (&$logs) {
+            $logs[] = $msg;
+        };
+
+        $origPdo = $this->targetPdo;
+        $refreshedPdo = $service->refreshPdoConnection($this->targetPdo, null, $targetCreds, $logger, 'Producción');
+        $this->assertInstanceOf(PDO::class, $refreshedPdo);
+        $this->assertTrue($service->pingPdo($this->targetPdo));
+        $this->assertNotSame($origPdo, $this->targetPdo);
+        $this->assertNotEmpty($logs);
+        $this->assertStringContainsString('Renovando controladamente Producción', $logs[0]);
+
+        // 3. refreshPdoConnection con reconnector personalizado
+        $reconnected = false;
+        $reconnector = function () use ($targetCreds, &$reconnected, $service) {
+            $reconnected = true;
+
+            return $service->createPdoConnection($targetCreds);
+        };
+        $service->refreshPdoConnection($this->targetPdo, $reconnector, null, null, 'Producción');
+        $this->assertTrue($reconnected);
+
+        // 4. refreshPdoConnection dentro de una transacción activa DEBE abortar con DomainException
+        $this->targetPdo->beginTransaction();
+        try {
+            $service->refreshPdoConnection($this->targetPdo, null, $targetCreds, null, 'Producción');
+            $this->fail('Debe lanzar DomainException si la conexión está en transacción.');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('transacción abierta', $e->getMessage());
+        } finally {
+            if ($this->targetPdo->inTransaction()) {
+                $this->targetPdo->rollBack();
+            }
+        }
+    }
+
+    public function test_validate_associations_pre_insert_batches_where_in_and_detects_conflicts(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        // Datos base: 2 elementos válidos
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES
+            (10, '11111111', 'doc10.pdf', 'AQP4'),
+            (20, '22222222', 'doc20.pdf', 'AQP5')");
+        $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (100, '11111111', 'CTA-10', 'OP-10', 'Caja AQP', 'CAJAAQP4'),
+            (200, '22222222', 'CTA-20', 'OP-20', 'Caja AQP', 'CAJAAQP5')");
+        $this->sourcePdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at) VALUES
+            (1, 10, 100, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'OK 1', NOW()),
+            (2, 20, 200, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'OK 2', NOW())");
+
+        // Destino con ccd_clientes y clientes_cuentas correspondientes
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES
+            (10, '11111111', 'doc10.pdf', 'AQP4'),
+            (20, '22222222', 'doc20.pdf', 'AQP5')");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (100, '11111111', 'CTA-10', 'OP-10', 'Caja AQP', 'CAJAAQP4'),
+            (200, '22222222', 'CTA-20', 'OP-20', 'Caja AQP', 'CAJAAQP5')");
+
+        // Validación exitosa con lotes
+        $logs = [];
+        $service->validateAssociationsPreInsert(
+            $this->sourcePdo,
+            $this->targetPdo,
+            2,
+            1, // Forzar múltiples lotes
+            function (string $msg) use (&$logs) {
+                $logs[] = $msg;
+            }
+        );
+        $this->assertNotEmpty($logs);
+        $this->assertStringContainsString('Validación previa masiva completada conforme: 2 asociaciones verificadas', end($logs));
+
+        // Subprueba A: Detección de cliente faltante en destino
+        $this->targetPdo->exec('DELETE FROM ccd_clientes WHERE id = 20');
+        try {
+            $service->validateAssociationsPreInsert($this->sourcePdo, $this->targetPdo, 2, 500);
+            $this->fail('Debe fallar al faltar el cliente en destino');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('no existe en destino', $e->getMessage());
+        }
+
+        // Subprueba B: Detección de discrepancia de DNI en destino
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES (20, '99999999', 'doc20.pdf', 'AQP5')");
+        try {
+            $service->validateAssociationsPreInsert($this->sourcePdo, $this->targetPdo, 2, 500);
+            $this->fail('Debe fallar si el DNI en destino difiere');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('difiere en destino', $e->getMessage());
+        }
+
+        // Subprueba C: Conflicto con asociación existente incompatible
+        $this->targetPdo->exec("UPDATE ccd_clientes SET numdoc = '22222222' WHERE id = 20");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES (299, '22222222', 'CTA-299', 'OP-299', 'Caja AQP', 'CAJAAQP5')");
+        $this->targetPdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at) VALUES
+            (99, 20, 299, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'Conflicto', NOW())");
+        try {
+            $service->validateAssociationsPreInsert($this->sourcePdo, $this->targetPdo, 2, 500);
+            $this->fail('Debe fallar si existe colisión de asociación con cuenta distinta');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('Conflicto de asociación incompatible en destino', $e->getMessage());
+        }
+
+        // Subprueba D: Idempotencia ante asociación existente idéntica
+        $this->targetPdo->exec('DELETE FROM ccd_cliente_cuenta WHERE id = 99');
+        $this->targetPdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at) VALUES
+            (99, 20, 200, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'Idéntica', NOW())");
+        // Debe culminar sin excepciones
+        $service->validateAssociationsPreInsert($this->sourcePdo, $this->targetPdo, 2, 500);
+    }
+
+    public function test_transfer_and_verify_files_closes_cursor_before_filesystem_operations(): void
+    {
+        $service = new CcdProductionMigratorService;
+
+        $content = '%PDF-1.4 Test Cursor Closed Content';
+        $sha256 = hash('sha256', $content);
+        $size = strlen($content);
+        $relPath = "sha256/33/44/{$sha256}.pdf";
+        $srcFile = $this->sourceStorage.'/'.$relPath;
+        File::ensureDirectoryExists(dirname($srcFile));
+        file_put_contents($srcFile, $content);
+
+        $this->sourcePdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at)
+                                VALUES (1, 'ccd-private', '{$relPath}', '{$sha256}', {$size}, 'application/pdf', 'doc.pdf', NOW(), NOW(), NOW())");
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id)
+                                VALUES (1, '44556677', 'doc.pdf', 'AQP4', 1)");
+
+        $logs = [];
+        $result = $service->transferAndVerifyFiles(
+            $this->sourcePdo,
+            $this->sourceStorage,
+            $this->targetStorage,
+            false,
+            function (string $msg) use (&$logs) {
+                $logs[] = $msg;
+            },
+            1
+        );
+
+        $this->assertSame(1, $result['verified']);
+        $this->assertSame(0, $result['transferred']);
+
+        // Assert que sourcePdo no mantiene cursor abierto y ejecuta consultas inmediatamente
+        $row = $this->sourcePdo->query('SELECT COUNT(*) as c FROM ccd_archivos')->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame(1, (int) $row['c']);
+    }
+
+    public function test_migrate_renews_connections_and_executes_batch_validation_end_to_end(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        $content = '%PDF-1.4 Migrated Content V6.2.2';
+        $sha256 = hash('sha256', $content);
+        $size = strlen($content);
+        $relPath = "sha256/55/66/{$sha256}.pdf";
+        $srcFile = $this->sourceStorage.'/'.$relPath;
+        File::ensureDirectoryExists(dirname($srcFile));
+        file_put_contents($srcFile, $content);
+
+        $this->sourcePdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at)
+                                VALUES (1, 'ccd-private', '{$relPath}', '{$sha256}', {$size}, 'application/pdf', 'doc.pdf', NOW(), NOW(), NOW())");
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id)
+                                VALUES (1, '88776655', 'doc.pdf', 'AQP4', 1)");
+        $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                VALUES (1, '88776655', 'CTA-88', 'OP-88', 'Caja AQP', 'CAJAAQP4')");
+        $this->sourcePdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at)
+                                VALUES (1, 1, 1, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'Verificado V6.2.2', NOW())");
+
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha)
+                                VALUES (1, '88776655', 'doc.pdf', 'AQP4')");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                VALUES (1, '88776655', 'CTA-88', 'OP-88', 'Caja AQP', 'CAJAAQP4')");
+
+        $sourceCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_source']);
+        $targetCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_target']);
+
+        $logs = [];
+        $logger = function (string $msg) use (&$logs) {
+            $logs[] = $msg;
+        };
+
+        $sourceRenewed = false;
+        $targetRenewed = false;
+
+        $result = $service->migrate([
+            'source_pdo' => $this->sourcePdo,
+            'target_pdo' => $this->targetPdo,
+            'source_credentials' => $sourceCreds,
+            'target_credentials' => $targetCreds,
+            'source_reconnector' => function () use ($sourceCreds, &$sourceRenewed, $service) {
+                $sourceRenewed = true;
+
+                return $service->createPdoConnection($sourceCreds);
+            },
+            'target_reconnector' => function () use ($targetCreds, &$targetRenewed, $service) {
+                $targetRenewed = true;
+
+                return $service->createPdoConnection($targetCreds);
+            },
+            'source_storage' => $this->sourceStorage,
+            'target_storage' => $this->targetStorage,
+            'apply' => true,
+            'batch_size' => 10,
+            'expected_total' => 1,
+            'logger' => $logger,
+        ]);
+
+        $this->assertTrue($sourceRenewed);
+        $this->assertTrue($targetRenewed);
+        $this->assertSame('success', $result['status']);
+        $this->assertSame(1, $result['files_transferred']);
+        $this->assertSame(1, $result['archivos_migrated']);
+        $this->assertSame(1, $result['associations_migrated']);
+        $this->assertTrue($result['audit']['passed']);
+
+        $hasStagingRenewLog = false;
+        $hasProdRenewLog = false;
+        $hasValidationLog = false;
+        foreach ($logs as $l) {
+            if (str_contains($l, 'conexión origen (staging)')) {
+                $hasStagingRenewLog = true;
+            }
+            if (str_contains($l, 'conexión destino (producción)')) {
+                $hasProdRenewLog = true;
+            }
+            if (str_contains($l, 'Validación previa masiva completada conforme')) {
+                $hasValidationLog = true;
+            }
+        }
+        $this->assertTrue($hasStagingRenewLog);
+        $this->assertTrue($hasProdRenewLog);
+        $this->assertTrue($hasValidationLog);
     }
 
     private function setupSourceSchema(PDO $pdo): void
