@@ -149,7 +149,7 @@ class MigrateCcdAqpProductionV6 extends Command
                     ['Conteo ccd_clientes verificado', number_format($result['preflight']['ccd_total'])],
                     ['Conteo clientes_cuentas verificado', number_format($result['preflight']['cuentas_total'])],
                     ['Huella CCD AQP conforme', substr($result['preflight']['ccd_sha256'], 0, 16).'...'],
-                    ['Huella Cuentas AQP conforme', substr($result['preflight']['cuentas_sha256'], 0, 16).'...'],
+                    ['Huella Cuentas (total) conforme', substr($result['preflight']['cuentas_sha256'], 0, 16).'...'],
                     ['PDFs verificados en origen', number_format($result['files_verified'])],
                     ['Registros ccd_archivos elegibles', number_format($result['archivos_eligible'])],
                     ['Vínculos ccd_archivo_id elegibles', number_format($result['links_eligible'])],

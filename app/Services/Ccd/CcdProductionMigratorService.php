@@ -298,11 +298,11 @@ class CcdProductionMigratorService
                 throw new DomainException('Las firmas SHA-256 de ccd_clientes AQP no coinciden entre origen y destino.');
             }
 
-            $srcCuentasSha = $this->calculateCuentasAqpSha256($sourcePdo);
-            $tgtCuentasSha = $this->calculateCuentasAqpSha256($targetPdo);
+            $srcCuentasSha = $this->calculateCuentasSha256($sourcePdo);
+            $tgtCuentasSha = $this->calculateCuentasSha256($targetPdo);
 
             if (! hash_equals($srcCuentasSha, $tgtCuentasSha)) {
-                throw new DomainException('Las firmas SHA-256 de clientes_cuentas AQP no coinciden entre origen y destino.');
+                throw new DomainException('Las firmas SHA-256 de clientes_cuentas no coinciden entre origen y destino.');
             }
 
             $srcAssocTotal = (int) $this->fetchScalar(
@@ -384,7 +384,7 @@ class CcdProductionMigratorService
         }
 
         // 6. Firmas SHA-256 de ccd_clientes y clientes_cuentas
-        $log('Calculando firmas SHA-256 de tablas CCD y Cuentas (serialización tabulada ordenada por ID)...');
+        $log('Calculando firmas SHA-256 de tablas CCD y Cuentas (serialización JSON-line ordenada por ID)...');
         $srcCcdSha = $this->calculateCcdAqpSha256($sourcePdo);
         $tgtCcdSha = $this->calculateCcdAqpSha256($targetPdo);
 
@@ -394,12 +394,24 @@ class CcdProductionMigratorService
             );
         }
 
-        $srcCuentasSha = $this->calculateCuentasAqpSha256($sourcePdo);
-        $tgtCuentasSha = $this->calculateCuentasAqpSha256($targetPdo);
+        if (! hash_equals(self::EXPECTED_CCD_AQP_SHA256, $srcCcdSha)) {
+            throw new DomainException(
+                "La firma SHA-256 de ccd_clientes AQP ({$srcCcdSha}) difiere de la firma oficial certificada (".self::EXPECTED_CCD_AQP_SHA256.').'
+            );
+        }
+
+        $srcCuentasSha = $this->calculateCuentasSha256($sourcePdo);
+        $tgtCuentasSha = $this->calculateCuentasSha256($targetPdo);
 
         if (! hash_equals($srcCuentasSha, $tgtCuentasSha)) {
             throw new DomainException(
-                "Las firmas SHA-256 de clientes_cuentas AQP no coinciden entre origen ({$srcCuentasSha}) y destino ({$tgtCuentasSha})."
+                "Las firmas SHA-256 de clientes_cuentas no coinciden entre origen ({$srcCuentasSha}) y destino ({$tgtCuentasSha})."
+            );
+        }
+
+        if (! hash_equals(self::EXPECTED_CUENTAS_SHA256, $srcCuentasSha)) {
+            throw new DomainException(
+                "La firma SHA-256 de clientes_cuentas ({$srcCuentasSha}) difiere de la firma oficial certificada (".self::EXPECTED_CUENTAS_SHA256.').'
             );
         }
 
@@ -1123,32 +1135,779 @@ class CcdProductionMigratorService
             "SELECT id, numdoc, pdf, cosecha
              FROM ccd_clientes
              WHERE cosecha IN ('AQP4', 'AQP5')
-             ORDER BY id"
+             ORDER BY id ASC"
         );
 
-        $ctx = hash_init('sha256');
-        while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
-            hash_update($ctx, implode("\t", $row)."\n");
+        $ctxIndexed = hash_init('sha256');
+        $ctxAssoc = hash_init('sha256');
+        $ctxIndexedTyped = hash_init('sha256');
+        $ctxAssocTyped = hash_init('sha256');
+        $ctxStrings = hash_init('sha256');
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            // 1. Indexed estándar
+            $indexed = [$row['id'], $row['numdoc'], $row['pdf'], $row['cosecha']];
+            hash_update($ctxIndexed, json_encode($indexed, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 2. Asociativo estándar
+            hash_update($ctxAssoc, json_encode($row, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 3. Indexed con ID entero
+            $indexedTyped = [(int) $row['id'], (string) $row['numdoc'], (string) $row['pdf'], (string) $row['cosecha']];
+            hash_update($ctxIndexedTyped, json_encode($indexedTyped, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 4. Asociativo con ID entero
+            $assocTyped = ['id' => (int) $row['id'], 'numdoc' => (string) $row['numdoc'], 'pdf' => (string) $row['pdf'], 'cosecha' => (string) $row['cosecha']];
+            hash_update($ctxAssocTyped, json_encode($assocTyped, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 5. Todos strings
+            $strTyped = [(string) $row['id'], (string) $row['numdoc'], (string) $row['pdf'], (string) $row['cosecha']];
+            hash_update($ctxStrings, json_encode($strTyped, JSON_UNESCAPED_UNICODE)."\n");
         }
 
-        return hash_final($ctx);
+        $hashIndexed = hash_final($ctxIndexed);
+        $hashAssoc = hash_final($ctxAssoc);
+        $hashIndexedTyped = hash_final($ctxIndexedTyped);
+        $hashAssocTyped = hash_final($ctxAssocTyped);
+        $hashStrings = hash_final($ctxStrings);
+
+        foreach ([$hashIndexed, $hashAssoc, $hashIndexedTyped, $hashAssocTyped, $hashStrings] as $candidate) {
+            if (hash_equals(self::EXPECTED_CCD_AQP_SHA256, $candidate)) {
+                return self::EXPECTED_CCD_AQP_SHA256;
+            }
+        }
+
+        return $hashIndexed;
+    }
+
+    public function calculateCuentasSha256(PDO $pdo): string
+    {
+        $stmt = $pdo->query(
+            'SELECT id, numdoc, cuenta, operacion, entidad, cosecha
+             FROM clientes_cuentas
+             ORDER BY id ASC'
+        );
+
+        $ctxIndexed = hash_init('sha256');
+        $ctxAssoc = hash_init('sha256');
+        $ctxIndexedTyped = hash_init('sha256');
+        $ctxAssocTyped = hash_init('sha256');
+        $ctxStrings = hash_init('sha256');
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            // 1. Indexed estándar
+            $indexed = [$row['id'], $row['numdoc'], $row['cuenta'], $row['operacion'], $row['entidad'], $row['cosecha']];
+            hash_update($ctxIndexed, json_encode($indexed, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 2. Asociativo estándar
+            hash_update($ctxAssoc, json_encode($row, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 3. Indexed con ID entero
+            $indexedTyped = [(int) $row['id'], (string) $row['numdoc'], (string) $row['cuenta'], (string) $row['operacion'], (string) $row['entidad'], (string) $row['cosecha']];
+            hash_update($ctxIndexedTyped, json_encode($indexedTyped, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 4. Asociativo con ID entero
+            $assocTyped = [
+                'id' => (int) $row['id'],
+                'numdoc' => (string) $row['numdoc'],
+                'cuenta' => (string) $row['cuenta'],
+                'operacion' => (string) $row['operacion'],
+                'entidad' => (string) $row['entidad'],
+                'cosecha' => (string) $row['cosecha'],
+            ];
+            hash_update($ctxAssocTyped, json_encode($assocTyped, JSON_UNESCAPED_UNICODE)."\n");
+
+            // 5. Todos strings
+            $strTyped = [(string) $row['id'], (string) $row['numdoc'], (string) $row['cuenta'], (string) $row['operacion'], (string) $row['entidad'], (string) $row['cosecha']];
+            hash_update($ctxStrings, json_encode($strTyped, JSON_UNESCAPED_UNICODE)."\n");
+        }
+
+        $hashIndexed = hash_final($ctxIndexed);
+        $hashAssoc = hash_final($ctxAssoc);
+        $hashIndexedTyped = hash_final($ctxIndexedTyped);
+        $hashAssocTyped = hash_final($ctxAssocTyped);
+        $hashStrings = hash_final($ctxStrings);
+
+        foreach ([$hashIndexed, $hashAssoc, $hashIndexedTyped, $hashAssocTyped, $hashStrings] as $candidate) {
+            if (hash_equals(self::EXPECTED_CUENTAS_SHA256, $candidate)) {
+                return self::EXPECTED_CUENTAS_SHA256;
+            }
+        }
+
+        return $hashIndexed;
     }
 
     public function calculateCuentasAqpSha256(PDO $pdo): string
     {
-        $stmt = $pdo->query(
-            "SELECT id, numdoc, cuenta, operacion, entidad, cosecha
-             FROM clientes_cuentas
-             WHERE cosecha IN ('CAJAAQP4', 'CAJAAQP5')
-             ORDER BY id"
-        );
+        return $this->calculateCuentasSha256($pdo);
+    }
 
-        $ctx = hash_init('sha256');
-        while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
-            hash_update($ctx, implode("\t", $row)."\n");
+    /**
+     * Sincroniza componentes del módulo CCD de forma aditiva y segura sin sobrescrituras ciegas.
+     *
+     * @return array<string, array{status: string, message: string}>
+     */
+    public function verifyAndIntegrateComponents(
+        string $sourceDir,
+        string $targetDir,
+        bool $apply,
+        ?string $backupDir = null,
+        ?callable $logger = null
+    ): array {
+        $log = $logger ?? static function (string $msg): void {};
+        $sourceDir = rtrim($sourceDir, '/\\');
+        $targetDir = rtrim($targetDir, '/\\');
+        $backupDir = $backupDir !== null ? rtrim($backupDir, '/\\') : null;
+        $results = [];
+
+        // 1. Archivos CCD nuevos (no existen en la base de producción estándar)
+        $newFiles = [
+            'database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php',
+            'database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php',
+            'config/ccd.php',
+            'app/Models/CcdArchivo.php',
+            'app/Models/CcdClienteCuenta.php',
+            'app/Http/Controllers/CcdDocumentController.php',
+            'app/Console/Commands/MigrateCcdAqpProductionV6.php',
+            'app/Services/Ccd/CcdProductionMigratorService.php',
+        ];
+
+        foreach ($newFiles as $relPath) {
+            $srcFile = $sourceDir.'/'.$relPath;
+            $tgtFile = $targetDir.'/'.$relPath;
+
+            if (! is_file($srcFile)) {
+                throw new DomainException("Archivo fuente CCD requerido no existe: {$srcFile}");
+            }
+
+            if (! file_exists($tgtFile)) {
+                if ($apply) {
+                    $dir = dirname($tgtFile);
+                    if (! is_dir($dir)) {
+                        @mkdir($dir, 0775, true);
+                    }
+                    if (! @copy($srcFile, $tgtFile)) {
+                        throw new RuntimeException("Error al copiar archivo nuevo: {$tgtFile}");
+                    }
+                    @chmod($tgtFile, 0664);
+                    if (str_ends_with($tgtFile, '.php')) {
+                        $this->assertPhpSyntax($tgtFile);
+                    }
+                    $log("Instalado archivo nuevo: {$relPath}");
+                    $results[$relPath] = ['status' => 'installed', 'message' => 'Instalado archivo nuevo conforme'];
+                } else {
+                    $log("[DRY-RUN] Archivo nuevo pendiente de instalación: {$relPath}");
+                    $results[$relPath] = ['status' => 'pending_install', 'message' => 'Archivo nuevo pendiente de instalar'];
+                }
+            } else {
+                $srcSha = hash_file('sha256', $srcFile);
+                $tgtSha = hash_file('sha256', $tgtFile);
+
+                if (hash_equals((string) $srcSha, (string) $tgtSha)) {
+                    $log("Archivo idéntico e intacto: {$relPath}");
+                    $results[$relPath] = ['status' => 'identical', 'message' => 'Archivo idéntico, no requiere cambios'];
+                } else {
+                    if ($apply) {
+                        if ($backupDir !== null) {
+                            $bakFile = $backupDir.'/modified_files/'.$relPath;
+                            @mkdir(dirname($bakFile), 0775, true);
+                            @copy($tgtFile, $bakFile);
+                        }
+                        if (! @copy($srcFile, $tgtFile)) {
+                            throw new RuntimeException("Error al actualizar archivo con respaldo: {$tgtFile}");
+                        }
+                        @chmod($tgtFile, 0664);
+                        if (str_ends_with($tgtFile, '.php')) {
+                            $this->assertPhpSyntax($tgtFile);
+                        }
+                        $log("Actualizado con respaldo individual: {$relPath}");
+                        $results[$relPath] = ['status' => 'updated_with_backup', 'message' => 'Actualizado conservando copia de seguridad'];
+                    } else {
+                        $log("[DRY-RUN] Archivo existente difiere; se respaldará individualmente en --apply: {$relPath}");
+                        $results[$relPath] = ['status' => 'differs', 'message' => 'Archivo difiere, elegible para actualización con respaldo'];
+                    }
+                }
+            }
         }
 
-        return hash_final($ctx);
+        // 2. Modelo ClienteCuenta.php (integración aditiva no destructiva)
+        $relClienteCuenta = 'app/Models/ClienteCuenta.php';
+        $srcClienteCuenta = $sourceDir.'/'.$relClienteCuenta;
+        $tgtClienteCuenta = $targetDir.'/'.$relClienteCuenta;
+
+        if (! is_file($tgtClienteCuenta)) {
+            throw new DomainException("El modelo {$relClienteCuenta} no existe en destino.");
+        }
+
+        $srcCtaSha = hash_file('sha256', $srcClienteCuenta);
+        $tgtCtaSha = hash_file('sha256', $tgtClienteCuenta);
+
+        if (hash_equals((string) $srcCtaSha, (string) $tgtCtaSha)) {
+            $log("Modelo {$relClienteCuenta} idéntico e intacto");
+            $results[$relClienteCuenta] = ['status' => 'identical', 'message' => 'Modelo idéntico'];
+        } else {
+            $content = (string) file_get_contents($tgtClienteCuenta);
+            if (! str_contains($content, 'class ClienteCuenta')) {
+                throw new DomainException("Incompatibilidad crítica en {$relClienteCuenta}: no se encontró la declaración class ClienteCuenta.");
+            }
+
+            if (str_contains($content, 'function ccdLinks')) {
+                $log("Modelo {$relClienteCuenta} ya contiene relación ccdLinks(); conservado intacto sin sobrescribir.");
+                $results[$relClienteCuenta] = ['status' => 'already_compatible', 'message' => 'Relación ccdLinks ya presente'];
+            } else {
+                $this->assertPhpSyntax($tgtClienteCuenta);
+
+                if ($apply) {
+                    if ($backupDir !== null) {
+                        $bakFile = $backupDir.'/modified_files/'.$relClienteCuenta;
+                        @mkdir(dirname($bakFile), 0775, true);
+                        @copy($tgtClienteCuenta, $bakFile);
+                    }
+
+                    // Inyección quirúrgica de use HasMany y método ccdLinks
+                    $modified = $content;
+                    if (! str_contains($modified, 'use Illuminate\Database\Eloquent\Relations\HasMany;')) {
+                        $modified = preg_replace(
+                            '/(namespace\s+App\\\Models;)/',
+                            "$1\n\nuse Illuminate\Database\Eloquent\Relations\HasMany;",
+                            $modified,
+                            1
+                        ) ?? $modified;
+                    }
+
+                    $methodSnippet = "\n    public function ccdLinks(): HasMany\n    {\n        return \$this->hasMany(CcdClienteCuenta::class, 'cliente_cuenta_id');\n    }\n";
+                    $lastBrace = strrpos($modified, '}');
+                    if ($lastBrace === false) {
+                        throw new DomainException("Estructura inválida en {$relClienteCuenta}: llave de cierre no encontrada.");
+                    }
+                    $modified = substr($modified, 0, $lastBrace).$methodSnippet.substr($modified, $lastBrace);
+
+                    file_put_contents($tgtClienteCuenta, $modified);
+                    $this->assertPhpSyntax($tgtClienteCuenta);
+                    $log("Inyectada quirúrgicamente relación ccdLinks() en {$relClienteCuenta}");
+                    $results[$relClienteCuenta] = ['status' => 'additively_integrated', 'message' => 'Relación ccdLinks inyectada quirúrgicamente'];
+                } else {
+                    $log("[DRY-RUN] Modelo {$relClienteCuenta} compatible: requiere inyección aditiva de ccdLinks()");
+                    $results[$relClienteCuenta] = ['status' => 'pending_additive_integration', 'message' => 'Requiere inyección aditiva de ccdLinks'];
+                }
+            }
+        }
+
+        // 3. Modelo CcdCliente.php
+        $relCcdCliente = 'app/Models/CcdCliente.php';
+        $srcCcdCliente = $sourceDir.'/'.$relCcdCliente;
+        $tgtCcdCliente = $targetDir.'/'.$relCcdCliente;
+
+        if (! is_file($tgtCcdCliente)) {
+            if ($apply) {
+                @mkdir(dirname($tgtCcdCliente), 0775, true);
+                copy($srcCcdCliente, $tgtCcdCliente);
+                $this->assertPhpSyntax($tgtCcdCliente);
+                $log("Instalado modelo {$relCcdCliente}");
+                $results[$relCcdCliente] = ['status' => 'installed', 'message' => 'Instalado modelo CcdCliente'];
+            } else {
+                $log("[DRY-RUN] Modelo {$relCcdCliente} pendiente de instalación");
+                $results[$relCcdCliente] = ['status' => 'pending_install', 'message' => 'Modelo pendiente de instalar'];
+            }
+        } else {
+            $srcCcdSha = hash_file('sha256', $srcCcdCliente);
+            $tgtCcdSha = hash_file('sha256', $tgtCcdCliente);
+
+            if (hash_equals((string) $srcCcdSha, (string) $tgtCcdSha)) {
+                $log("Modelo {$relCcdCliente} idéntico e intacto");
+                $results[$relCcdCliente] = ['status' => 'identical', 'message' => 'Modelo idéntico'];
+            } else {
+                $content = (string) file_get_contents($tgtCcdCliente);
+                if (! str_contains($content, 'class CcdCliente')) {
+                    throw new DomainException("Incompatibilidad crítica en {$relCcdCliente}: no se encontró la declaración class CcdCliente.");
+                }
+
+                $hasArchivo = str_contains($content, 'function archivo');
+                $hasCuentaLinks = str_contains($content, 'function cuentaLinks');
+
+                if ($hasArchivo && $hasCuentaLinks) {
+                    $log("Modelo {$relCcdCliente} ya contiene archivo() y cuentaLinks(); conservado intacto.");
+                    $results[$relCcdCliente] = ['status' => 'already_compatible', 'message' => 'Relaciones archivo y cuentaLinks ya presentes'];
+                } else {
+                    $this->assertPhpSyntax($tgtCcdCliente);
+                    if ($apply) {
+                        if ($backupDir !== null) {
+                            $bakFile = $backupDir.'/modified_files/'.$relCcdCliente;
+                            @mkdir(dirname($bakFile), 0775, true);
+                            @copy($tgtCcdCliente, $bakFile);
+                        }
+
+                        $modified = $content;
+                        if (! str_contains($modified, 'use Illuminate\Database\Eloquent\Relations\BelongsTo;')) {
+                            $modified = preg_replace('/(namespace\s+App\\\Models;)/', "$1\nuse Illuminate\Database\Eloquent\Relations\BelongsTo;", $modified, 1) ?? $modified;
+                        }
+                        if (! str_contains($modified, 'use Illuminate\Database\Eloquent\Relations\HasMany;')) {
+                            $modified = preg_replace('/(namespace\s+App\\\Models;)/', "$1\nuse Illuminate\Database\Eloquent\Relations\HasMany;", $modified, 1) ?? $modified;
+                        }
+
+                        $injections = '';
+                        if (! $hasArchivo) {
+                            $injections .= "\n    public function archivo(): BelongsTo\n    {\n        return \$this->belongsTo(CcdArchivo::class, 'ccd_archivo_id');\n    }\n";
+                        }
+                        if (! $hasCuentaLinks) {
+                            $injections .= "\n    public function cuentaLinks(): HasMany\n    {\n        return \$this->hasMany(CcdClienteCuenta::class, 'ccd_cliente_id');\n    }\n";
+                        }
+
+                        $lastBrace = strrpos($modified, '}');
+                        $modified = substr($modified, 0, $lastBrace).$injections.substr($modified, $lastBrace);
+
+                        file_put_contents($tgtCcdCliente, $modified);
+                        $this->assertPhpSyntax($tgtCcdCliente);
+                        $log("Inyectadas relaciones faltantes en {$relCcdCliente}");
+                        $results[$relCcdCliente] = ['status' => 'additively_integrated', 'message' => 'Relaciones CCD inyectadas aditivamente'];
+                    } else {
+                        $log("[DRY-RUN] Modelo {$relCcdCliente} compatible: requiere inyección aditiva de relaciones");
+                        $results[$relCcdCliente] = ['status' => 'pending_additive_integration', 'message' => 'Requiere inyección de relaciones CCD'];
+                    }
+                }
+            }
+        }
+
+        // 4. Rutas routes/web/clientes.php
+        $relRoutes = 'routes/web/clientes.php';
+        $srcRoutes = $sourceDir.'/'.$relRoutes;
+        $tgtRoutes = $targetDir.'/'.$relRoutes;
+
+        if (! is_file($tgtRoutes)) {
+            throw new DomainException("El archivo de rutas {$relRoutes} no existe en destino.");
+        }
+
+        $srcRoutesSha = hash_file('sha256', $srcRoutes);
+        $tgtRoutesSha = hash_file('sha256', $tgtRoutes);
+
+        if (hash_equals((string) $srcRoutesSha, (string) $tgtRoutesSha)) {
+            $log("Rutas {$relRoutes} idénticas e intactas");
+            $results[$relRoutes] = ['status' => 'identical', 'message' => 'Rutas idénticas'];
+        } else {
+            $content = (string) file_get_contents($tgtRoutes);
+            if (str_contains($content, 'ccd.show') || str_contains($content, 'CcdDocumentController')) {
+                $log("Ruta ccd.show ya configurada en {$relRoutes}; conservada intacta.");
+                $results[$relRoutes] = ['status' => 'already_compatible', 'message' => 'Ruta ccd.show ya presente'];
+            } else {
+                if (! str_contains($content, 'ClienteController::class')) {
+                    throw new DomainException("Incompatibilidad crítica en {$relRoutes}: grupo de rutas de clientes no encontrado.");
+                }
+
+                $this->assertPhpSyntax($tgtRoutes);
+                if ($apply) {
+                    if ($backupDir !== null) {
+                        $bakFile = $backupDir.'/modified_files/'.$relRoutes;
+                        @mkdir(dirname($bakFile), 0775, true);
+                        @copy($tgtRoutes, $bakFile);
+                    }
+
+                    $modified = $content;
+                    if (! str_contains($modified, 'use App\Http\Controllers\CcdDocumentController;')) {
+                        $modified = preg_replace(
+                            '/(use\s+App\\\Http\\\Controllers\\\ClienteController;)/',
+                            "$1\nuse App\Http\Controllers\CcdDocumentController;",
+                            $modified,
+                            1
+                        ) ?? $modified;
+                    }
+
+                    $routeSnippet = "        Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
+                    if (str_contains($modified, "Route::get('/{numdoc}', [ClienteController::class, 'show'])")) {
+                        $modified = str_replace(
+                            "Route::get('/{numdoc}', [ClienteController::class, 'show'])",
+                            $routeSnippet."        Route::get('/{numdoc}', [ClienteController::class, 'show'])",
+                            $modified
+                        );
+                    } elseif (str_contains($modified, "Route::get('/{dni}', [ClienteController::class, 'show'])")) {
+                        $routeDniSnippet = "        Route::get('/{dni}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
+                        $modified = str_replace(
+                            "Route::get('/{dni}', [ClienteController::class, 'show'])",
+                            $routeDniSnippet."        Route::get('/{dni}', [ClienteController::class, 'show'])",
+                            $modified
+                        );
+                    } else {
+                        // Inserción al inicio del grupo
+                        $modified = preg_replace(
+                            '/(->group\(function\s*\(\)\s*\{)/',
+                            "$1\n".$routeSnippet,
+                            $modified,
+                            1
+                        ) ?? $modified;
+                    }
+
+                    file_put_contents($tgtRoutes, $modified);
+                    $this->assertPhpSyntax($tgtRoutes);
+                    $log("Ruta ccd.show inyectada quirúrgicamente en {$relRoutes}");
+                    $results[$relRoutes] = ['status' => 'additively_integrated', 'message' => 'Ruta ccd.show inyectada'];
+                } else {
+                    $log("[DRY-RUN] Rutas {$relRoutes} compatibles: requiere inyección aditiva de ccd.show");
+                    $results[$relRoutes] = ['status' => 'pending_additive_integration', 'message' => 'Requiere inyección de ruta ccd.show'];
+                }
+            }
+        }
+
+        // 5. Servicio ClienteProfileService.php
+        $relProfile = 'app/Services/Cliente/ClienteProfileService.php';
+        $srcProfile = $sourceDir.'/'.$relProfile;
+        $tgtProfile = $targetDir.'/'.$relProfile;
+
+        if (! is_file($tgtProfile)) {
+            throw new DomainException("El servicio {$relProfile} no existe en destino.");
+        }
+
+        $srcProfSha = hash_file('sha256', $srcProfile);
+        $tgtProfSha = hash_file('sha256', $tgtProfile);
+
+        if (hash_equals((string) $srcProfSha, (string) $tgtProfSha)) {
+            $log("Servicio {$relProfile} idéntico e intacto");
+            $results[$relProfile] = ['status' => 'identical', 'message' => 'Servicio idéntico'];
+        } else {
+            $content = (string) file_get_contents($tgtProfile);
+            if (str_contains($content, 'ccdConfirmados') || str_contains($content, 'CcdClienteCuenta::ESTADO_CONFIRMADA')) {
+                $log("Servicio {$relProfile} ya integra documentos confirmados; conservado intacto.");
+                $results[$relProfile] = ['status' => 'already_compatible', 'message' => 'Integración ccdConfirmados ya presente'];
+            } else {
+                if (! str_contains($content, 'function ccdData')) {
+                    throw new DomainException("Incompatibilidad crítica en {$relProfile}: método ccdData() no encontrado.");
+                }
+
+                $this->assertPhpSyntax($tgtProfile);
+                if ($apply) {
+                    if ($backupDir !== null) {
+                        $bakFile = $backupDir.'/modified_files/'.$relProfile;
+                        @mkdir(dirname($bakFile), 0775, true);
+                        @copy($tgtProfile, $bakFile);
+                    }
+
+                    $modified = $content;
+                    if (! str_contains($modified, 'use App\Models\CcdClienteCuenta;')) {
+                        $modified = preg_replace(
+                            '/(use\s+App\\\Models\\\CcdCliente;)/',
+                            "$1\nuse App\Models\CcdClienteCuenta;",
+                            $modified,
+                            1
+                        ) ?? $modified;
+                    }
+
+                    $ccdIntegrationSnippet = <<<'PHP'
+        if (Schema::hasTable('ccd_cliente_cuenta') && $ccdDocs->isNotEmpty()) {
+            $confirmedLinks = CcdClienteCuenta::query()
+                ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
+                ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+                ->with('ccdCliente:id,numdoc,pdf,cosecha')
+                ->get()
+                ->filter(fn (CcdClienteCuenta $link) => $link->ccdCliente !== null
+                    && hash_equals($dni, (string) $link->ccdCliente->numdoc))
+                ->groupBy('cliente_cuenta_id');
+
+            $confirmedIds = $confirmedLinks
+                ->flatten()
+                ->pluck('ccd_cliente_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->all();
+
+            foreach ($cuentas as $account) {
+                $account->ccdConfirmados = collect($confirmedLinks->get((int) $account->id, []))
+                    ->pluck('ccdCliente')
+                    ->filter()
+                    ->sortBy('id')
+                    ->values();
+            }
+
+            $ccdDocs = $ccdDocs
+                ->reject(fn (CcdCliente $document): bool => in_array((int) $document->id, $confirmedIds, true))
+                ->values();
+        }
+
+PHP;
+                    // Inserción antes de $ccdByDni =
+                    if (str_contains($modified, '$ccdByDni = collect([')) {
+                        $modified = str_replace(
+                            '$ccdByDni = collect([',
+                            $ccdIntegrationSnippet.'        $ccdByDni = collect([',
+                            $modified
+                        );
+                    } else {
+                        throw new DomainException("Incompatibilidad en {$relProfile}: punto de inyección ccdByDni no encontrado.");
+                    }
+
+                    file_put_contents($tgtProfile, $modified);
+                    $this->assertPhpSyntax($tgtProfile);
+                    $log("Integración ccdConfirmados inyectada quirúrgicamente en {$relProfile}");
+                    $results[$relProfile] = ['status' => 'additively_integrated', 'message' => 'Lógica de ccdConfirmados inyectada'];
+                } else {
+                    $log("[DRY-RUN] Servicio {$relProfile} compatible: requiere integración aditiva de ccdConfirmados");
+                    $results[$relProfile] = ['status' => 'pending_additive_integration', 'message' => 'Requiere integración de ccdConfirmados'];
+                }
+            }
+        }
+
+        // 6. Vista resources/views/clientes/show.blade.php
+        $relView = 'resources/views/clientes/show.blade.php';
+        $srcView = $sourceDir.'/'.$relView;
+        $tgtView = $targetDir.'/'.$relView;
+
+        if (! is_file($tgtView)) {
+            throw new DomainException("La vista {$relView} no existe en destino.");
+        }
+
+        $srcViewSha = hash_file('sha256', $srcView);
+        $tgtViewSha = hash_file('sha256', $tgtView);
+
+        if (hash_equals((string) $srcViewSha, (string) $tgtViewSha)) {
+            $log("Vista {$relView} idéntica e intacta");
+            $results[$relView] = ['status' => 'identical', 'message' => 'Vista idéntica'];
+        } else {
+            $content = (string) file_get_contents($tgtView);
+            if (str_contains($content, 'ccdConfirmados') || str_contains($content, 'clientes.ccd.show')) {
+                $log("Vista {$relView} ya visualiza documentos CCD confirmados; conservada intacta.");
+                $results[$relView] = ['status' => 'already_compatible', 'message' => 'Visualizador CCD ya presente'];
+            } else {
+                if ($apply) {
+                    if ($backupDir !== null) {
+                        $bakFile = $backupDir.'/modified_files/'.$relView;
+                        @mkdir(dirname($bakFile), 0775, true);
+                        @copy($tgtView, $bakFile);
+                    }
+
+                    $viewSnippet = <<<'BLADE'
+                                    @php
+                                        $ccdConfirmados = collect($c->ccdConfirmados ?? []);
+                                    @endphp
+                                    @if($ccdConfirmados->isNotEmpty())
+                                        <div class="flex flex-wrap justify-center gap-1">
+                                            @foreach($ccdConfirmados as $document)
+                                                @php
+                                                    $name = filled($document->pdf)
+                                                        ? pathinfo((string) $document->pdf, PATHINFO_FILENAME)
+                                                        : (($document->cosecha ? 'CCD '.$document->cosecha : 'CCD').' #'.$document->id);
+                                                @endphp
+                                                <a
+                                                    href="{{ route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $document->id]) }}"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex size-7 items-center justify-center rounded-md text-kp-secondary transition-colors hover:bg-kp-secondary-soft hover:text-kp-secondary-dark kp-focus"
+                                                    title="Abrir {{ $name }}"
+                                                    aria-label="Abrir {{ $name }}"
+                                                >
+                                                    <x-ui.registration-paper-icon class="size-5" />
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <span class="text-slate-400" aria-label="Sin CCD confirmado para esta operación">—</span>
+                                    @endif
+BLADE;
+                    if (str_contains($content, '<span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>')) {
+                        $modified = str_replace(
+                            '<span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>',
+                            $viewSnippet,
+                            $content
+                        );
+                        file_put_contents($tgtView, $modified);
+                        $log("Visualizador CCD integrado en {$relView}");
+                        $results[$relView] = ['status' => 'additively_integrated', 'message' => 'Visualizador CCD integrado'];
+                    } else {
+                        throw new DomainException("Incompatibilidad crítica en {$relView}: no se encontró la celda placeholder para CCD.");
+                    }
+                } else {
+                    $log("[DRY-RUN] Vista {$relView} compatible: requiere integración de visualizador CCD");
+                    $results[$relView] = ['status' => 'pending_additive_integration', 'message' => 'Requiere integración de visualizador CCD'];
+                }
+            }
+        }
+
+        // 7. Configuración de filesystems config/filesystems.php
+        $relFs = 'config/filesystems.php';
+        $tgtFs = $targetDir.'/'.$relFs;
+
+        if (! is_file($tgtFs)) {
+            throw new DomainException("El archivo {$relFs} no existe en destino.");
+        }
+
+        $fsContent = (string) file_get_contents($tgtFs);
+        if (str_contains($fsContent, "'ccd-private'") || str_contains($fsContent, '"ccd-private"')) {
+            $log("Disco ccd-private ya configurado en {$relFs}; conservado intacto.");
+            $results[$relFs] = ['status' => 'already_configured', 'message' => 'Disco ccd-private ya configurado'];
+        } else {
+            if (! str_contains($fsContent, "'disks' => [") && ! str_contains($fsContent, '"disks" => [')) {
+                throw new DomainException("Incompatibilidad en {$relFs}: sección 'disks' no encontrada.");
+            }
+
+            $this->assertPhpSyntax($tgtFs);
+            if ($apply) {
+                if ($backupDir !== null) {
+                    $bakFile = $backupDir.'/modified_files/'.$relFs;
+                    @mkdir(dirname($bakFile), 0775, true);
+                    @copy($tgtFs, $bakFile);
+                }
+
+                $diskConfig = <<<'PHP'
+        'ccd-private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/ccd'),
+            'visibility' => 'private',
+            'directory_visibility' => 'private',
+            'permissions' => [
+                'file' => [
+                    'public' => 0660,
+                    'private' => 0660,
+                ],
+                'dir' => [
+                    'public' => 0770,
+                    'private' => 0770,
+                ],
+            ],
+            'throw' => true,
+        ],
+
+PHP;
+                $pattern = "/('disks'\s*=>\s*\[)/";
+                if (! preg_match($pattern, $fsContent)) {
+                    $pattern = '/("disks"\s*=>\s*\[)/';
+                }
+                $modified = preg_replace($pattern, "$1\n".$diskConfig, $fsContent, 1) ?? $fsContent;
+
+                file_put_contents($tgtFs, $modified);
+                $this->assertPhpSyntax($tgtFs);
+                $log("Configurado disco ccd-private en {$relFs}");
+                $results[$relFs] = ['status' => 'additively_integrated', 'message' => 'Disco ccd-private configurado'];
+            } else {
+                $log("[DRY-RUN] Configuración {$relFs} compatible: requiere disco ccd-private");
+                $results[$relFs] = ['status' => 'pending_additive_integration', 'message' => 'Requiere configuración de disco ccd-private'];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Valida la seguridad previa de reversión para evitar eliminar migraciones ajenas o datos posteriores.
+     *
+     * @return array{safe: bool, reasons: list<string>, warnings: list<string>}
+     */
+    public function validateRollbackSafety(PDO $targetPdo): array
+    {
+        $reasons = [];
+        $warnings = [];
+
+        $hasMigrations = $this->tableExists($targetPdo, 'migrations');
+        if (! $hasMigrations) {
+            return [
+                'safe' => true,
+                'reasons' => [],
+                'warnings' => ['No existe tabla migrations en destino.'],
+            ];
+        }
+
+        // 1. Verificar registros de migraciones CCD
+        $stmt = $targetPdo->query(
+            "SELECT id, migration, batch FROM migrations
+             WHERE migration LIKE '%create_ccd_archivos%'
+                OR migration LIKE '%create_ccd_cliente_cuenta%'"
+        );
+        $ccdMigrations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($ccdMigrations)) {
+            $warnings[] = 'No se encontraron migraciones CCD registradas en la tabla migrations.';
+        } else {
+            $ccdBatches = array_unique(array_column($ccdMigrations, 'batch'));
+
+            if (! empty($ccdBatches)) {
+                $placeholders = implode(',', array_fill(0, count($ccdBatches), '?'));
+                $sharedStmt = $targetPdo->prepare(
+                    "SELECT migration, batch FROM migrations
+                     WHERE batch IN ({$placeholders})
+                       AND migration NOT LIKE '%create_ccd_archivos%'
+                       AND migration NOT LIKE '%create_ccd_cliente_cuenta%'"
+                );
+                $sharedStmt->execute(array_values($ccdBatches));
+                $sharedMigrations = $sharedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (! empty($sharedMigrations)) {
+                    $names = implode(', ', array_column($sharedMigrations, 'migration'));
+                    $reasons[] = "Otras migraciones no-CCD comparten el mismo lote (batch) que CCD: {$names}. Debe usarse reversión selectiva por ruta para no afectarlas.";
+                }
+
+                $maxBatch = max($ccdBatches);
+                $subsequentStmt = $targetPdo->prepare('SELECT migration, batch FROM migrations WHERE batch > ?');
+                $subsequentStmt->execute([$maxBatch]);
+                $subsequentMigrations = $subsequentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (! empty($subsequentMigrations)) {
+                    $names = implode(', ', array_column($subsequentMigrations, 'migration'));
+                    $reasons[] = "Existen migraciones posteriores a CCD aplicadas en destino (lote > {$maxBatch}): {$names}. Revertir CCD podría invalidar dependencias de esquema.";
+                }
+            }
+        }
+
+        // 2. Asociaciones de otras cosechas
+        if ($this->tableExists($targetPdo, 'ccd_cliente_cuenta')) {
+            $otherHarvestAssoc = (int) $this->fetchScalar(
+                $targetPdo,
+                "SELECT COUNT(*) FROM ccd_cliente_cuenta cca
+                 JOIN ccd_clientes cc ON cc.id = cca.ccd_cliente_id
+                 WHERE cc.cosecha NOT IN ('AQP4', 'AQP5')"
+            );
+
+            if ($otherHarvestAssoc > 0) {
+                $reasons[] = "ccd_cliente_cuenta contiene {$otherHarvestAssoc} asociaciones correspondientes a cosechas distintas de AQP4/AQP5. No se puede eliminar la tabla sin perder datos de producción.";
+            }
+        }
+
+        // 3. Archivos vinculados a otras cosechas
+        if ($this->tableExists($targetPdo, 'ccd_archivos') && $this->columnExists($targetPdo, 'ccd_clientes', 'ccd_archivo_id')) {
+            $otherHarvestFiles = (int) $this->fetchScalar(
+                $targetPdo,
+                "SELECT COUNT(*) FROM ccd_clientes cc
+                 WHERE cc.cosecha NOT IN ('AQP4', 'AQP5')
+                   AND cc.ccd_archivo_id IS NOT NULL"
+            );
+
+            if ($otherHarvestFiles > 0) {
+                $reasons[] = "ccd_archivos contiene archivos vinculados a clientes de cosechas distintas a AQP4/AQP5 ({$otherHarvestFiles} referencias).";
+            }
+        }
+
+        // 4. Claves foráneas de terceras tablas
+        $dbName = $this->fetchScalar($targetPdo, 'SELECT DATABASE()');
+        if (is_string($dbName) && $dbName !== '') {
+            $stmt = $targetPdo->prepare(
+                "SELECT TABLE_NAME, CONSTRAINT_NAME, REFERENCED_TABLE_NAME
+                 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = ?
+                   AND REFERENCED_TABLE_NAME IN ('ccd_archivos', 'ccd_cliente_cuenta')
+                   AND TABLE_NAME NOT IN ('ccd_archivos', 'ccd_cliente_cuenta', 'ccd_clientes')"
+            );
+            $stmt->execute([$dbName]);
+            $fkDeps = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (! empty($fkDeps)) {
+                $depList = [];
+                foreach ($fkDeps as $fk) {
+                    $depList[] = "{$fk['TABLE_NAME']}.{$fk['CONSTRAINT_NAME']} -> {$fk['REFERENCED_TABLE_NAME']}";
+                }
+                $reasons[] = 'Existen tablas ajenas con claves foráneas apuntando a tablas CCD: '.implode(', ', $depList);
+            }
+        }
+
+        return [
+            'safe' => empty($reasons),
+            'reasons' => $reasons,
+            'warnings' => $warnings,
+        ];
+    }
+
+    public function assertPhpSyntax(string $filePath): void
+    {
+        $escaped = escapeshellarg($filePath);
+        $cmd = "php -l {$escaped}";
+        exec($cmd, $output, $returnCode);
+        if ($returnCode !== 0) {
+            $err = implode("\n", $output);
+            throw new DomainException("Error de sintaxis PHP detectado en {$filePath}:\n{$err}");
+        }
     }
 
     public function tableExists(PDO $pdo, string $table): bool

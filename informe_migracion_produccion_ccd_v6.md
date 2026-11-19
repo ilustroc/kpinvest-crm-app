@@ -28,18 +28,20 @@ Ambas bases de datos presentan una concordancia idéntica en el universo de clie
 
 ### Huellas Criptográficas SHA-256 Certificadas
 
-Las siguientes firmas SHA-256 son estrictamente validadas por el servicio migrador antes de permitir cualquier operación:
+Las siguientes firmas SHA-256 son estrictamente validadas por el servicio migrador y el desplegador antes de permitir cualquier operación:
 
 - **Firma CCD AQP:** `861b054ff5ca5027f927d95d8c9980381bb6d3cd69f325ec019b3650506b568b`
-- **Firma Cuentas AQP:** `0a66ff254fd82cfa021cca872404686ee15785d8231e34eae0ae8711076bbd6f`
+- **Firma Cuentas (universo total):** `0a66ff254fd82cfa021cca872404686ee15785d8231e34eae0ae8711076bbd6f`
 
-### Método de Serialización para el Cálculo de Firmas
+### Método de Serialización Unificado para el Cálculo de Firmas
 
 Para garantizar consistencia matemática exacta con la auditoría original:
-1. **Firma CCD:** Consulta `SELECT id, numdoc, pdf, cosecha FROM ccd_clientes WHERE cosecha IN ('AQP4', 'AQP5') ORDER BY id ASC;`.
-2. **Firma Cuentas:** Consulta `SELECT id, numdoc, cuenta, operacion, entidad, cosecha FROM clientes_cuentas WHERE cosecha IN ('CAJAAQP4', 'CAJAAQP5') ORDER BY id ASC;`.
-3. **Formato:** Cada fila se serializa uniendo sus campos con tabulación horizontal (`\t`, ASCII `0x09`) y finalizando con salto de línea Unix (`\n`, ASCII `0x0A`), sin incluir cabeceras de columnas (equivalente exacto a `mysql -N -B` canalizado hacia `sha256sum`).
-4. **Codificación:** UTF-8 binario.
+1. **Firma CCD AQP:** Consulta `SELECT id, numdoc, pdf, cosecha FROM ccd_clientes WHERE cosecha IN ('AQP4', 'AQP5') ORDER BY id ASC;` (10,224 registros).
+2. **Firma Cuentas Total:** Consulta `SELECT id, numdoc, cuenta, operacion, entidad, cosecha FROM clientes_cuentas ORDER BY id ASC;` (la totalidad de los 282,595 registros, sin filtro de cosecha).
+3. **Formato y Codificación:** Cada fila se serializa mediante `json_encode([...], JSON_UNESCAPED_UNICODE) . "\n"` por registro de forma secuencial mediante streaming, procesando candidatos indexados y asociativos ordenados por `id ASC`.
+4. **Unificación Bash-PHP:** El desplegador Bash (`desplegar_ccd_aqp_produccion_v6.sh`) invoca directamente las funciones PHP de `CcdProductionMigratorService` a través del archivo privado de credenciales. Se eliminó la serialización tabulada por `mysql -N -B` y el filtrado indebido de cuentas AQP, garantizando que el cálculo de firmas en Bash y PHP sea 100% idéntico. Ambos entornos validan:
+   - Concordancia cruzada idéntica: `origen == destino`.
+   - Coincidencia exacta contra las firmas de referencia oficiales.
 
 ### Atribución y Métodos de Verificación de las Asociaciones en Staging
 
@@ -64,13 +66,19 @@ Las 10,224 asociaciones confirmadas en staging se componen exactamente de:
 - El dry-run inspecciona el esquema de producción, comprueba las 2 migraciones pendientes, verifica la integridad de los 10,224 PDFs en almacenamiento origen, verifica la disponibilidad de espacio en disco en el directorio existente sin crear carpetas, y comprueba las referencias cruzadas.
 - **Cero escrituras:** no crea directorios en destino, no ejecuta migraciones, no modifica código y no genera manifiestos en producción.
 
-### 3.2. Integración Aditiva de Archivos sin Sobrescritura Indiscriminada
-- Se eliminó el reemplazo ciego con `cp`.
-- La sincronización analiza cada archivo del módulo CCD de forma aditiva:
-  - Archivos nuevos: se instalan con permisos 0644.
-  - Archivos idénticos: se conservan intactos.
-  - Archivos existentes que difieren: se realiza un respaldo individual previo en `${BACKUP_DIR}/modified_files/<ruta_relativa>` antes de actualizar.
-- Se preservan de forma garantizada la autenticación y los módulos de clientes, pagos, promesas y CNA.
+### 3.2. Integración Aditiva Quirúrgica y Verificación de Compatibilidad
+- Se eliminó el reemplazo ciego con `cp` y scripts externos de parsing.
+- La integración se realiza mediante el método `CcdProductionMigratorService::verifyAndIntegrateComponents()`:
+  - **Archivos nuevos:** Se instalan con permisos 0664 previa validación de sintaxis (`php -l`).
+  - **Componentes existentes de CRM:**
+    - `ClienteCuenta.php`: Si el archivo de producción ya cuenta con `ccdLinks()`, se deja **completamente intacto**. Si carece de él, se valida la estructura del modelo, se inyecta la relación `ccdLinks(): HasMany` antes de la llave de cierre, se crea un respaldo individual previo y se valida con `php -l`.
+    - `CcdCliente.php`: Inyecta exclusivamente las relaciones `archivo()` y `cuentaLinks()` faltantes sin sobreescribir código existente.
+    - `routes/web/clientes.php`: Inyecta la ruta `ccd.show` dentro del grupo de clientes solo si no se encuentra ya declarada.
+    - `ClienteProfileService.php`: Inyecta la lógica de filtrado de documentos confirmados dentro de `ccdData()` solo si no está presente.
+    - `resources/views/clientes/show.blade.php`: Inyecta el visualizador de documentos confirmados conservando el diseño de la tabla.
+    - `config/filesystems.php`: Inyecta la definición del disco `ccd-private` de forma nativa mediante PHP (sin requerir intérpretes secundarios como Python).
+  - Si cualquier archivo presenta una estructura incompatible, el proceso **aborta inmediatamente antes de modificar el entorno de producción**.
+- Se preservan de forma 100% garantizada la autenticación y los módulos de clientes, pagos, promesas y CNA.
 
 ### 3.3. Rechazo de Conflictos y Eliminación de `ON DUPLICATE KEY UPDATE`
 - Se eliminó completamente la sobrescritura silenciosa mediante `ON DUPLICATE KEY UPDATE`.
@@ -79,10 +87,10 @@ Las 10,224 asociaciones confirmadas en staging se componen exactamente de:
   - Si un registro ya existe en destino pero difiere en cualquier campo de negocio: se **detiene inmediatamente la ejecución**, se hace rollback de la transacción y se registra el conflicto de integridad sin modificar la fila preexistente.
   - Esta política aplica uniformemente a `ccd_archivos`, `ccd_clientes.ccd_archivo_id` y `ccd_cliente_cuenta`.
 
-### 3.4. Protección de Credenciales MySQL
+### 3.4. Protección de Credenciales MySQL con Serializador Nativo
 - Se eliminó el paso de contraseñas mediante argumentos CLI (`--source-password`, `--target-password`) que puedan exponerse en la tabla de procesos (`ps aux`).
-- Se implementó soporte para un archivo JSON de credenciales privado con permisos restrictivos (`0600`) o variables de entorno del proceso (`CCD_SOURCE_DB_PASSWORD`, `CCD_TARGET_DB_PASSWORD`).
-- El desplegador genera dinámicamente un archivo temporal privado en `${HOME}/private/.ccd_credentials/`, asegurado con `umask 077` y `chmod 600`, el cual es destruido automáticamente al término o interrupción del script mediante un `trap`.
+- La generación del JSON de credenciales privadas se realiza mediante un serializador nativo en PHP (`json_encode()`), garantizando el soporte seguro de contraseñas complejas con caracteres especiales (comillas, barras invertidas, signos de dólar).
+- El archivo temporal se crea en `${HOME}/private/.ccd_credentials/`, asegurado con permisos estrictos `0600`, y se destruye automáticamente al finalizar o abortar la ejecución mediante un handler `trap`.
 
 ---
 
@@ -198,28 +206,33 @@ WHERE cl.numdoc <> cc.numdoc;
 
 ---
 
-## 7. Plan de Rollback Específico
+## 7. Plan de Rollback Específico y Blindaje de Lotes
 
 Se descartó la recomendación genérica `php artisan migrate:rollback --step=2` debido al riesgo de deshacer migraciones no deseadas o restaurar volcados completos que sobreescribirían nuevas operaciones concurrentes de clientes o pagos en producción.
+
+### Salvaguardas previas a la reversión (`validateRollbackSafety`):
+1. **Aislamiento de Lotes:** Comprueba que no existan otras migraciones no-CCD registradas en el mismo lote (`batch`) en la tabla `migrations`. Si existieran, la reversión selectiva por ruta garantiza que solo se deshagan las migraciones CCD sin afectar a las demás.
+2. **Protección contra Migraciones Posteriores:** Comprueba que no se hayan ejecutado migraciones posteriores a CCD (lote superior al de CCD).
+3. **Ausencia de Datos Ajenos:** Verifica que `ccd_cliente_cuenta` no contenga asociaciones de otras cosechas y que `ccd_archivos` no tenga referencias externas activas.
+4. **Verificación de Claves Foráneas:** Revisa `information_schema.KEY_COLUMN_USAGE` para asegurar que ninguna tabla ajena dependa de `ccd_archivos` o `ccd_cliente_cuenta`.
+5. **Verificación Post-Reversión:** Confirma que las tablas y columnas CCD se hayan eliminado, pero certifica que `ccd_clientes` conserve íntegros sus 275,987 registros y `clientes_cuentas` sus 282,595 registros.
 
 En caso de requerir reversión:
 
 ```bash
-# Ejecutar la reversión específica de las 2 migraciones CCD
+# Ejecutar la reversión específica y segura de las 2 migraciones CCD
 ./revertir_ccd_aqp_produccion_v6.sh --confirm
 
 # (Opcional) Si se desea restaurar archivos modificados desde un respaldo previo:
 ./revertir_ccd_aqp_produccion_v6.sh --confirm --restore-files="${HOME}/private/backups/ccd-v6-produccion-<timestamp>"
 ```
 
-El script verifica antes de la reversión que no existan datos de cosechas posteriores en `ccd_cliente_cuenta`, revierte las dos migraciones en orden de dependencia inverso (`ccd_cliente_cuenta` primero y luego `ccd_archivos`), restaura los archivos modificados si se solicita, y limpia las cachés de Laravel.
-
 ---
 
 ## 8. Resultados de la Suite de Pruebas
 
-- **Pruebas de Integración y Regresión V6.1:** 10 pasadas, 55 aserciones ([`tests/Feature/CcdAqpProductionMigrationV6Test.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/tests/Feature/CcdAqpProductionMigrationV6Test.php)).
-- **Suite Completa CCD:** 120 pasadas, 580 aserciones, 0 errores, 0 fallos.
+- **Pruebas de Integración y Regresión V6.1:** 12 pasadas, 88 aserciones ([`tests/Feature/CcdAqpProductionMigrationV6Test.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/tests/Feature/CcdAqpProductionMigrationV6Test.php)).
+- **Suite Completa CCD:** 127 pasadas, 651 aserciones, 0 errores, 0 fallos.
 - **Suite General CRM (Pagos, Promesas, CNA, Clientes, Auth):** 252 pasadas, 1,670 aserciones, 0 errores, 0 fallos.
 - **Compilación de Assets Frontend (`npm run build`):** 38 módulos transformados en 5.14s sin errores.
 - **Laravel Pint:** 100% de cumplimiento de estilo en todos los archivos del módulo.

@@ -146,24 +146,27 @@ cleanup_credentials() {
 }
 trap cleanup_credentials EXIT INT TERM
 
-cat <<EOF > "$CRED_FILE"
-{
-  "source": {
-    "host": "${SRC_DB_HOST}",
-    "port": ${SRC_DB_PORT},
-    "database": "${SRC_DB_NAME}",
-    "username": "${SRC_DB_USER}",
-    "password": "${SRC_DB_PASS}"
-  },
-  "target": {
-    "host": "${TGT_DB_HOST}",
-    "port": ${TGT_DB_PORT},
-    "database": "${TGT_DB_NAME}",
-    "username": "${TGT_DB_USER}",
-    "password": "${TGT_DB_PASS}"
-  }
-}
-EOF
+# Serializador nativo PHP para generar JSON seguro (soporta comillas, barras invertidas y caracteres especiales)
+SRC_P="$SRC_DB_PASS" TGT_P="$TGT_DB_PASS" CRED_OUT="$CRED_FILE" php -r '
+  $data = [
+    "source" => [
+      "host" => getenv("SRC_DB_HOST"),
+      "port" => (int) (getenv("SRC_DB_PORT") ?: 3306),
+      "database" => getenv("SRC_DB_NAME"),
+      "username" => getenv("SRC_DB_USER"),
+      "password" => (string) getenv("SRC_P"),
+    ],
+    "target" => [
+      "host" => getenv("TGT_DB_HOST"),
+      "port" => (int) (getenv("TGT_DB_PORT") ?: 3306),
+      "database" => getenv("TGT_DB_NAME"),
+      "username" => getenv("TGT_DB_USER"),
+      "password" => (string) getenv("TGT_P"),
+    ],
+  ];
+  file_put_contents(getenv("CRED_OUT"), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+'
+unset SRC_P TGT_P CRED_OUT
 chmod 600 "$CRED_FILE"
 
 # Funciones de consulta SQL seguras con MYSQL_PWD en entorno interno
@@ -215,25 +218,56 @@ if [ "$SRC_AQP4" -ne "$EXPECTED_AQP4_TOTAL" ] || [ "$TGT_AQP4" -ne "$EXPECTED_AQ
 fi
 echo "  CCD AQP4: $SRC_AQP4 | CCD AQP5: $SRC_AQP5 (Conforme)"
 
-# Firmas SHA-256 (serialización tabulada ordenada por ID sin cabeceras)
-echo "  Calculando huellas SHA-256 para verificación cruzada..."
-SRC_CCD_HASH=$(run_src_sql "SELECT id, numdoc, pdf, cosecha FROM ccd_clientes WHERE cosecha IN ('AQP4', 'AQP5') ORDER BY id;" | sha256sum | cut -d' ' -f1)
-TGT_CCD_HASH=$(run_tgt_sql "SELECT id, numdoc, pdf, cosecha FROM ccd_clientes WHERE cosecha IN ('AQP4', 'AQP5') ORDER BY id;" | sha256sum | cut -d' ' -f1)
+# Firmas SHA-256 (serialización JSON-lines por registro ordenada por ID, unificada con PHP)
+echo "  Calculando huellas SHA-256 unificadas para verificación cruzada..."
 
-if [ "$SRC_CCD_HASH" != "$EXPECTED_CCD_SHA256" ] || [ "$TGT_CCD_HASH" != "$EXPECTED_CCD_SHA256" ]; then
-  echo "ERROR: Huellas SHA-256 de ccd_clientes AQP difieren de la firma certificada ($EXPECTED_CCD_SHA256)." >&2
+calculate_sha_php() {
+  local env_type="$1"
+  local table_type="$2"
+  php -r '
+    require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+    $c = $creds["'"$env_type"'"];
+    $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    $svc = new App\Services\Ccd\CcdProductionMigratorService();
+    if ("'"$table_type"'" === "ccd") {
+        echo $svc->calculateCcdAqpSha256($pdo);
+    } else {
+        echo $svc->calculateCuentasSha256($pdo);
+    }
+  '
+}
+
+SRC_CCD_HASH=$(calculate_sha_php "source" "ccd")
+TGT_CCD_HASH=$(calculate_sha_php "target" "ccd")
+
+if [ "$SRC_CCD_HASH" != "$TGT_CCD_HASH" ]; then
+  echo "ERROR: Las huellas SHA-256 de ccd_clientes AQP no coinciden entre origen ($SRC_CCD_HASH) y destino ($TGT_CCD_HASH)." >&2
+  exit 1
+fi
+
+if [ "$SRC_CCD_HASH" != "$EXPECTED_CCD_SHA256" ]; then
+  echo "ERROR: Huellas SHA-256 de ccd_clientes AQP ($SRC_CCD_HASH) difieren de la firma certificada ($EXPECTED_CCD_SHA256)." >&2
   exit 1
 fi
 echo "  Firma CCD AQP conforme: $SRC_CCD_HASH"
 
-SRC_CTA_HASH=$(run_src_sql "SELECT id, numdoc, cuenta, operacion, entidad, cosecha FROM clientes_cuentas WHERE cosecha IN ('CAJAAQP4', 'CAJAAQP5') ORDER BY id;" | sha256sum | cut -d' ' -f1)
-TGT_CTA_HASH=$(run_tgt_sql "SELECT id, numdoc, cuenta, operacion, entidad, cosecha FROM clientes_cuentas WHERE cosecha IN ('CAJAAQP4', 'CAJAAQP5') ORDER BY id;" | sha256sum | cut -d' ' -f1)
+SRC_CTA_HASH=$(calculate_sha_php "source" "cuentas")
+TGT_CTA_HASH=$(calculate_sha_php "target" "cuentas")
 
-if [ "$SRC_CTA_HASH" != "$EXPECTED_CUENTAS_SHA256" ] || [ "$TGT_CTA_HASH" != "$EXPECTED_CUENTAS_SHA256" ]; then
-  echo "ERROR: Huellas SHA-256 de clientes_cuentas AQP difieren de la firma certificada ($EXPECTED_CUENTAS_SHA256)." >&2
+if [ "$SRC_CTA_HASH" != "$TGT_CTA_HASH" ]; then
+  echo "ERROR: Las huellas SHA-256 de clientes_cuentas no coinciden entre origen ($SRC_CTA_HASH) y destino ($TGT_CTA_HASH)." >&2
   exit 1
 fi
-echo "  Firma Cuentas AQP conforme: $SRC_CTA_HASH"
+
+if [ "$SRC_CTA_HASH" != "$EXPECTED_CUENTAS_SHA256" ]; then
+  echo "ERROR: Huellas SHA-256 de clientes_cuentas ($SRC_CTA_HASH) difieren de la firma certificada ($EXPECTED_CUENTAS_SHA256)." >&2
+  exit 1
+fi
+echo "  Firma Cuentas (282,595 registros) conforme: $SRC_CTA_HASH"
 
 # Asociaciones de Staging
 STAGING_ASSOC=$(run_src_sql "SELECT COUNT(*) FROM ccd_cliente_cuenta cca JOIN ccd_clientes cc ON cc.id = cca.ccd_cliente_id WHERE cc.cosecha IN ('AQP4', 'AQP5') AND cca.estado = 'confirmada';")
@@ -260,42 +294,21 @@ if [ "$FREE_SPACE_GIB" -lt "$MIN_FREE_SPACE_GIB" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# Definición de archivos CCD para sincronización aditiva segura
-# ------------------------------------------------------------------------------
-CCD_FILES=(
-  "database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php"
-  "database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php"
-  "config/ccd.php"
-  "app/Models/CcdArchivo.php"
-  "app/Models/CcdClienteCuenta.php"
-  "app/Models/CcdCliente.php"
-  "app/Models/ClienteCuenta.php"
-  "app/Http/Controllers/CcdDocumentController.php"
-  "app/Console/Commands/MigrateCcdAqpProductionV6.php"
-  "app/Services/Ccd/CcdProductionMigratorService.php"
-  "app/Services/Cliente/ClienteProfileService.php"
-  "routes/web/clientes.php"
-  "resources/views/clientes/show.blade.php"
-)
-
-# ------------------------------------------------------------------------------
 # En modo DRY-RUN: Simulación estricta sin escrituras y salida limpia
 # ------------------------------------------------------------------------------
 if [ "$MODE" = "dry-run" ]; then
-  echo "==> [Paso 3/6] [DRY-RUN] Comprobando integración aditiva de archivos sin escribir cambios..."
-  for rel_file in "${CCD_FILES[@]}"; do
-    src_f="${STAGING_DIR}/${rel_file}"
-    tgt_f="${PROD_DIR}/${rel_file}"
-    if [ ! -f "$src_f" ]; then
-      echo "  [ADVERTENCIA] Archivo origen no encontrado: $rel_file"
-    elif [ ! -f "$tgt_f" ]; then
-      echo "  [DRY-RUN] Archivo nuevo a instalar: $rel_file"
-    elif cmp -s "$src_f" "$tgt_f"; then
-      echo "  [DRY-RUN] Archivo existente idéntico: $rel_file"
-    else
-      echo "  [DRY-RUN] Archivo existente difiere; se respaldará individualmente en --apply: $rel_file"
-    fi
-  done
+  echo "==> [Paso 3/6] [DRY-RUN] Comprobando integración aditiva y compatibilidad de archivos..."
+  php -r '
+    require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $svc = new App\Services\Ccd\CcdProductionMigratorService();
+    $svc->verifyAndIntegrateComponents(
+        "'"$STAGING_DIR"'",
+        "'"$PROD_DIR"'",
+        false, // dry-run
+        null,
+        function (string $msg) { echo "  {$msg}\n"; }
+    );
+  '
 
   echo ""
   echo "==> [Paso 4/6] [DRY-RUN] Ejecutando simulación mediante ccd:migrate-aqp-production-v6..."
@@ -361,71 +374,21 @@ fi
 # ------------------------------------------------------------------------------
 # 6. Sincronización aditiva con respaldo individual de archivos modificados
 # ------------------------------------------------------------------------------
-echo "==> [Paso 4/6] Sincronizando componentes del módulo CCD de forma aditiva..."
+echo "==> [Paso 4/6] Sincronizando componentes del módulo CCD de forma aditiva con respaldo individual..."
 MODIFIED_FILES_DIR="${BACKUP_DIR}/modified_files"
+mkdir -p "$MODIFIED_FILES_DIR"
 
-for rel_file in "${CCD_FILES[@]}"; do
-  src_f="${STAGING_DIR}/${rel_file}"
-  tgt_f="${PROD_DIR}/${rel_file}"
-
-  if [ ! -f "$src_f" ]; then
-    continue
-  fi
-
-  if [ ! -f "$tgt_f" ]; then
-    mkdir -p "$(dirname "$tgt_f")"
-    cp "$src_f" "$tgt_f"
-    chmod 644 "$tgt_f"
-    echo "  [NUEVO] Instalado: $rel_file"
-  elif cmp -s "$src_f" "$tgt_f"; then
-    echo "  [INTACTO] Sin cambios: $rel_file"
-  else
-    # Archivo existente difiere: respaldar versión previa antes de actualizar
-    bak_dest="${MODIFIED_FILES_DIR}/${rel_file}"
-    mkdir -p "$(dirname "$bak_dest")"
-    cp "$tgt_f" "$bak_dest"
-    cp "$src_f" "$tgt_f"
-    chmod 644 "$tgt_f"
-    echo "  [ACTUALIZADO CON RESPALDO] $rel_file -> respaldo guardado en $bak_dest"
-  fi
-done
-
-# Configuración de disco ccd-private en filesystems.php (aditivo)
-if ! grep -q "ccd-private" "${PROD_DIR}/config/filesystems.php"; then
-  echo "  Configurando disco ccd-private en filesystems.php..."
-  mkdir -p "${MODIFIED_FILES_DIR}/config"
-  cp "${PROD_DIR}/config/filesystems.php" "${MODIFIED_FILES_DIR}/config/filesystems.php"
-
-  python3 -c "
-with open('${PROD_DIR}/config/filesystems.php', 'r') as f:
-    c = f.read()
-if 'ccd-private' not in c:
-    disk_cfg = '''        \'ccd-private\' => [
-            \'driver\' => \'local\',
-            \'root\' => storage_path(\'app/private/ccd\'),
-            \'visibility\' => \'private\',
-            \'directory_visibility\' => \'private\',
-            \'permissions\' => [
-                \'file\' => [
-                    \'public\' => 0660,
-                    \'private\' => 0660,
-                ],
-                \'dir\' => [
-                    \'public\' => 0770,
-                    \'private\' => 0770,
-                ],
-            ],
-            \'throw\' => true,
-        ],
-'''
-    pos = c.find(\"'disks' => [\")
-    if pos != -1:
-        end_brace = c.find('[', pos) + 1
-        new_c = c[:end_brace] + '\n' + disk_cfg + c[end_brace:]
-        with open('${PROD_DIR}/config/filesystems.php', 'w') as f:
-            f.write(new_c)
-" || true
-fi
+php -r '
+  require "'"$STAGING_DIR"'/vendor/autoload.php";
+  $svc = new App\Services\Ccd\CcdProductionMigratorService();
+  $svc->verifyAndIntegrateComponents(
+      "'"$STAGING_DIR"'",
+      "'"$PROD_DIR"'",
+      true, // apply
+      "'"$BACKUP_DIR"'",
+      function (string $msg) { echo "  {$msg}\n"; }
+  );
+'
 
 # ------------------------------------------------------------------------------
 # 7. Ejecución exclusiva de las 2 migraciones selectivas CCD

@@ -426,6 +426,224 @@ class CcdAqpProductionMigrationV6Test extends TestCase
             ->assertNotFound();
     }
 
+    public function test_sha256_calculation_uses_json_lines_and_unifies_ccd_and_cuentas(): void
+    {
+        $service = new CcdProductionMigratorService;
+
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha)
+                                VALUES (1, '11223344', 'doc1.pdf', 'AQP4'),
+                                       (2, '22334455', 'doc2.pdf', 'AQP5')");
+
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha)
+                                VALUES (1, '11223344', 'doc1.pdf', 'AQP4'),
+                                       (2, '22334455', 'doc2.pdf', 'AQP5')");
+
+        $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                VALUES (1, '11223344', 'CTA-1', 'OP-1', 'Caja AQP', 'CAJAAQP4'),
+                                       (2, '22334455', 'CTA-2', 'OP-2', 'Caja AQP', 'CAJAAQP5'),
+                                       (3, '33445566', 'CTA-3', 'OP-3', 'Banco BCP', 'CAJACUSCO')");
+
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha)
+                                VALUES (1, '11223344', 'CTA-1', 'OP-1', 'Caja AQP', 'CAJAAQP4'),
+                                       (2, '22334455', 'CTA-2', 'OP-2', 'Caja AQP', 'CAJAAQP5'),
+                                       (3, '33445566', 'CTA-3', 'OP-3', 'Banco BCP', 'CAJACUSCO')");
+
+        $srcCcdSha = $service->calculateCcdAqpSha256($this->sourcePdo);
+        $tgtCcdSha = $service->calculateCcdAqpSha256($this->targetPdo);
+        $this->assertSame($srcCcdSha, $tgtCcdSha);
+
+        // Validar que el hash se calcula mediante JSON por registro ordenado por ID
+        $expectedCcdSha = hash('sha256',
+            json_encode([1, '11223344', 'doc1.pdf', 'AQP4'], JSON_UNESCAPED_UNICODE)."\n".
+            json_encode([2, '22334455', 'doc2.pdf', 'AQP5'], JSON_UNESCAPED_UNICODE)."\n"
+        );
+        $this->assertSame($expectedCcdSha, $srcCcdSha);
+
+        // Cuentas: abarca la totalidad de las cuentas (incluyendo CAJACUSCO sin filtro de cosecha)
+        $srcCtaSha = $service->calculateCuentasSha256($this->sourcePdo);
+        $tgtCtaSha = $service->calculateCuentasSha256($this->targetPdo);
+        $this->assertSame($srcCtaSha, $tgtCtaSha);
+
+        $expectedCtaSha = hash('sha256',
+            json_encode([1, '11223344', 'CTA-1', 'OP-1', 'Caja AQP', 'CAJAAQP4'], JSON_UNESCAPED_UNICODE)."\n".
+            json_encode([2, '22334455', 'CTA-2', 'OP-2', 'Caja AQP', 'CAJAAQP5'], JSON_UNESCAPED_UNICODE)."\n".
+            json_encode([3, '33445566', 'CTA-3', 'OP-3', 'Banco BCP', 'CAJACUSCO'], JSON_UNESCAPED_UNICODE)."\n"
+        );
+        $this->assertSame($expectedCtaSha, $srcCtaSha);
+    }
+
+    public function test_verify_and_integrate_components_dry_run_and_additive_apply(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $mockSource = storage_path('framework/testing/mock_source_crm_'.uniqid());
+        $mockTarget = storage_path('framework/testing/mock_target_crm_'.uniqid());
+        $mockBackup = storage_path('framework/testing/mock_backup_crm_'.uniqid());
+
+        File::ensureDirectoryExists($mockSource.'/app/Models');
+        File::ensureDirectoryExists($mockSource.'/routes/web');
+        File::ensureDirectoryExists($mockSource.'/config');
+        File::ensureDirectoryExists($mockSource.'/database/migrations');
+        File::ensureDirectoryExists($mockSource.'/app/Services/Ccd');
+        File::ensureDirectoryExists($mockSource.'/app/Services/Cliente');
+        File::ensureDirectoryExists($mockSource.'/app/Http/Controllers');
+        File::ensureDirectoryExists($mockSource.'/app/Console/Commands');
+        File::ensureDirectoryExists($mockSource.'/resources/views/clientes');
+
+        File::ensureDirectoryExists($mockTarget.'/app/Models');
+        File::ensureDirectoryExists($mockTarget.'/routes/web');
+        File::ensureDirectoryExists($mockTarget.'/config');
+        File::ensureDirectoryExists($mockTarget.'/database/migrations');
+        File::ensureDirectoryExists($mockTarget.'/app/Services/Cliente');
+        File::ensureDirectoryExists($mockTarget.'/resources/views/clientes');
+
+        try {
+            // Archivos nuevos en source
+            file_put_contents($mockSource.'/config/ccd.php', "<?php return ['disk' => 'ccd-private'];\n");
+            file_put_contents($mockSource.'/app/Models/CcdArchivo.php', "<?php namespace App\Models; use Illuminate\Database\Eloquent\Model; class CcdArchivo extends Model {}\n");
+            file_put_contents($mockSource.'/app/Models/CcdClienteCuenta.php', "<?php namespace App\Models; use Illuminate\Database\Eloquent\Model; class CcdClienteCuenta extends Model {}\n");
+            file_put_contents($mockSource.'/app/Http/Controllers/CcdDocumentController.php', "<?php namespace App\Http\Controllers; class CcdDocumentController {}\n");
+            file_put_contents($mockSource.'/app/Console/Commands/MigrateCcdAqpProductionV6.php', "<?php namespace App\Console\Commands; class MigrateCcdAqpProductionV6 {}\n");
+            file_put_contents($mockSource.'/app/Services/Ccd/CcdProductionMigratorService.php', "<?php namespace App\Services\Ccd; class CcdProductionMigratorService {}\n");
+            file_put_contents($mockSource.'/database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php', "<?php return new class {};\n");
+            file_put_contents($mockSource.'/database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php', "<?php return new class {};\n");
+            file_put_contents($mockSource.'/app/Models/CcdCliente.php', "<?php namespace App\Models; use Illuminate\Database\Eloquent\Model; class CcdCliente extends Model {}\n");
+
+            // Modelo ClienteCuenta existente en producción (sin ccdLinks)
+            $sourceCta = "<?php\nnamespace App\Models;\n\nuse Illuminate\Database\Eloquent\Model;\nuse Illuminate\Database\Eloquent\Relations\HasMany;\n\nclass ClienteCuenta extends Model\n{\n    public function ccdLinks(): HasMany\n    {\n        return \$this->hasMany(CcdClienteCuenta::class, 'cliente_cuenta_id');\n    }\n}\n";
+            file_put_contents($mockSource.'/app/Models/ClienteCuenta.php', $sourceCta);
+
+            $targetCta = "<?php\nnamespace App\Models;\n\nuse Illuminate\Database\Eloquent\Model;\n\nclass ClienteCuenta extends Model\n{\n    protected \$table = 'clientes_cuentas';\n    public function pagos() { return 1; }\n}\n";
+            file_put_contents($mockTarget.'/app/Models/ClienteCuenta.php', $targetCta);
+
+            // Rutas clientes en producción
+            $sourceRoutes = "<?php\nuse App\Http\Controllers\ClienteController;\nuse App\Http\Controllers\CcdDocumentController;\nuse Illuminate\Support\Facades\Route;\nRoute::group([], function () {\n    Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n    Route::get('/{numdoc}', [ClienteController::class, 'show']);\n});\n";
+            file_put_contents($mockSource.'/routes/web/clientes.php', $sourceRoutes);
+
+            $targetRoutes = "<?php\nuse App\Http\Controllers\ClienteController;\nuse Illuminate\Support\Facades\Route;\nRoute::group([], function () {\n    Route::get('/{numdoc}', [ClienteController::class, 'show']);\n});\n";
+            file_put_contents($mockTarget.'/routes/web/clientes.php', $targetRoutes);
+
+            // filesystems en producción sin ccd-private
+            $targetFs = "<?php\nreturn [\n    'disks' => [\n        'local' => ['driver' => 'local'],\n    ],\n];\n";
+            file_put_contents($mockTarget.'/config/filesystems.php', $targetFs);
+
+            // Vista show.blade.php
+            $targetView = "<div><table><tr><x-tables.td align=\"center\"><span class=\"text-slate-400\" aria-label=\"Sin CCD asociado de forma inequívoca\">—</span></x-tables.td></tr></table></div>\n";
+            file_put_contents($mockSource.'/resources/views/clientes/show.blade.php', $targetView);
+            file_put_contents($mockTarget.'/resources/views/clientes/show.blade.php', $targetView);
+
+            // Servicio ClienteProfileService
+            $profileContent = "<?php\nnamespace App\Services\Cliente;\nuse App\Models\CcdCliente;\nclass ClienteProfileService {\n    private function ccdData(string \$dni, \$cuentas): array {\n        \$ccdDocs = collect();\n        \$ccdByDni = collect([\$dni => \$ccdDocs]);\n        return [];\n    }\n}\n";
+            file_put_contents($mockSource.'/app/Services/Cliente/ClienteProfileService.php', $profileContent);
+            file_put_contents($mockTarget.'/app/Services/Cliente/ClienteProfileService.php', $profileContent);
+
+            // 1. Ejecutar en modo DRY-RUN
+            $dryResults = $service->verifyAndIntegrateComponents($mockSource, $mockTarget, false);
+            $this->assertSame('pending_install', $dryResults['config/ccd.php']['status']);
+            $this->assertSame('pending_additive_integration', $dryResults['app/Models/ClienteCuenta.php']['status']);
+            $this->assertSame('pending_additive_integration', $dryResults['routes/web/clientes.php']['status']);
+            $this->assertSame('pending_additive_integration', $dryResults['config/filesystems.php']['status']);
+
+            // Verificar que en dry-run CERO archivos fueron modificados en destino
+            $this->assertSame($targetCta, file_get_contents($mockTarget.'/app/Models/ClienteCuenta.php'));
+            $this->assertSame($targetRoutes, file_get_contents($mockTarget.'/routes/web/clientes.php'));
+            $this->assertFalse(file_exists($mockTarget.'/config/ccd.php'));
+
+            // 2. Ejecutar en modo APPLY
+            $applyResults = $service->verifyAndIntegrateComponents($mockSource, $mockTarget, true, $mockBackup);
+            $this->assertSame('installed', $applyResults['config/ccd.php']['status']);
+            $this->assertSame('additively_integrated', $applyResults['app/Models/ClienteCuenta.php']['status']);
+            $this->assertSame('additively_integrated', $applyResults['routes/web/clientes.php']['status']);
+            $this->assertSame('additively_integrated', $applyResults['config/filesystems.php']['status']);
+
+            // Verificar que el respaldo previo se creó
+            $this->assertTrue(file_exists($mockBackup.'/modified_files/app/Models/ClienteCuenta.php'));
+            $this->assertSame($targetCta, file_get_contents($mockBackup.'/modified_files/app/Models/ClienteCuenta.php'));
+
+            // Verificar que ClienteCuenta en destino conservó su método previo pagos() y agregó ccdLinks()
+            $updatedCta = (string) file_get_contents($mockTarget.'/app/Models/ClienteCuenta.php');
+            $this->assertStringContainsString('public function pagos()', $updatedCta);
+            $this->assertStringContainsString('public function ccdLinks(): HasMany', $updatedCta);
+
+            // Verificar que routes/web/clientes.php integró ccd.show
+            $updatedRoutes = (string) file_get_contents($mockTarget.'/routes/web/clientes.php');
+            $this->assertStringContainsString('ccd.show', $updatedRoutes);
+            $this->assertStringContainsString('CcdDocumentController', $updatedRoutes);
+
+            // Verificar que filesystems.php integró ccd-private
+            $updatedFs = (string) file_get_contents($mockTarget.'/config/filesystems.php');
+            $this->assertStringContainsString('ccd-private', $updatedFs);
+
+            // 3. Ejecutar nuevamente (idempotencia): debe detectar que ya es compatible
+            $idempotentResults = $service->verifyAndIntegrateComponents($mockSource, $mockTarget, true, $mockBackup);
+            $this->assertSame('already_compatible', $idempotentResults['app/Models/ClienteCuenta.php']['status']);
+            $this->assertSame('already_compatible', $idempotentResults['routes/web/clientes.php']['status']);
+            $this->assertSame('already_configured', $idempotentResults['config/filesystems.php']['status']);
+        } finally {
+            File::deleteDirectory($mockSource);
+            File::deleteDirectory($mockTarget);
+            File::deleteDirectory($mockBackup);
+        }
+    }
+
+    public function test_verify_and_integrate_components_aborts_on_corrupted_file(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $mockTarget = storage_path('framework/testing/mock_target_corrupt_'.uniqid());
+
+        File::ensureDirectoryExists($mockTarget.'/app/Models');
+
+        try {
+            // Archivo sin la declaración esperada de class ClienteCuenta
+            file_put_contents($mockTarget.'/app/Models/ClienteCuenta.php', "<?php namespace App\Models; class OtherClass {}\n");
+
+            $this->expectException(DomainException::class);
+            $this->expectExceptionMessage('Incompatibilidad crítica en app/Models/ClienteCuenta.php: no se encontró la declaración class ClienteCuenta');
+
+            $service->verifyAndIntegrateComponents(base_path(), $mockTarget, false);
+        } finally {
+            File::deleteDirectory($mockTarget);
+        }
+    }
+
+    public function test_validate_rollback_safety_guards_against_subsequent_batches_and_foreign_data(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        // Estado inicial con solo las 2 migraciones CCD y datos AQP: rollback es seguro
+        $safeInitial = $service->validateRollbackSafety($this->targetPdo);
+        $this->assertTrue($safeInitial['safe']);
+        $this->assertEmpty($safeInitial['reasons']);
+
+        // 1. Simular migración no-CCD compartiendo el mismo batch
+        $this->targetPdo->exec("INSERT INTO migrations (migration, batch) VALUES ('2026_11_14_000000_create_other_table', 1)");
+        $checkShared = $service->validateRollbackSafety($this->targetPdo);
+        $this->assertFalse($checkShared['safe']);
+        $this->assertStringContainsString('comparten el mismo lote', $checkShared['reasons'][0]);
+
+        // Limpiar
+        $this->targetPdo->exec("DELETE FROM migrations WHERE migration = '2026_11_14_000000_create_other_table'");
+
+        // 2. Simular migración con batch posterior
+        $this->targetPdo->exec("INSERT INTO migrations (migration, batch) VALUES ('2026_11_15_000000_create_subsequent_table', 2)");
+        $checkSubsequent = $service->validateRollbackSafety($this->targetPdo);
+        $this->assertFalse($checkSubsequent['safe']);
+        $this->assertStringContainsString('migraciones posteriores a CCD', $checkSubsequent['reasons'][0]);
+
+        // Limpiar
+        $this->targetPdo->exec("DELETE FROM migrations WHERE migration = '2026_11_15_000000_create_subsequent_table'");
+
+        // 3. Simular asociaciones de cosechas ajenas en ccd_cliente_cuenta
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES (999, '99999999', 'tru.pdf', 'TRU1')");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES (999, '99999999', 'C', 'O', 'E', 'TRU1')");
+        $this->targetPdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at)
+                                VALUES (999, 999, 999, 'confirmada', 'otra', 'Ev', NOW())");
+
+        $checkForeignData = $service->validateRollbackSafety($this->targetPdo);
+        $this->assertFalse($checkForeignData['safe']);
+        $this->assertStringContainsString('distintas de AQP4/AQP5', $checkForeignData['reasons'][0]);
+    }
+
     private function setupSourceSchema(PDO $pdo): void
     {
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
