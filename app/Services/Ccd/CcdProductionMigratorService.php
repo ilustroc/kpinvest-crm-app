@@ -227,9 +227,14 @@ class CcdProductionMigratorService
 
         $logger('Ejecutando auditoría integral post-migración...');
         $tAudStart = microtime(true);
-        $audit = $this->auditTarget($targetPdo, $targetStorage, $skipFiles, $expectedTotal);
+        $audit = $this->auditTarget($targetPdo, $targetStorage, $skipFiles, $expectedTotal, $logger);
         $tAudElapsed = round(microtime(true) - $tAudStart, 2);
         $logger("Auditoría post-migración finalizada en {$tAudElapsed}s.");
+
+        // RENOVACIÓN CONTROLADA DE AMBAS CONEXIONES TRAS AUDITORÍA FÍSICA PROLONGADA (HOSTINGER wait_timeout=20)
+        $logger('Renovando controladamente conexiones MySQL tras auditoría física antes de generar manifiesto...');
+        $this->refreshPdoConnection($sourcePdo, $sourceReconnector, $sourceCredentials, $logger, 'conexión origen (staging)');
+        $this->refreshPdoConnection($targetPdo, $targetReconnector, $targetCredentials, $logger, 'conexión destino (producción)');
 
         $manifestSha256 = null;
         if ($manifestPath !== null) {
@@ -1368,7 +1373,8 @@ class CcdProductionMigratorService
         PDO $targetPdo,
         string $targetStorage,
         bool $skipFiles = false,
-        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL
+        ?int $expectedTotal = self::EXPECTED_AQP_TOTAL,
+        ?callable $logger = null
     ): array {
         $archivosCount = (int) $this->fetchScalar($targetPdo, 'SELECT COUNT(*) FROM ccd_archivos');
         $linkedCcdCount = (int) $this->fetchScalar($targetPdo, 'SELECT COUNT(*) FROM ccd_clientes WHERE ccd_archivo_id IS NOT NULL');
@@ -1475,7 +1481,16 @@ class CcdProductionMigratorService
         $filesVerifiedTarget = 0;
         if (! $skipFiles) {
             $stmt = $targetPdo->query('SELECT path, sha256 FROM ccd_archivos');
-            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->closeCursor();
+            unset($stmt);
+
+            $totalFiles = count($files);
+            $tFilesAuditStart = microtime(true);
+            $lastBatchAuditTime = $tFilesAuditStart;
+
+            foreach ($files as $index => $row) {
+                $fileNum = $index + 1;
                 $filePath = $targetStorage.'/'.(string) $row['path'];
                 if (! is_file($filePath)) {
                     $anomalies[] = "Archivo físico no encontrado en destino: {$filePath}";
@@ -1489,6 +1504,14 @@ class CcdProductionMigratorService
                     continue;
                 }
                 $filesVerifiedTarget++;
+
+                if ($logger !== null && ($fileNum % 1000 === 0 || $fileNum === $totalFiles) && $totalFiles > 0) {
+                    $now = microtime(true);
+                    $elapsed = round($now - $tFilesAuditStart, 2);
+                    $batchElapsed = round($now - $lastBatchAuditTime, 2);
+                    $lastBatchAuditTime = $now;
+                    $logger("  Auditoría física de PDFs en destino: {$fileNum}/{$totalFiles} ({$elapsed}s acumulados, último bloque en {$batchElapsed}s)");
+                }
             }
         }
 
@@ -1579,6 +1602,8 @@ class CcdProductionMigratorService
             $rows++;
         }
 
+        $stmt->closeCursor();
+        unset($stmt);
         fclose($stream);
 
         if ($expectedTotal !== null && $rows !== $expectedTotal) {

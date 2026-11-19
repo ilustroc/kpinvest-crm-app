@@ -121,6 +121,15 @@ El método `verifyAndIntegrateComponents()` detecta automáticamente la arquitec
    - Progreso reportado en bloques de 1,000 PDFs y seguimiento de lotes procesados en base de datos.
    - Privacidad absoluta: prohibición estricta de registrar contraseñas, tokens de conexión o datos personales de clientes (PII) en consola o archivos de registro.
 
+4. **Auditoría Física Desacoplada y Prevención de Timeout ante `wait_timeout=20`:**
+   - **Materialización Previa en `auditTarget()`:** Se ejecuta `fetchAll(PDO::FETCH_ASSOC)` y cierre inmediato de cursor (`$stmt->closeCursor()`) antes de proceder con el cálculo hash de los archivos físicos en disco, evitando cursores activos durante operaciones de filesystem.
+   - **Renovación Obligatoria Post-Auditoría:** Se renuevan controladamente `$sourcePdo` y `$targetPdo` fuera de transacciones inmediatamente después de la auditoría física y justo antes de `generateManifest()`, garantizando la ejecución exitosa de la consulta de manifiesto incluso tras lapsos prolongados de hashing.
+
+5. **Seguridad Documental Estricta sin Fallbacks Permisivos (`CcdDocumentController`):**
+   - **Autenticación y Usuario Activo:** Exige sesión autenticada (`401`) y valida que el usuario no esté desactivado (`active` o `activo` en `false` -> `403` / redirección segura).
+   - **Permisos Equivalentes a `clientes.show`:** Valida la autorización mediante el Gate `view-cliente` o el conjunto de roles autorizados (`Roles::FINAL_ROLES`), rechazando cualquier acceso si no se cumplen las condiciones (`403`), erradicando fallbacks que reduzcan la seguridad existente.
+   - **Bloqueo Específico y DNI:** Integra la verificación de bloqueo (`cliente_bloqueos` -> `403`) y mantiene la concordancia estricta de DNI en URL contra el registro del documento (`404` ante discrepancias).
+
 ---
 
 ## 4. Separación del Proceso en 5 Fases Controladas
@@ -216,9 +225,11 @@ Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
   - `test_validate_associations_pre_insert_batches_where_in_and_detects_conflicts`: PASS
   - `test_transfer_and_verify_files_closes_cursor_before_filesystem_operations`: PASS
   - `test_migrate_renews_connections_and_executes_batch_validation_end_to_end`: PASS
-  - **Total:** 24 pruebas pasadas, 249 aserciones.
+  - `test_audit_target_materializes_rows_closes_cursor_and_renews_connections_exceeding_timeout_for_manifest`: PASS
+  - `test_interrupted_migration_between_phases_recovers_completely`: PASS
+  - **Total:** 26 pruebas pasadas, 270 aserciones.
 
-- **Suite General CCD:** 139 pruebas pasadas (812 aserciones).
+- **Suite General CCD:** 141 pruebas pasadas (833 aserciones).
 - **Estándar de Código (Laravel Pint):** 100% de conformidad sin advertencias.
 - **Validación de Sintaxis Bash (`bash -n`):** 100% de conformidad sin errores.
 

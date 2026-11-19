@@ -4,22 +4,51 @@ namespace App\Http\Controllers;
 
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
+use App\Support\Authorization\Roles;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class CcdDocumentController extends Controller
 {
     public function show(Request $request, string $numdoc, CcdCliente $ccdCliente)
     {
-        if (Gate::has('view-cliente')) {
-            Gate::forUser($request->user())->authorize('view-cliente');
-        } else {
-            abort_unless($request->user() !== null, 401);
+        $user = $request->user();
+        abort_unless($user !== null, 401, 'No autenticado.');
+
+        // 1. Control de usuario activo (mismo criterio que middleware EnsureUserIsActive)
+        if ((isset($user->active) && ! $user->active) || (isset($user->activo) && ! $user->activo)) {
+            abort(403, 'Tu cuenta ha sido desactivada.');
         }
 
+        // 2. Control de permisos equivalente a clientes.show (sin fallbacks que reduzcan permisos)
+        if (Gate::has('view-cliente')) {
+            Gate::forUser($user)->authorize('view-cliente');
+        } elseif (class_exists(Roles::class) && isset($user->role)) {
+            abort_unless(
+                in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true),
+                403,
+                'No autorizado para consultar información de clientes.'
+            );
+        } else {
+            abort(403, 'No autorizado para consultar información de clientes.');
+        }
+
+        // 3. Verificación estricta de DNI en URL contra DNI del registro documental
         $targetDoc = (string) ($request->route('numdoc') ?? $request->route('dni') ?? $numdoc);
         abort_unless(hash_equals((string) $ccdCliente->numdoc, $targetDoc), 404);
+
+        // 4. Control de bloqueo de cliente (mismo criterio que BlockClienteAccess)
+        if ($user && (! isset($user->role) || $user->role !== 'administrador') && Schema::hasTable('cliente_bloqueos')) {
+            $col = Schema::hasColumn('cliente_bloqueos', 'numdoc') ? 'numdoc' : 'dni';
+            $blocked = DB::table('cliente_bloqueos')
+                ->where('user_id', $user->id)
+                ->where($col, $targetDoc)
+                ->exists();
+            abort_if($blocked, 403, 'No autorizado para ver este cliente.');
+        }
 
         $archivoId = $ccdCliente->getAttribute('ccd_archivo_id');
 

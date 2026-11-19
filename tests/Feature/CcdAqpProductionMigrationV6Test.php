@@ -941,7 +941,7 @@ BLADE;
 
         $user = User::factory()->create();
 
-        // 1. Acceso legítimo con usuario autenticado (simulando contexto legacy sin Gate view-cliente)
+        // 1. Acceso legítimo con usuario autenticado, activo y con rol autorizado
         $this->actingAs($user);
         $response = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
         $response->assertStatus(200);
@@ -955,6 +955,39 @@ BLADE;
         auth()->logout();
         $responseGuest = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
         $this->assertTrue(in_array($responseGuest->getStatusCode(), [302, 401], true));
+
+        // 4. Intento de acceso con usuario inactivo -> Debe ser rechazado (302 a login por middleware active o 403)
+        $inactiveUser = User::factory()->create(['active' => false]);
+        $this->actingAs($inactiveUser);
+        $responseInactive = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
+        $this->assertTrue(in_array($responseInactive->getStatusCode(), [302, 403], true));
+        if ($responseInactive->getStatusCode() === 302) {
+            $responseInactive->assertRedirect(route('login'));
+        }
+
+        // 5. Intento de acceso cuando el Gate o permiso view-cliente rechaza la autorización -> Debe abortar con 403 sin fallback permisivo
+        \Illuminate\Support\Facades\Gate::define('view-cliente', fn () => false);
+        $this->actingAs($user);
+        $responseForbidden = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
+        $responseForbidden->assertStatus(403);
+        \Illuminate\Support\Facades\Gate::define('view-cliente', [\App\Policies\ClientePolicy::class, 'view']);
+
+        // 6. Intento de acceso con usuario bloqueado específicamente para este cliente -> Debe abortar con 403
+        $blockedUser = User::factory()->create(['role' => 'asesor', 'active' => true]);
+        if (! \Illuminate\Support\Facades\Schema::hasTable('cliente_bloqueos')) {
+            \Illuminate\Support\Facades\Schema::create('cliente_bloqueos', function ($table) {
+                $table->id();
+                $table->unsignedBigInteger('user_id');
+                $table->string('numdoc');
+            });
+        }
+        \Illuminate\Support\Facades\DB::table('cliente_bloqueos')->insert([
+            'user_id' => $blockedUser->id,
+            'numdoc' => $dniReal,
+        ]);
+        $this->actingAs($blockedUser);
+        $responseBlocked = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
+        $responseBlocked->assertStatus(403);
     }
 
     public function test_inspect_target_schema_unifies_column_keys_and_detects_discrepancies(): void
@@ -1588,6 +1621,178 @@ BLADE;
         $this->assertTrue($hasStagingRenewLog);
         $this->assertTrue($hasProdRenewLog);
         $this->assertTrue($hasValidationLog);
+    }
+
+    public function test_audit_target_materializes_rows_closes_cursor_and_renews_connections_exceeding_timeout_for_manifest(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        $content1 = '%PDF-1.4 Audit File 1';
+        $sha1 = hash('sha256', $content1);
+        $size1 = strlen($content1);
+        $relPath1 = "sha256/11/22/{$sha1}.pdf";
+        $srcFile1 = $this->sourceStorage.'/'.$relPath1;
+        $tgtFile1 = $this->targetStorage.'/'.$relPath1;
+        File::ensureDirectoryExists(dirname($srcFile1));
+        File::ensureDirectoryExists(dirname($tgtFile1));
+        file_put_contents($srcFile1, $content1);
+        file_put_contents($tgtFile1, $content1);
+
+        $content2 = '%PDF-1.4 Audit File 2';
+        $sha2 = hash('sha256', $content2);
+        $size2 = strlen($content2);
+        $relPath2 = "sha256/33/44/{$sha2}.pdf";
+        $srcFile2 = $this->sourceStorage.'/'.$relPath2;
+        $tgtFile2 = $this->targetStorage.'/'.$relPath2;
+        File::ensureDirectoryExists(dirname($srcFile2));
+        File::ensureDirectoryExists(dirname($tgtFile2));
+        file_put_contents($srcFile2, $content2);
+        file_put_contents($tgtFile2, $content2);
+
+        $this->sourcePdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at) VALUES
+            (1, 'ccd-private', '{$relPath1}', '{$sha1}', {$size1}, 'application/pdf', 'doc1.pdf', NOW(), NOW(), NOW()),
+            (2, 'ccd-private', '{$relPath2}', '{$sha2}', {$size2}, 'application/pdf', 'doc2.pdf', NOW(), NOW(), NOW())");
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id) VALUES
+            (1, '10000001', 'doc1.pdf', 'AQP4', 1),
+            (2, '10000002', 'doc2.pdf', 'AQP5', 2)");
+        $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (1, '10000001', 'CTA-1', 'OP-1', 'Caja AQP', 'CAJAAQP4'),
+            (2, '10000002', 'CTA-2', 'OP-2', 'Caja AQP', 'CAJAAQP5')");
+        $this->sourcePdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at) VALUES
+            (1, 1, 1, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'EV1', NOW()),
+            (2, 2, 2, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'EV2', NOW())");
+
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES
+            (1, '10000001', 'doc1.pdf', 'AQP4'),
+            (2, '10000002', 'doc2.pdf', 'AQP5')");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (1, '10000001', 'CTA-1', 'OP-1', 'Caja AQP', 'CAJAAQP4'),
+            (2, '10000002', 'CTA-2', 'OP-2', 'Caja AQP', 'CAJAAQP5')");
+
+        $sourceCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_source']);
+        $targetCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_target']);
+
+        $logs = [];
+        $logger = function (string $msg) use (&$logs) {
+            $logs[] = $msg;
+        };
+
+        $postAuditRenewCount = 0;
+        $manifestPath = $this->targetStorage.'/audits/test-manifest-'.time().'.csv';
+
+        $result = $service->migrate([
+            'source_pdo' => $this->sourcePdo,
+            'target_pdo' => $this->targetPdo,
+            'source_credentials' => $sourceCreds,
+            'target_credentials' => $targetCreds,
+            'source_reconnector' => function () use ($sourceCreds, &$postAuditRenewCount, $service) {
+                $postAuditRenewCount++;
+
+                return $service->createPdoConnection($sourceCreds);
+            },
+            'target_reconnector' => function () use ($targetCreds, $service) {
+                return $service->createPdoConnection($targetCreds);
+            },
+            'source_storage' => $this->sourceStorage,
+            'target_storage' => $this->targetStorage,
+            'apply' => true,
+            'batch_size' => 10,
+            'expected_total' => 2,
+            'manifest_path' => $manifestPath,
+            'logger' => $logger,
+        ]);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertTrue($result['audit']['passed']);
+        $this->assertNotNull($result['manifest_sha256']);
+        $this->assertTrue(file_exists($manifestPath));
+        $this->assertSame($result['manifest_sha256'], hash_file('sha256', $manifestPath));
+
+        $hasPostAuditRenewLog = false;
+        foreach ($logs as $l) {
+            if (str_contains($l, 'tras auditoría física antes de generar manifiesto')) {
+                $hasPostAuditRenewLog = true;
+            }
+        }
+        $this->assertTrue($hasPostAuditRenewLog);
+        $this->assertGreaterThanOrEqual(2, $postAuditRenewCount);
+    }
+
+    public function test_interrupted_migration_between_phases_recovers_completely(): void
+    {
+        $service = new CcdProductionMigratorService;
+        $this->applySelectiveMigrationsToTarget($this->targetPdo);
+
+        $contentA = '%PDF-1.4 Recovery Item A';
+        $shaA = hash('sha256', $contentA);
+        $sizeA = strlen($contentA);
+        $relPathA = "sha256/aa/bb/{$shaA}.pdf";
+        $srcFileA = $this->sourceStorage.'/'.$relPathA;
+        File::ensureDirectoryExists(dirname($srcFileA));
+        file_put_contents($srcFileA, $contentA);
+
+        $contentB = '%PDF-1.4 Recovery Item B';
+        $shaB = hash('sha256', $contentB);
+        $sizeB = strlen($contentB);
+        $relPathB = "sha256/cc/dd/{$shaB}.pdf";
+        $srcFileB = $this->sourceStorage.'/'.$relPathB;
+        File::ensureDirectoryExists(dirname($srcFileB));
+        file_put_contents($srcFileB, $contentB);
+
+        $this->sourcePdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at) VALUES
+            (10, 'ccd-private', '{$relPathA}', '{$shaA}', {$sizeA}, 'application/pdf', 'a.pdf', NOW(), NOW(), NOW()),
+            (20, 'ccd-private', '{$relPathB}', '{$shaB}', {$sizeB}, 'application/pdf', 'b.pdf', NOW(), NOW(), NOW())");
+        $this->sourcePdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha, ccd_archivo_id) VALUES
+            (10, '55555551', 'a.pdf', 'AQP4', 10),
+            (20, '55555552', 'b.pdf', 'AQP5', 20)");
+        $this->sourcePdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (100, '55555551', 'CTA-A', 'OP-A', 'Caja AQP', 'CAJAAQP4'),
+            (200, '55555552', 'CTA-B', 'OP-B', 'Caja AQP', 'CAJAAQP5')");
+        $this->sourcePdo->exec("INSERT INTO ccd_cliente_cuenta (id, ccd_cliente_id, cliente_cuenta_id, estado, metodo_verificacion, evidencia, confirmado_at) VALUES
+            (1, 10, 100, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'EV A', NOW()),
+            (2, 20, 200, 'confirmada', 'operacion_pdf_aqp_auditada_v5', 'EV B', NOW())");
+
+        $this->targetPdo->exec("INSERT INTO ccd_clientes (id, numdoc, pdf, cosecha) VALUES
+            (10, '55555551', 'a.pdf', 'AQP4'),
+            (20, '55555552', 'b.pdf', 'AQP5')");
+        $this->targetPdo->exec("INSERT INTO clientes_cuentas (id, numdoc, cuenta, operacion, entidad, cosecha) VALUES
+            (100, '55555551', 'CTA-A', 'OP-A', 'Caja AQP', 'CAJAAQP4'),
+            (200, '55555552', 'CTA-B', 'OP-B', 'Caja AQP', 'CAJAAQP5')");
+
+        // Simular fallo entre fases: Fase 2 ejecutada, y en Fase 3 solo se transfirió el primer archivo e insertó el primer archivo
+        $tgtFileA = $this->targetStorage.'/'.$relPathA;
+        File::ensureDirectoryExists(dirname($tgtFileA));
+        file_put_contents($tgtFileA, $contentA);
+
+        $this->targetPdo->exec("INSERT INTO ccd_archivos (id, disk, path, sha256, size_bytes, mime_type, nombre_original, verified_at, created_at, updated_at) VALUES
+            (10, 'ccd-private', '{$relPathA}', '{$shaA}', {$sizeA}, 'application/pdf', 'a.pdf', NOW(), NOW(), NOW())");
+
+        $sourceCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_source']);
+        $targetCreds = array_merge($this->dbConfig, ['database' => 'kp_crm_testing_target']);
+
+        $manifestPath = $this->targetStorage.'/audits/recovery-manifest.csv';
+        $result = $service->migrate([
+            'source_pdo' => $this->sourcePdo,
+            'target_pdo' => $this->targetPdo,
+            'source_credentials' => $sourceCreds,
+            'target_credentials' => $targetCreds,
+            'source_storage' => $this->sourceStorage,
+            'target_storage' => $this->targetStorage,
+            'apply' => true,
+            'batch_size' => 10,
+            'expected_total' => 2,
+            'manifest_path' => $manifestPath,
+        ]);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame(2, $result['files_verified']);
+        $this->assertSame(1, $result['files_transferred']); // Solo transfirió el archivo B faltante
+        $this->assertSame(2, $result['archivos_migrated']);
+        $this->assertSame(2, $result['links_updated']);
+        $this->assertSame(2, $result['associations_migrated']);
+        $this->assertTrue($result['audit']['passed']);
+        $this->assertTrue(file_exists($manifestPath));
     }
 
     private function setupSourceSchema(PDO $pdo): void
