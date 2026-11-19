@@ -1468,8 +1468,11 @@ class CcdProductionMigratorService
             }
         }
 
-        // 4. Rutas routes/web/clientes.php
-        $relRoutes = 'routes/web/clientes.php';
+        // 4. Rutas (Soporta arquitectura Moderna: routes/web/clientes.php o Legacy: routes/web.php)
+        $relModernRoutes = 'routes/web/clientes.php';
+        $relLegacyRoutes = 'routes/web.php';
+
+        $relRoutes = file_exists($targetDir.'/'.$relModernRoutes) ? $relModernRoutes : $relLegacyRoutes;
         $srcRoutes = $sourceDir.'/'.$relRoutes;
         $tgtRoutes = $targetDir.'/'.$relRoutes;
 
@@ -1477,22 +1480,18 @@ class CcdProductionMigratorService
             throw new DomainException("El archivo de rutas {$relRoutes} no existe en destino.");
         }
 
-        $srcRoutesSha = hash_file('sha256', $srcRoutes);
+        $srcRoutesSha = is_file($srcRoutes) ? hash_file('sha256', $srcRoutes) : null;
         $tgtRoutesSha = hash_file('sha256', $tgtRoutes);
 
-        if (hash_equals((string) $srcRoutesSha, (string) $tgtRoutesSha)) {
+        if ($srcRoutesSha !== null && hash_equals((string) $srcRoutesSha, (string) $tgtRoutesSha)) {
             $log("Rutas {$relRoutes} idénticas e intactas");
             $results[$relRoutes] = ['status' => 'identical', 'message' => 'Rutas idénticas'];
         } else {
             $content = (string) file_get_contents($tgtRoutes);
-            if (str_contains($content, 'ccd.show') || str_contains($content, 'CcdDocumentController')) {
+            if (str_contains($content, 'ccd.show') || str_contains($content, 'clientes.ccd.show') || str_contains($content, 'CcdDocumentController')) {
                 $log("Ruta ccd.show ya configurada en {$relRoutes}; conservada intacta.");
                 $results[$relRoutes] = ['status' => 'already_compatible', 'message' => 'Ruta ccd.show ya presente'];
             } else {
-                if (! str_contains($content, 'ClienteController::class')) {
-                    throw new DomainException("Incompatibilidad crítica en {$relRoutes}: grupo de rutas de clientes no encontrado.");
-                }
-
                 $this->assertPhpSyntax($tgtRoutes);
                 if ($apply) {
                     if ($backupDir !== null) {
@@ -1503,93 +1502,136 @@ class CcdProductionMigratorService
 
                     $modified = $content;
                     if (! str_contains($modified, 'use App\Http\Controllers\CcdDocumentController;')) {
-                        $modified = preg_replace(
-                            '/(use\s+App\\\Http\\\Controllers\\\ClienteController;)/',
-                            "$1\nuse App\Http\Controllers\CcdDocumentController;",
-                            $modified,
-                            1
-                        ) ?? $modified;
+                        if (preg_match('/(use\s+App\\\Http\\\Controllers\\\Client[a-zA-Z0-9_]*;)/', $modified)) {
+                            $modified = preg_replace(
+                                '/(use\s+App\\\Http\\\Controllers\\\Client[a-zA-Z0-9_]*;)/',
+                                "$1\nuse App\Http\Controllers\CcdDocumentController;",
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        } elseif (preg_match('/(use\s+Illuminate\\\Support\\\Facades\\\Route;)/', $modified)) {
+                            $modified = preg_replace(
+                                '/(use\s+Illuminate\\\Support\\\Facades\\\Route;)/',
+                                "$1\nuse App\Http\Controllers\CcdDocumentController;",
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        } else {
+                            $modified = preg_replace('/(<\?php\s*)/', "$1\nuse App\Http\Controllers\CcdDocumentController;\n", $modified, 1) ?? $modified;
+                        }
                     }
 
-                    $routeSnippet = "        Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
-                    if (str_contains($modified, "Route::get('/{numdoc}', [ClienteController::class, 'show'])")) {
-                        $modified = str_replace(
-                            "Route::get('/{numdoc}', [ClienteController::class, 'show'])",
-                            $routeSnippet."        Route::get('/{numdoc}', [ClienteController::class, 'show'])",
-                            $modified
-                        );
-                    } elseif (str_contains($modified, "Route::get('/{dni}', [ClienteController::class, 'show'])")) {
-                        $routeDniSnippet = "        Route::get('/{dni}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
-                        $modified = str_replace(
-                            "Route::get('/{dni}', [ClienteController::class, 'show'])",
-                            $routeDniSnippet."        Route::get('/{dni}', [ClienteController::class, 'show'])",
-                            $modified
-                        );
+                    if ($relRoutes === $relLegacyRoutes) {
+                        // Inyección en routes/web.php dentro de prefijo 'clientes' o grupo 'auth'
+                        $routeSnippet = "        Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('clientes.ccd.show');\n";
+                        if (str_contains($modified, "Route::prefix('clientes')->group(function () {")) {
+                            $modified = str_replace(
+                                "Route::prefix('clientes')->group(function () {",
+                                "Route::prefix('clientes')->group(function () {\n".$routeSnippet,
+                                $modified
+                            );
+                        } elseif (str_contains($modified, "Route::prefix('clientes')->group(function ()")) {
+                            $modified = preg_replace(
+                                '/(Route::prefix\(\'clientes\'\)->group\(function\s*\(\)\s*\{)/',
+                                "$1\n".$routeSnippet,
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        } elseif (str_contains($modified, "Route::middleware('auth')->group(function () {")) {
+                            $directSnippet = "    Route::get('/clientes/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('clientes.ccd.show');\n";
+                            $modified = str_replace(
+                                "Route::middleware('auth')->group(function () {",
+                                "Route::middleware('auth')->group(function () {\n".$directSnippet,
+                                $modified
+                            );
+                        } else {
+                            $directSnippet = "Route::middleware('auth')->get('/clientes/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('clientes.ccd.show');\n";
+                            $modified .= "\n".$directSnippet;
+                        }
                     } else {
-                        // Inserción al inicio del grupo
-                        $modified = preg_replace(
-                            '/(->group\(function\s*\(\)\s*\{)/',
-                            "$1\n".$routeSnippet,
-                            $modified,
-                            1
-                        ) ?? $modified;
+                        // Inyección en routes/web/clientes.php
+                        $routeSnippet = "        Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
+                        if (str_contains($modified, "Route::get('/{numdoc}', [ClienteController::class, 'show'])")) {
+                            $modified = str_replace(
+                                "Route::get('/{numdoc}', [ClienteController::class, 'show'])",
+                                $routeSnippet."        Route::get('/{numdoc}', [ClienteController::class, 'show'])",
+                                $modified
+                            );
+                        } elseif (str_contains($modified, "Route::get('/{dni}', [ClienteController::class, 'show'])")) {
+                            $routeDniSnippet = "        Route::get('/{dni}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('ccd.show');\n";
+                            $modified = str_replace(
+                                "Route::get('/{dni}', [ClienteController::class, 'show'])",
+                                $routeDniSnippet."        Route::get('/{dni}', [ClienteController::class, 'show'])",
+                                $modified
+                            );
+                        } else {
+                            $modified = preg_replace(
+                                '/(->group\(function\s*\(\)\s*\{)/',
+                                "$1\n".$routeSnippet,
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        }
                     }
 
                     file_put_contents($tgtRoutes, $modified);
                     $this->assertPhpSyntax($tgtRoutes);
-                    $log("Ruta ccd.show inyectada quirúrgicamente en {$relRoutes}");
-                    $results[$relRoutes] = ['status' => 'additively_integrated', 'message' => 'Ruta ccd.show inyectada'];
+                    $log("Ruta clientes.ccd.show inyectada quirúrgicamente en {$relRoutes}");
+                    $results[$relRoutes] = ['status' => 'additively_integrated', 'message' => 'Ruta clientes.ccd.show inyectada'];
                 } else {
-                    $log("[DRY-RUN] Rutas {$relRoutes} compatibles: requiere inyección aditiva de ccd.show");
-                    $results[$relRoutes] = ['status' => 'pending_additive_integration', 'message' => 'Requiere inyección de ruta ccd.show'];
+                    $log("[DRY-RUN] Rutas {$relRoutes} compatibles: requiere inyección aditiva de clientes.ccd.show");
+                    $results[$relRoutes] = ['status' => 'pending_additive_integration', 'message' => 'Requiere inyección de ruta clientes.ccd.show'];
                 }
             }
         }
 
-        // 5. Servicio ClienteProfileService.php
-        $relProfile = 'app/Services/Cliente/ClienteProfileService.php';
-        $srcProfile = $sourceDir.'/'.$relProfile;
-        $tgtProfile = $targetDir.'/'.$relProfile;
+        // 5. Lógica de cliente (Soporta arquitectura Moderna: ClienteProfileService.php o Legacy: ClienteController.php)
+        $relModernProfile = 'app/Services/Cliente/ClienteProfileService.php';
+        $relLegacyController = 'app/Http/Controllers/ClienteController.php';
 
-        if (! is_file($tgtProfile)) {
-            throw new DomainException("El servicio {$relProfile} no existe en destino.");
-        }
+        $hasModernProfile = file_exists($targetDir.'/'.$relModernProfile);
+        $hasLegacyController = file_exists($targetDir.'/'.$relLegacyController);
 
-        $srcProfSha = hash_file('sha256', $srcProfile);
-        $tgtProfSha = hash_file('sha256', $tgtProfile);
+        if ($hasModernProfile) {
+            $relProfile = $relModernProfile;
+            $srcProfile = $sourceDir.'/'.$relProfile;
+            $tgtProfile = $targetDir.'/'.$relProfile;
 
-        if (hash_equals((string) $srcProfSha, (string) $tgtProfSha)) {
-            $log("Servicio {$relProfile} idéntico e intacto");
-            $results[$relProfile] = ['status' => 'identical', 'message' => 'Servicio idéntico'];
-        } else {
-            $content = (string) file_get_contents($tgtProfile);
-            if (str_contains($content, 'ccdConfirmados') || str_contains($content, 'CcdClienteCuenta::ESTADO_CONFIRMADA')) {
-                $log("Servicio {$relProfile} ya integra documentos confirmados; conservado intacto.");
-                $results[$relProfile] = ['status' => 'already_compatible', 'message' => 'Integración ccdConfirmados ya presente'];
+            $srcProfSha = hash_file('sha256', $srcProfile);
+            $tgtProfSha = hash_file('sha256', $tgtProfile);
+
+            if (hash_equals((string) $srcProfSha, (string) $tgtProfSha)) {
+                $log("Servicio {$relProfile} idéntico e intacto");
+                $results[$relProfile] = ['status' => 'identical', 'message' => 'Servicio idéntico'];
             } else {
-                if (! str_contains($content, 'function ccdData')) {
-                    throw new DomainException("Incompatibilidad crítica en {$relProfile}: método ccdData() no encontrado.");
-                }
-
-                $this->assertPhpSyntax($tgtProfile);
-                if ($apply) {
-                    if ($backupDir !== null) {
-                        $bakFile = $backupDir.'/modified_files/'.$relProfile;
-                        @mkdir(dirname($bakFile), 0775, true);
-                        @copy($tgtProfile, $bakFile);
+                $content = (string) file_get_contents($tgtProfile);
+                if (str_contains($content, 'ccdConfirmados') || str_contains($content, 'CcdClienteCuenta::ESTADO_CONFIRMADA')) {
+                    $log("Servicio {$relProfile} ya integra documentos confirmados; conservado intacto.");
+                    $results[$relProfile] = ['status' => 'already_compatible', 'message' => 'Integración ccdConfirmados ya presente'];
+                } else {
+                    if (! str_contains($content, 'function ccdData')) {
+                        throw new DomainException("Incompatibilidad crítica en {$relProfile}: método ccdData() no encontrado.");
                     }
 
-                    $modified = $content;
-                    if (! str_contains($modified, 'use App\Models\CcdClienteCuenta;')) {
-                        $modified = preg_replace(
-                            '/(use\s+App\\\Models\\\CcdCliente;)/',
-                            "$1\nuse App\Models\CcdClienteCuenta;",
-                            $modified,
-                            1
-                        ) ?? $modified;
-                    }
+                    $this->assertPhpSyntax($tgtProfile);
+                    if ($apply) {
+                        if ($backupDir !== null) {
+                            $bakFile = $backupDir.'/modified_files/'.$relProfile;
+                            @mkdir(dirname($bakFile), 0775, true);
+                            @copy($tgtProfile, $bakFile);
+                        }
 
-                    $ccdIntegrationSnippet = <<<'PHP'
+                        $modified = $content;
+                        if (! str_contains($modified, 'use App\Models\CcdClienteCuenta;')) {
+                            $modified = preg_replace(
+                                '/(use\s+App\\\Models\\\CcdCliente;)/',
+                                "$1\nuse App\Models\CcdClienteCuenta;",
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        }
+
+                        $ccdIntegrationSnippet = <<<'PHP'
         if (Schema::hasTable('ccd_cliente_cuenta') && $ccdDocs->isNotEmpty()) {
             $confirmedLinks = CcdClienteCuenta::query()
                 ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
@@ -1621,26 +1663,139 @@ class CcdProductionMigratorService
         }
 
 PHP;
-                    // Inserción antes de $ccdByDni =
+                        // Inserción antes de $ccdByDni =
+                        if (str_contains($modified, '$ccdByDni = collect([')) {
+                            $modified = str_replace(
+                                '$ccdByDni = collect([',
+                                $ccdIntegrationSnippet.'        $ccdByDni = collect([',
+                                $modified
+                            );
+                        } else {
+                            throw new DomainException("Incompatibilidad en {$relProfile}: punto de inyección ccdByDni no encontrado.");
+                        }
+
+                        file_put_contents($tgtProfile, $modified);
+                        $this->assertPhpSyntax($tgtProfile);
+                        $log("Integración ccdConfirmados inyectada quirúrgicamente en {$relProfile}");
+                        $results[$relProfile] = ['status' => 'additively_integrated', 'message' => 'Lógica de ccdConfirmados inyectada'];
+                    } else {
+                        $log("[DRY-RUN] Servicio {$relProfile} compatible: requiere integración aditiva de ccdConfirmados");
+                        $results[$relProfile] = ['status' => 'pending_additive_integration', 'message' => 'Requiere integración de ccdConfirmados'];
+                    }
+                }
+            }
+        } elseif ($hasLegacyController) {
+            $relClientLogic = $relLegacyController;
+            $tgtController = $targetDir.'/'.$relClientLogic;
+            $content = (string) file_get_contents($tgtController);
+
+            if (str_contains($content, 'ccdConfirmados') || str_contains($content, 'CcdClienteCuenta::ESTADO_CONFIRMADA')) {
+                $log("Controlador {$relClientLogic} ya integra documentos confirmados; conservado intacto.");
+                $results[$relClientLogic] = ['status' => 'already_compatible', 'message' => 'Integración ccdConfirmados ya presente'];
+            } else {
+                if (! str_contains($content, 'function show(')) {
+                    throw new DomainException("Incompatibilidad crítica en {$relClientLogic}: método show() no encontrado.");
+                }
+
+                $this->assertPhpSyntax($tgtController);
+                if ($apply) {
+                    if ($backupDir !== null) {
+                        $bakFile = $backupDir.'/modified_files/'.$relClientLogic;
+                        @mkdir(dirname($bakFile), 0775, true);
+                        @copy($tgtController, $bakFile);
+                    }
+
+                    $modified = $content;
+
+                    // 1. Asegurar 'id' en las columnas seleccionadas de cuentas para permitir vinculación por clave primaria
+                    if (str_contains($modified, "'numdoc','nombre','cuenta'") && ! str_contains($modified, "'id','numdoc'")) {
+                        $modified = str_replace("'numdoc','nombre','cuenta'", "'id','numdoc','nombre','cuenta'", $modified);
+                    } elseif (str_contains($modified, "'numdoc', 'nombre', 'cuenta'") && ! str_contains($modified, "'id', 'numdoc'")) {
+                        $modified = str_replace("'numdoc', 'nombre', 'cuenta'", "'id', 'numdoc', 'nombre', 'cuenta'", $modified);
+                    }
+
+                    // 2. Importar CcdClienteCuenta si no está presente
+                    if (! str_contains($modified, 'use App\Models\CcdClienteCuenta;')) {
+                        if (str_contains($modified, 'use App\Models\CcdCliente;')) {
+                            $modified = preg_replace(
+                                '/(use\s+App\\\Models\\\CcdCliente;)/',
+                                "$1\nuse App\Models\CcdClienteCuenta;",
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        } else {
+                            $modified = preg_replace(
+                                '/(namespace\s+App\\\Http\\\Controllers;)/',
+                                "$1\n\nuse App\Models\CcdClienteCuenta;\nuse App\Models\CcdCliente;",
+                                $modified,
+                                1
+                            ) ?? $modified;
+                        }
+                    }
+
+                    // 3. Snippet de vinculación estricta por cliente_cuenta_id
+                    $legacyCcdSnippet = <<<'PHP'
+
+            // === CCD Confirmados por operación (asociación estricta cliente_cuenta_id = clientes_cuentas.id)
+            if (\Illuminate\Support\Facades\Schema::hasTable('ccd_cliente_cuenta') && $ccdDocs->isNotEmpty()) {
+                $confirmedLinks = \App\Models\CcdClienteCuenta::query()
+                    ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
+                    ->where('estado', \App\Models\CcdClienteCuenta::ESTADO_CONFIRMADA)
+                    ->with('ccdCliente:id,numdoc,pdf,cosecha,link')
+                    ->get()
+                    ->filter(fn ($link) => $link->ccdCliente !== null
+                        && hash_equals((string) $dni, (string) $link->ccdCliente->numdoc))
+                    ->groupBy('cliente_cuenta_id');
+
+                $confirmedIds = $confirmedLinks
+                    ->flatten()
+                    ->pluck('ccd_cliente_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->all();
+
+                foreach ($cuentas as $cta) {
+                    $cta->ccdConfirmados = collect($confirmedLinks->get((int) $cta->id, []))
+                        ->pluck('ccdCliente')
+                        ->filter()
+                        ->sortBy('id')
+                        ->values();
+                }
+
+                $ccdDocs = $ccdDocs
+                    ->reject(fn ($document): bool => in_array((int) $document->id, $confirmedIds, true))
+                    ->values();
+            }
+PHP;
+
                     if (str_contains($modified, '$ccdByDni = collect([')) {
                         $modified = str_replace(
                             '$ccdByDni = collect([',
-                            $ccdIntegrationSnippet.'        $ccdByDni = collect([',
+                            $legacyCcdSnippet."\n\n            \$ccdByDni = collect([",
                             $modified
                         );
+                    } elseif (str_contains($modified, 'return view(')) {
+                        $modified = preg_replace(
+                            '/(return\s+view\s*\()/i',
+                            $legacyCcdSnippet."\n\n            $1",
+                            $modified,
+                            1
+                        ) ?? $modified;
                     } else {
-                        throw new DomainException("Incompatibilidad en {$relProfile}: punto de inyección ccdByDni no encontrado.");
+                        throw new DomainException("Incompatibilidad en {$relClientLogic}: punto de inyección ccdConfirmados no encontrado.");
                     }
 
-                    file_put_contents($tgtProfile, $modified);
-                    $this->assertPhpSyntax($tgtProfile);
-                    $log("Integración ccdConfirmados inyectada quirúrgicamente en {$relProfile}");
-                    $results[$relProfile] = ['status' => 'additively_integrated', 'message' => 'Lógica de ccdConfirmados inyectada'];
+                    file_put_contents($tgtController, $modified);
+                    $this->assertPhpSyntax($tgtController);
+                    $log("Integración ccdConfirmados inyectada quirúrgicamente en {$relClientLogic}");
+                    $results[$relClientLogic] = ['status' => 'additively_integrated', 'message' => 'Lógica de ccdConfirmados inyectada en controlador'];
                 } else {
-                    $log("[DRY-RUN] Servicio {$relProfile} compatible: requiere integración aditiva de ccdConfirmados");
-                    $results[$relProfile] = ['status' => 'pending_additive_integration', 'message' => 'Requiere integración de ccdConfirmados'];
+                    $log("[DRY-RUN] Controlador {$relClientLogic} compatible: requiere integración aditiva de ccdConfirmados");
+                    $results[$relClientLogic] = ['status' => 'pending_additive_integration', 'message' => 'Requiere integración de ccdConfirmados'];
                 }
             }
+        } else {
+            throw new DomainException("No se encontró componente de lógica de clientes ({$relModernProfile} o {$relLegacyController}) en destino.");
         }
 
         // 6. Vista resources/views/clientes/show.blade.php
@@ -1671,7 +1826,8 @@ PHP;
                         @copy($tgtView, $bakFile);
                     }
 
-                    $viewSnippet = <<<'BLADE'
+                    if (str_contains($content, '<span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>')) {
+                        $viewSnippet = <<<'BLADE'
                                     @php
                                         $ccdConfirmados = collect($c->ccdConfirmados ?? []);
                                     @endphp
@@ -1699,15 +1855,57 @@ PHP;
                                         <span class="text-slate-400" aria-label="Sin CCD confirmado para esta operación">—</span>
                                     @endif
 BLADE;
-                    if (str_contains($content, '<span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>')) {
                         $modified = str_replace(
                             '<span class="text-slate-400" aria-label="Sin CCD asociado de forma inequívoca">—</span>',
                             $viewSnippet,
                             $content
                         );
                         file_put_contents($tgtView, $modified);
-                        $log("Visualizador CCD integrado en {$relView}");
+                        $log("Visualizador CCD integrado en {$relView} (arquitectura moderna)");
                         $results[$relView] = ['status' => 'additively_integrated', 'message' => 'Visualizador CCD integrado'];
+                    } elseif (str_contains($content, '{{-- === CELDA CCD === --}}') && str_contains($content, '{{-- === /CELDA CCD === --}}')) {
+                        $pattern = '/(\{\{--\s*===\s*CELDA CCD\s*===\s*--\}\}\s*<td[^>]*>)(.*?)(\s*<\/td>\s*\{\{--\s*===\s*\/CELDA CCD\s*===\s*--\}\})/s';
+                        $legacyReplacement = <<<'BLADE'
+$1
+                @php
+                  $confirmados = collect($cta->ccdConfirmados ?? $c->ccdConfirmados ?? []);
+                @endphp
+                @if($confirmados->isNotEmpty())
+                  @if($confirmados->count() === 1)
+                    @php
+                      $d = $confirmados->first();
+                      $name = filled($d->pdf) ? pathinfo((string)$d->pdf, PATHINFO_FILENAME) : (($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id);
+                    @endphp
+                    <a href="{{ route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $d->id]) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Abrir {{ $name }}">
+                      <i class="bi bi-filetype-pdf me-1"></i> {{ $name }}
+                    </a>
+                  @else
+                    <div class="btn-group">
+                      <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-filetype-pdf me-1"></i> CCD ({{ $confirmados->count() }})
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        @foreach($confirmados as $d)
+                          @php
+                            $name = filled($d->pdf) ? pathinfo((string)$d->pdf, PATHINFO_FILENAME) : (($d->cosecha ? 'CCD '.$d->cosecha : 'CCD').' #'.$d->id);
+                          @endphp
+                          <li><a class="dropdown-item" href="{{ route('clientes.ccd.show', ['numdoc' => $dni, 'ccdCliente' => $d->id]) }}" target="_blank">{{ $name }}</a></li>
+                        @endforeach
+                      </ul>
+                    </div>
+                  @endif
+                @else
+$2
+                @endif
+$3
+BLADE;
+                        $modified = preg_replace($pattern, $legacyReplacement, $content);
+                        if ($modified === null || $modified === $content) {
+                            throw new DomainException("Error al inyectar visualizador CCD en celda legacy de {$relView}.");
+                        }
+                        file_put_contents($tgtView, $modified);
+                        $log("Visualizador CCD integrado en {$relView} (arquitectura legacy)");
+                        $results[$relView] = ['status' => 'additively_integrated', 'message' => 'Visualizador CCD integrado en celda legacy'];
                     } else {
                         throw new DomainException("Incompatibilidad crítica en {$relView}: no se encontró la celda placeholder para CCD.");
                     }
@@ -1901,12 +2099,39 @@ PHP;
 
     public function assertPhpSyntax(string $filePath): void
     {
-        $escaped = escapeshellarg($filePath);
-        $cmd = "php -l {$escaped}";
-        exec($cmd, $output, $returnCode);
-        if ($returnCode !== 0) {
-            $err = implode("\n", $output);
-            throw new DomainException("Error de sintaxis PHP detectado en {$filePath}:\n{$err}");
+        if (! file_exists($filePath)) {
+            throw new DomainException("El archivo a validar no existe: {$filePath}");
+        }
+
+        $phpBinary = PHP_BINARY ?: 'php';
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $process = @proc_open([$phpBinary, '-l', $filePath], $descriptors, $pipes);
+        if (is_resource($process)) {
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+            $returnCode = proc_close($process);
+
+            if ($returnCode !== 0) {
+                $err = trim($stderr !== '' ? $stderr : $stdout);
+                throw new DomainException("Error de sintaxis PHP detectado en {$filePath}:\n{$err}");
+            }
+
+            return;
+        }
+
+        try {
+            $code = (string) file_get_contents($filePath);
+            token_get_all($code, TOKEN_PARSE);
+        } catch (\ParseError $e) {
+            throw new DomainException("Error de sintaxis PHP detectado en {$filePath}:\n".$e->getMessage());
         }
     }
 

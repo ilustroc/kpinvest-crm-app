@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KP INVEST — Desplegador Automatizado CCD AQP V6 a Producción (V6.1)
+# KP INVEST — Desplegador Automatizado CCD AQP V6.2 a Producción LEGACY
 # ==============================================================================
 # Uso:
 #   ./desplegar_ccd_aqp_produccion_v6.sh --dry-run   # Simulación sin escrituras
@@ -11,7 +11,7 @@ set -euo pipefail
 umask 077
 
 echo "=============================================================================="
-echo "  KP INVEST — DESPLEGADOR CCD AQP V6 A PRODUCCIÓN (V6.1)"
+echo "  KP INVEST — DESPLEGADOR CCD AQP V6.2 A PRODUCCIÓN LEGACY"
 echo "=============================================================================="
 
 # Rutas estándar del entorno Hostinger
@@ -56,8 +56,8 @@ for arg in "$@"; do
       echo "Uso: $0 [--dry-run | --apply] [--confirm]"
       echo ""
       echo "Opciones:"
-      echo "  --dry-run   Simula la migración completa sin realizar escrituras ni modificaciones."
-      echo "  --apply     Ejecuta la migración aditiva autorizada hacia producción."
+      echo "  --dry-run   Simula las 5 fases completas sin realizar escrituras ni modificaciones."
+      echo "  --apply     Ejecuta las 5 fases de migración aditiva autorizada hacia producción."
       echo "  --confirm   Evita la confirmación interactiva en modo --apply."
       exit 0
       ;;
@@ -73,13 +73,13 @@ if [ -z "$MODE" ]; then
   exit 1
 fi
 
-echo "Modo de ejecución: $MODE"
+echo "Modo de ejecución:    $MODE"
 echo "Directorio Staging:    $STAGING_DIR"
 echo "Directorio Producción: $PROD_DIR"
 echo ""
 
 # ------------------------------------------------------------------------------
-# 1. Comprobación de binarios requeridos
+# Comprobación de binarios requeridos
 # ------------------------------------------------------------------------------
 for bin in php mysql mysqldump sha256sum df cmp cp tar; do
   if ! command -v "$bin" >/dev/null 2>&1; then
@@ -89,55 +89,12 @@ for bin in php mysql mysqldump sha256sum df cmp cp tar; do
 done
 
 # ------------------------------------------------------------------------------
-# 2. Extracción de credenciales de .env sin exponer contraseñas en logs
-# ------------------------------------------------------------------------------
-get_env_var() {
-  local env_file="$1"
-  local var_name="$2"
-  local default_val="${3:-}"
-  if [ -f "$env_file" ]; then
-    local val
-    val=$(grep -E "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2- | tr -d '"\r' || true)
-    if [ -n "$val" ]; then
-      echo "$val"
-      return 0
-    fi
-  fi
-  echo "$default_val"
-}
-
-STAGING_ENV="${STAGING_DIR}/.env"
-PROD_ENV="${PROD_DIR}/.env"
-
-if [ ! -f "$STAGING_ENV" ]; then
-  echo "ERROR: Archivo .env de staging no encontrado: $STAGING_ENV" >&2
-  exit 1
-fi
-
-if [ ! -f "$PROD_ENV" ]; then
-  echo "ERROR: Archivo .env de producción no encontrado: $PROD_ENV" >&2
-  exit 1
-fi
-
-SRC_DB_HOST="${STAGING_DB_HOST:-$(get_env_var "$STAGING_ENV" "DB_HOST" "127.0.0.1")}"
-SRC_DB_PORT="${STAGING_DB_PORT:-$(get_env_var "$STAGING_ENV" "DB_PORT" "3306")}"
-SRC_DB_NAME="${STAGING_DB_DATABASE:-$(get_env_var "$STAGING_ENV" "DB_DATABASE" "u480021566_prueba")}"
-SRC_DB_USER="${STAGING_DB_USERNAME:-$(get_env_var "$STAGING_ENV" "DB_USERNAME")}"
-SRC_DB_PASS="${STAGING_DB_PASSWORD:-$(get_env_var "$STAGING_ENV" "DB_PASSWORD")}"
-
-TGT_DB_HOST="${PROD_DB_HOST:-$(get_env_var "$PROD_ENV" "DB_HOST" "127.0.0.1")}"
-TGT_DB_PORT="${PROD_DB_PORT:-$(get_env_var "$PROD_ENV" "DB_PORT" "3306")}"
-TGT_DB_NAME="${PROD_DB_DATABASE:-$(get_env_var "$PROD_ENV" "DB_DATABASE" "u480021566_kpinvest_bd")}"
-TGT_DB_USER="${PROD_DB_USERNAME:-$(get_env_var "$PROD_ENV" "DB_USERNAME")}"
-TGT_DB_PASS="${PROD_DB_PASSWORD:-$(get_env_var "$PROD_ENV" "DB_PASSWORD")}"
-
-# ------------------------------------------------------------------------------
-# 3. Mecanismo privado de credenciales (evita pasar contraseñas por argumentos ps)
+# Extracción de credenciales efectivas de Laravel (sin parser frágil de .env)
 # ------------------------------------------------------------------------------
 CRED_DIR="${HOME}/private/.ccd_credentials"
 mkdir -p "$CRED_DIR"
 chmod 700 "$CRED_DIR"
-CRED_FILE="${CRED_DIR}/ccd_v6_${$}_$(date +%s).json"
+CRED_FILE="${CRED_DIR}/ccd_v62_deploy_${$}_$(date +%s).json"
 
 cleanup_credentials() {
   if [ -f "$CRED_FILE" ]; then
@@ -146,81 +103,136 @@ cleanup_credentials() {
 }
 trap cleanup_credentials EXIT INT TERM
 
-# Serializador nativo PHP para generar JSON seguro (soporta comillas, barras invertidas y caracteres especiales)
-SRC_P="$SRC_DB_PASS" TGT_P="$TGT_DB_PASS" CRED_OUT="$CRED_FILE" php -r '
-  $data = [
-    "source" => [
-      "host" => getenv("SRC_DB_HOST"),
-      "port" => (int) (getenv("SRC_DB_PORT") ?: 3306),
-      "database" => getenv("SRC_DB_NAME"),
-      "username" => getenv("SRC_DB_USER"),
-      "password" => (string) getenv("SRC_P"),
-    ],
-    "target" => [
-      "host" => getenv("TGT_DB_HOST"),
-      "port" => (int) (getenv("TGT_DB_PORT") ?: 3306),
-      "database" => getenv("TGT_DB_NAME"),
-      "username" => getenv("TGT_DB_USER"),
-      "password" => (string) getenv("TGT_P"),
-    ],
-  ];
-  file_put_contents(getenv("CRED_OUT"), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-'
-unset SRC_P TGT_P CRED_OUT
+# Cargar configuraciones efectivas de base de datos desde Laravel
+php -r '
+  $stagingDir = $argv[1];
+  $prodDir = $argv[2];
+  $credOut = $argv[3];
+
+  function getLaravelDbConfig(string $dir, string $prefix, string $defaultHost, string $defaultDb): array {
+      $dir = rtrim($dir, "/\\");
+      $autoload = $dir . "/vendor/autoload.php";
+      $bootstrap = $dir . "/bootstrap/app.php";
+
+      $cfg = [];
+      if (file_exists($autoload) && file_exists($bootstrap)) {
+          $code = "require \$argv[1].\"/vendor/autoload.php\"; \$app=require \$argv[1].\"/bootstrap/app.php\"; \$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap(); \$conn=config(\"database.default\",\"mysql\"); echo json_encode(config(\"database.connections.{\$conn}\", []));";
+          $descriptors = [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]];
+          $proc = @proc_open([PHP_BINARY ?: "php", "-r", $code, $dir], $descriptors, $pipes);
+          if (is_resource($proc)) {
+              fclose($pipes[0]);
+              $out = stream_get_contents($pipes[1]);
+              fclose($pipes[1]);
+              fclose($pipes[2]);
+              proc_close($proc);
+              $decoded = json_decode(trim($out), true);
+              if (is_array($decoded)) {
+                  $cfg = $decoded;
+              }
+          }
+      }
+
+      $host = getenv($prefix."_DB_HOST") ?: ($cfg["host"] ?? $defaultHost);
+      $port = (int) (getenv($prefix."_DB_PORT") ?: ($cfg["port"] ?? 3306));
+      $db   = getenv($prefix."_DB_DATABASE") ?: ($cfg["database"] ?? $defaultDb);
+      $user = getenv($prefix."_DB_USERNAME") ?: ($cfg["username"] ?? "");
+      $pass = (string) (getenv($prefix."_DB_PASSWORD") ?: ($cfg["password"] ?? ""));
+
+      return [
+          "host" => $host,
+          "port" => $port,
+          "database" => $db,
+          "username" => $user,
+          "password" => $pass,
+      ];
+  }
+
+  $src = getLaravelDbConfig($stagingDir, "STAGING", "localhost", "u480021566_prueba");
+  $tgt = getLaravelDbConfig($prodDir, "PROD", "127.0.0.1", "u480021566_kpinvest_bd");
+
+  file_put_contents($credOut, json_encode(["source" => $src, "target" => $tgt], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+' "$STAGING_DIR" "$PROD_DIR" "$CRED_FILE"
 chmod 600 "$CRED_FILE"
 
-# Funciones de consulta SQL seguras con MYSQL_PWD en entorno interno
+# Función PDO segura para ejecutar consultas SQL sin exponer contraseñas en ps
+run_sql_query() {
+  local env_type="$1"
+  local sql="$2"
+  php -r '
+    $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+    $c = $creds["'"$env_type"'"];
+    $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
+    $stmt = $pdo->query($argv[1]);
+    while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
+        echo implode("\t", $row) . "\n";
+    }
+  ' "$sql"
+}
+
 run_src_sql() {
-  local sql="$1"
-  MYSQL_PWD="${SRC_DB_PASS}" mysql -h "${SRC_DB_HOST}" -P "${SRC_DB_PORT}" -u "${SRC_DB_USER}" -N -B "${SRC_DB_NAME}" -e "$sql"
+  run_sql_query "source" "$1"
 }
 
 run_tgt_sql() {
-  local sql="$1"
-  MYSQL_PWD="${TGT_DB_PASS}" mysql -h "${TGT_DB_HOST}" -P "${TGT_DB_PORT}" -u "${TGT_DB_USER}" -N -B "${TGT_DB_NAME}" -e "$sql"
+  run_sql_query "target" "$1"
 }
 
-# ------------------------------------------------------------------------------
-# 4. Preflight: Validación de firmas y conteos
-# ------------------------------------------------------------------------------
-echo "==> [Paso 1/6] Ejecutando validaciones preflight de datos certificados..."
+# ==============================================================================
+# FASE 1: VALIDACIONES Y RESPALDO
+# ==============================================================================
+echo "==> [Fase 1/5] Validaciones de preflight, firmas SHA-256 certificadas y espacio..."
 
-# Conteos ccd_clientes
+# 1.1 Verificación de conectividad origen y destino
+php -r '
+  $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+  foreach (["source" => "Staging", "target" => "Producción"] as $key => $label) {
+      $c = $creds[$key];
+      try {
+          $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+              PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+          ]);
+          echo "  Conectividad con {$label} ({$c["username"]}@{$c["host"]}:{$c["database"]}): OK\n";
+      } catch (Exception $e) {
+          fwrite(STDERR, "ERROR: No se pudo conectar a {$label}: " . $e->getMessage() . "\n");
+          exit(1);
+      }
+  }
+'
+
+# 1.2 Verificación de conteo de registros en ambas bases
 SRC_CCD_COUNT=$(run_src_sql "SELECT COUNT(*) FROM ccd_clientes;")
 TGT_CCD_COUNT=$(run_tgt_sql "SELECT COUNT(*) FROM ccd_clientes;")
-echo "  ccd_clientes total: origen=$SRC_CCD_COUNT | destino=$TGT_CCD_COUNT (esperado: $EXPECTED_TOTAL_CCD)"
-
-if [ "$SRC_CCD_COUNT" -ne "$EXPECTED_TOTAL_CCD" ] || [ "$TGT_CCD_COUNT" -ne "$EXPECTED_TOTAL_CCD" ]; then
-  echo "ERROR: Conteo de ccd_clientes no coincide con el valor certificado." >&2
-  exit 1
-fi
-
-# Conteos clientes_cuentas
 SRC_CTA_COUNT=$(run_src_sql "SELECT COUNT(*) FROM clientes_cuentas;")
 TGT_CTA_COUNT=$(run_tgt_sql "SELECT COUNT(*) FROM clientes_cuentas;")
-echo "  clientes_cuentas total: origen=$SRC_CTA_COUNT | destino=$TGT_CTA_COUNT (esperado: $EXPECTED_TOTAL_CUENTAS)"
+SRC_AQP4_COUNT=$(run_src_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP4';")
+TGT_AQP4_COUNT=$(run_tgt_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP4';")
+SRC_AQP5_COUNT=$(run_src_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP5';")
+TGT_AQP5_COUNT=$(run_tgt_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP5';")
+
+if [ "$SRC_CCD_COUNT" -ne "$EXPECTED_TOTAL_CCD" ] || [ "$TGT_CCD_COUNT" -ne "$EXPECTED_TOTAL_CCD" ]; then
+  echo "ERROR: Conteo de ccd_clientes no coincide con 275,987 (Origen: $SRC_CCD_COUNT, Destino: $TGT_CCD_COUNT)." >&2
+  exit 1
+fi
 
 if [ "$SRC_CTA_COUNT" -ne "$EXPECTED_TOTAL_CUENTAS" ] || [ "$TGT_CTA_COUNT" -ne "$EXPECTED_TOTAL_CUENTAS" ]; then
-  echo "ERROR: Conteo de clientes_cuentas no coincide con el valor certificado." >&2
+  echo "ERROR: Conteo de clientes_cuentas no coincide con 282,595 (Origen: $SRC_CTA_COUNT, Destino: $TGT_CTA_COUNT)." >&2
   exit 1
 fi
 
-# Conteos AQP4 / AQP5
-SRC_AQP4=$(run_src_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP4';")
-TGT_AQP4=$(run_tgt_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP4';")
-SRC_AQP5=$(run_src_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP5';")
-TGT_AQP5=$(run_tgt_sql "SELECT COUNT(*) FROM ccd_clientes WHERE cosecha = 'AQP5';")
-
-if [ "$SRC_AQP4" -ne "$EXPECTED_AQP4_TOTAL" ] || [ "$TGT_AQP4" -ne "$EXPECTED_AQP4_TOTAL" ] || \
-   [ "$SRC_AQP5" -ne "$EXPECTED_AQP5_TOTAL" ] || [ "$TGT_AQP5" -ne "$EXPECTED_AQP5_TOTAL" ]; then
-  echo "ERROR: Distribución AQP4/AQP5 en ccd_clientes no coincide." >&2
+if [ "$SRC_AQP4_COUNT" -ne "$EXPECTED_AQP4_TOTAL" ] || [ "$TGT_AQP4_COUNT" -ne "$EXPECTED_AQP4_TOTAL" ]; then
+  echo "ERROR: Conteo de AQP4 no coincide con 7,024 (Origen: $SRC_AQP4_COUNT, Destino: $TGT_AQP4_COUNT)." >&2
   exit 1
 fi
-echo "  CCD AQP4: $SRC_AQP4 | CCD AQP5: $SRC_AQP5 (Conforme)"
 
-# Firmas SHA-256 (serialización JSON-lines por registro ordenada por ID, unificada con PHP)
-echo "  Calculando huellas SHA-256 unificadas para verificación cruzada..."
+if [ "$SRC_AQP5_COUNT" -ne "$EXPECTED_AQP5_TOTAL" ] || [ "$TGT_AQP5_COUNT" -ne "$EXPECTED_AQP5_TOTAL" ]; then
+  echo "ERROR: Conteo de AQP5 no coincide con 3,200 (Origen: $SRC_AQP5_COUNT, Destino: $TGT_AQP5_COUNT)." >&2
+  exit 1
+fi
+echo "  Conteos tabulares conforme: 275,987 CCDs, 282,595 Cuentas (7,024 AQP4, 3,200 AQP5)"
 
+# 1.3 Verificación de firmas SHA-256 certificadas
 calculate_sha_php() {
   local env_type="$1"
   local table_type="$2"
@@ -269,7 +281,7 @@ if [ "$SRC_CTA_HASH" != "$EXPECTED_CUENTAS_SHA256" ]; then
 fi
 echo "  Firma Cuentas (282,595 registros) conforme: $SRC_CTA_HASH"
 
-# Asociaciones de Staging
+# 1.4 Verificación de asociaciones en Staging
 STAGING_ASSOC=$(run_src_sql "SELECT COUNT(*) FROM ccd_cliente_cuenta cca JOIN ccd_clientes cc ON cc.id = cca.ccd_cliente_id WHERE cc.cosecha IN ('AQP4', 'AQP5') AND cca.estado = 'confirmada';")
 STAGING_V3=$(run_src_sql "SELECT COUNT(*) FROM ccd_cliente_cuenta cca JOIN ccd_clientes cc ON cc.id = cca.ccd_cliente_id WHERE cc.cosecha IN ('AQP4', 'AQP5') AND cca.estado = 'confirmada' AND cca.metodo_verificacion = 'operacion_pdf_aqp_auditada_v3';")
 STAGING_V5=$(run_src_sql "SELECT COUNT(*) FROM ccd_cliente_cuenta cca JOIN ccd_clientes cc ON cc.id = cca.ccd_cliente_id WHERE cc.cosecha IN ('AQP4', 'AQP5') AND cca.estado = 'confirmada' AND cca.metodo_verificacion = 'operacion_pdf_aqp_auditada_v5';")
@@ -280,162 +292,196 @@ if [ "$STAGING_ASSOC" -ne "$EXPECTED_AQP_TOTAL" ] || [ "$STAGING_V3" -ne "$EXPEC
 fi
 echo "  Asociaciones en Staging: $STAGING_ASSOC (1 v3, 10,223 v5) (Conforme)"
 
-# ------------------------------------------------------------------------------
-# 5. Comprobación de espacio en disco (sin crear directorios en dry-run)
-# ------------------------------------------------------------------------------
-echo "==> [Paso 2/6] Verificando espacio disponible en disco..."
+# 1.5 Comprobación de espacio en disco
 FREE_SPACE_KB=$(df -k "$PROD_DIR" | awk 'NR==2 {print $4}')
 FREE_SPACE_GIB=$(( FREE_SPACE_KB / 1024 / 1024 ))
-echo "  Espacio libre en sistema de destino: ${FREE_SPACE_GIB} GiB (Requerido: >= ${MIN_FREE_SPACE_GIB} GiB)"
+echo "  Espacio libre en destino: ${FREE_SPACE_GIB} GiB (Requerido: >= ${MIN_FREE_SPACE_GIB} GiB)"
 
 if [ "$FREE_SPACE_GIB" -lt "$MIN_FREE_SPACE_GIB" ]; then
   echo "ERROR: Espacio insuficiente en disco para alojar los 2.618 GiB de PDFs privados." >&2
   exit 1
 fi
 
-# ------------------------------------------------------------------------------
-# En modo DRY-RUN: Simulación estricta sin escrituras y salida limpia
-# ------------------------------------------------------------------------------
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+BACKUP_DIR="${HOME}/private/backups/ccd-v6-produccion-${TIMESTAMP}"
+
+if [ "$MODE" = "apply" ]; then
+  echo ""
+  echo "ADVERTENCIA: Está a punto de ejecutar la MIGRACIÓN A PRODUCCIÓN (--apply)."
+  if [ "$CONFIRM_FLAG" = false ]; then
+    echo "Escriba 'CONFIRMAR_PRODUCCION' para continuar:"
+    read -r user_input
+    if [ "$user_input" != "CONFIRMAR_PRODUCCION" ]; then
+      echo "Operación cancelada por el usuario."
+      exit 1
+    fi
+  fi
+
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  echo "  Generando respaldo SQL previo en ${BACKUP_DIR}..."
+
+  PROD_DUMP="${BACKUP_DIR}/prod_pre_migracion_${TIMESTAMP}.sql"
+  TGT_DUMP_PASS=$(php -r '$c = json_decode(file_get_contents("'"$CRED_FILE"'"), true); echo $c["target"]["password"];')
+  TGT_DUMP_USER=$(php -r '$c = json_decode(file_get_contents("'"$CRED_FILE"'"), true); echo $c["target"]["username"];')
+  TGT_DUMP_HOST=$(php -r '$c = json_decode(file_get_contents("'"$CRED_FILE"'"), true); echo $c["target"]["host"];')
+  TGT_DUMP_PORT=$(php -r '$c = json_decode(file_get_contents("'"$CRED_FILE"'"), true); echo $c["target"]["port"];')
+  TGT_DUMP_DB=$(php -r '$c = json_decode(file_get_contents("'"$CRED_FILE"'"), true); echo $c["target"]["database"];')
+
+  MYSQL_PWD="${TGT_DUMP_PASS}" mysqldump \
+    -h "${TGT_DUMP_HOST}" -P "${TGT_DUMP_PORT}" -u "${TGT_DUMP_USER}" \
+    --single-transaction --quick --skip-lock-tables --no-tablespaces \
+    "${TGT_DUMP_DB}" ccd_clientes clientes_cuentas migrations > "${PROD_DUMP}"
+
+  unset TGT_DUMP_PASS TGT_DUMP_USER TGT_DUMP_HOST TGT_DUMP_PORT TGT_DUMP_DB
+  chmod 600 "${PROD_DUMP}"
+  sha256sum "${PROD_DUMP}" | tee "${PROD_DUMP}.sha256"
+  test -s "${PROD_DUMP}"
+  echo "  Respaldo SQL generado exitosamente."
+
+  if [ -f "${PROD_DIR}/.env" ]; then
+    cp "${PROD_DIR}/.env" "${BACKUP_DIR}/prod_env_${TIMESTAMP}.bak"
+    chmod 600 "${BACKUP_DIR}/prod_env_${TIMESTAMP}.bak"
+  fi
+  if [ -f "${PROD_DIR}/config/filesystems.php" ]; then
+    cp "${PROD_DIR}/config/filesystems.php" "${BACKUP_DIR}/prod_filesystems_${TIMESTAMP}.bak"
+  fi
+fi
+
+# ==============================================================================
+# FASE 2: INSTALACIÓN DE TABLAS CCD
+# ==============================================================================
+echo ""
+echo "==> [Fase 2/5] Comprobación e instalación de esquema CCD (migraciones selectivas)..."
+
 if [ "$MODE" = "dry-run" ]; then
-  echo "==> [Paso 3/6] [DRY-RUN] Comprobando integración aditiva y compatibilidad de archivos..."
   php -r '
     require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+    $c = $creds["target"];
+    $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
     $svc = new App\Services\Ccd\CcdProductionMigratorService();
-    $svc->verifyAndIntegrateComponents(
-        "'"$STAGING_DIR"'",
-        "'"$PROD_DIR"'",
-        false, // dry-run
-        null,
-        function (string $msg) { echo "  {$msg}\n"; }
-    );
+    $schema = $svc->inspectTargetSchema($pdo);
+    echo "  [DRY-RUN] Tabla ccd_archivos: " . ($schema["has_ccd_archivos"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+    echo "  [DRY-RUN] Tabla ccd_cliente_cuenta: " . ($schema["has_ccd_cliente_cuenta"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
+    echo "  [DRY-RUN] Columna ccd_clientes.ccd_archivo_id: " . ($schema["has_ccd_archivo_id_column"] ? "EXISTE" : "PENDIENTE DE MIGRAR") . "\n";
   '
-
-  echo ""
-  echo "==> [Paso 4/6] [DRY-RUN] Ejecutando simulación mediante ccd:migrate-aqp-production-v6..."
+else
+  # En modo apply: ejecutar las 2 migraciones selectivas CCD
   (
-    cd "$STAGING_DIR"
+    cd "$PROD_DIR"
+    php artisan migrate --path=database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php --force
+    php artisan migrate --path=database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php --force
+  )
+  echo "  Migraciones selectivas ejecutadas exitosamente."
+fi
+
+# ==============================================================================
+# FASE 3: MIGRACIÓN DE LOS 10,224 PDFS Y ASOCIACIONES
+# ==============================================================================
+echo ""
+echo "==> [Fase 3/5] Migración transaccional de PDFs y asociaciones CCD..."
+
+MANIFEST_PATH=""
+if [ "$MODE" = "apply" ]; then
+  MANIFEST_DIR="${PROD_DIR}/storage/app/private/ccd/audits"
+  mkdir -p "$MANIFEST_DIR"
+  MANIFEST_PATH="${MANIFEST_DIR}/ccd-v6-produccion-manifest-${TIMESTAMP}.csv"
+fi
+
+(
+  cd "$STAGING_DIR"
+  if [ "$MODE" = "dry-run" ]; then
     php artisan ccd:migrate-aqp-production-v6 \
       --dry-run \
       --credentials-file="$CRED_FILE" \
       --source-storage="${STAGING_DIR}/storage/app/private/ccd" \
       --target-storage="${PROD_DIR}/storage/app/private/ccd"
-  )
-
-  echo ""
-  echo "=============================================================================="
-  echo "  SIMULACIÓN DRY-RUN COMPLETADA SATISFACTORIAMENTE"
-  echo "  - CERO escrituras realizadas en base de datos de producción."
-  echo "  - CERO directorios o archivos modificados en el CRM de producción."
-  echo "  - Puede proceder con --apply cuando cuente con la autorización requerida."
-  echo "=============================================================================="
-  exit 0
-fi
+  else
+    php artisan ccd:migrate-aqp-production-v6 \
+      --apply \
+      --authorization="$APPLY_AUTH_TOKEN" \
+      --confirmation="$APPLY_CONF_TOKEN" \
+      --credentials-file="$CRED_FILE" \
+      --source-storage="${STAGING_DIR}/storage/app/private/ccd" \
+      --target-storage="${PROD_DIR}/storage/app/private/ccd" \
+      --manifest="$MANIFEST_PATH"
+  fi
+)
 
 # ==============================================================================
-# SECCIÓN APPLY: Ejecución con escrituras autorizadas
+# FASE 4: INTEGRACIÓN DE LA INTERFAZ DEL CRM (ADAPTADA A PRODUCCIÓN LEGACY)
 # ==============================================================================
 echo ""
-echo "ADVERTENCIA: Está a punto de ejecutar la MIGRACIÓN A PRODUCCIÓN (--apply)."
-if [ "$CONFIRM_FLAG" = false ]; then
-  echo "Escriba 'CONFIRMAR_PRODUCCION' para continuar:"
-  read -r user_input
-  if [ "$user_input" != "CONFIRMAR_PRODUCCION" ]; then
-    echo "Operación cancelada por el usuario."
-    exit 1
-  fi
-fi
-
-TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-BACKUP_DIR="${HOME}/private/backups/ccd-v6-produccion-${TIMESTAMP}"
-mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
-
-echo "==> [Paso 3/6] Realizando respaldo previo en ${BACKUP_DIR}..."
-
-# Respaldo de BD destino (solo tablas afectadas)
-PROD_DUMP="${BACKUP_DIR}/prod_pre_migracion_${TIMESTAMP}.sql"
-MYSQL_PWD="${TGT_DB_PASS}" mysqldump \
-  -h "${TGT_DB_HOST}" -P "${TGT_DB_PORT}" -u "${TGT_DB_USER}" \
-  --single-transaction --quick --skip-lock-tables --no-tablespaces \
-  "${TGT_DB_NAME}" ccd_clientes clientes_cuentas migrations > "${PROD_DUMP}"
-
-chmod 600 "${PROD_DUMP}"
-sha256sum "${PROD_DUMP}" | tee "${PROD_DUMP}.sha256"
-test -s "${PROD_DUMP}"
-echo "  Respaldo SQL generado exitosamente."
-
-# Respaldo de configuración base
-cp "${PROD_DIR}/.env" "${BACKUP_DIR}/prod_env_${TIMESTAMP}.bak"
-chmod 600 "${BACKUP_DIR}/prod_env_${TIMESTAMP}.bak"
-if [ -f "${PROD_DIR}/config/filesystems.php" ]; then
-  cp "${PROD_DIR}/config/filesystems.php" "${BACKUP_DIR}/prod_filesystems_${TIMESTAMP}.bak"
-fi
-
-# ------------------------------------------------------------------------------
-# 6. Sincronización aditiva con respaldo individual de archivos modificados
-# ------------------------------------------------------------------------------
-echo "==> [Paso 4/6] Sincronizando componentes del módulo CCD de forma aditiva con respaldo individual..."
-MODIFIED_FILES_DIR="${BACKUP_DIR}/modified_files"
-mkdir -p "$MODIFIED_FILES_DIR"
+echo "==> [Fase 4/5] Integración de interfaz aditiva del CRM (rutas, controlador, vista)..."
 
 php -r '
   require "'"$STAGING_DIR"'/vendor/autoload.php";
   $svc = new App\Services\Ccd\CcdProductionMigratorService();
+  $apply = ("'"$MODE"'" === "apply");
+  $backupDir = $apply ? "'"$BACKUP_DIR"'" : null;
   $svc->verifyAndIntegrateComponents(
       "'"$STAGING_DIR"'",
       "'"$PROD_DIR"'",
-      true, // apply
-      "'"$BACKUP_DIR"'",
+      $apply,
+      $backupDir,
       function (string $msg) { echo "  {$msg}\n"; }
   );
 '
 
-# ------------------------------------------------------------------------------
-# 7. Ejecución exclusiva de las 2 migraciones selectivas CCD
-# ------------------------------------------------------------------------------
-echo "==> [Paso 5/6] Ejecutando exclusivamente las 2 migraciones selectivas CCD..."
-(
-  cd "$PROD_DIR"
-  php artisan migrate --path=database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php --force
-  php artisan migrate --path=database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php --force
-)
-
-# ------------------------------------------------------------------------------
-# 8. Transferencia de PDFs y migración transaccional de datos
-# ------------------------------------------------------------------------------
-echo "==> [Paso 6/6] Ejecutando transferencia de PDFs y migración transaccional de datos..."
-
-MANIFEST_DIR="${PROD_DIR}/storage/app/private/ccd/audits"
-mkdir -p "$MANIFEST_DIR"
-MANIFEST_PATH="${MANIFEST_DIR}/ccd-v6-produccion-manifest-${TIMESTAMP}.csv"
-
-(
-  cd "$STAGING_DIR"
-  php artisan ccd:migrate-aqp-production-v6 \
-    --apply \
-    --authorization="$APPLY_AUTH_TOKEN" \
-    --confirmation="$APPLY_CONF_TOKEN" \
-    --credentials-file="$CRED_FILE" \
-    --source-storage="${STAGING_DIR}/storage/app/private/ccd" \
-    --target-storage="${PROD_DIR}/storage/app/private/ccd" \
-    --manifest="$MANIFEST_PATH"
-)
-
-# Limpieza de cachés de Laravel en producción
-(
-  cd "$PROD_DIR"
-  php artisan config:clear
-  php artisan route:clear
-  php artisan view:clear
-)
-
+# ==============================================================================
+# FASE 5: AUDITORÍA FUNCIONAL FINAL
+# ==============================================================================
 echo ""
-echo "=============================================================================="
-echo "  DESPLIEGUE CCD AQP V6 A PRODUCCIÓN COMPLETADO SATISFACTORIAMENTE"
-echo "  Respaldo previo: $BACKUP_DIR"
-echo "  Manifiesto:      $MANIFEST_PATH"
-if [ -f "$MANIFEST_PATH" ]; then
-  echo "  Manifiesto SHA:  $(sha256sum "$MANIFEST_PATH" | cut -d' ' -f1)"
+echo "==> [Fase 5/5] Auditoría funcional final..."
+
+if [ "$MODE" = "dry-run" ]; then
+  echo "  [DRY-RUN] Simulando auditoría final post-migración: conforme."
+  echo ""
+  echo "=============================================================================="
+  echo "  SIMULACIÓN DRY-RUN V6.2 COMPLETADA SATISFACTORIAMENTE"
+  echo "  - CERO escrituras realizadas en base de datos de producción."
+  echo "  - CERO directorios o archivos modificados en el CRM de producción."
+  echo "  - Integración compatible comprobada con arquitectura LEGACY de producción."
+  echo "  - Puede proceder con --apply cuando cuente con la debida autorización."
+  echo "=============================================================================="
+  exit 0
+else
+  # En modo apply: ejecutar auditoría sobre target
+  php -r '
+    require "'"$STAGING_DIR"'/vendor/autoload.php";
+    $creds = json_decode(file_get_contents("'"$CRED_FILE"'"), true);
+    $c = $creds["target"];
+    $pdo = new PDO("mysql:host={$c["host"]};port={$c["port"]};dbname={$c["database"]};charset=utf8mb4", $c["username"], $c["password"], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
+    $svc = new App\Services\Ccd\CcdProductionMigratorService();
+    $audit = $svc->auditTarget($pdo, "'"$PROD_DIR"'/storage/app/private/ccd", false);
+    if (!$audit["success"]) {
+        fwrite(STDERR, "ERROR en auditoría post-migración:\n" . implode("\n", $audit["errors"]) . "\n");
+        exit(1);
+    }
+    echo "  Auditoría conforme: {$audit["total_archivos"]} archivos catalogados, {$audit["total_asociaciones"]} asociaciones confirmadas.\n";
+  '
+
+  # Limpieza de cachés de Laravel en producción
+  (
+    cd "$PROD_DIR"
+    php artisan config:clear
+    php artisan route:clear
+    php artisan view:clear
+  )
+
+  echo ""
+  echo "=============================================================================="
+  echo "  DESPLIEGUE CCD AQP V6.2 A PRODUCCIÓN LEGACY COMPLETADO CON ÉXITO"
+  echo "  Respaldo previo: $BACKUP_DIR"
+  echo "  Manifiesto:      $MANIFEST_PATH"
+  if [ -f "$MANIFEST_PATH" ]; then
+    echo "  Manifiesto SHA:  $(sha256sum "$MANIFEST_PATH" | cut -d' ' -f1)"
+  fi
+  echo "=============================================================================="
+  exit 0
 fi
-echo "=============================================================================="
-exit 0

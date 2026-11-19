@@ -10,11 +10,16 @@ use Illuminate\Support\Facades\Storage;
 
 class CcdDocumentController extends Controller
 {
-    public function show(Request $request, string $dni, CcdCliente $ccdCliente)
+    public function show(Request $request, string $numdoc, CcdCliente $ccdCliente)
     {
-        Gate::forUser($request->user())->authorize('view-cliente');
+        if (Gate::has('view-cliente')) {
+            Gate::forUser($request->user())->authorize('view-cliente');
+        } else {
+            abort_unless($request->user() !== null, 401);
+        }
 
-        abort_unless(hash_equals((string) $ccdCliente->numdoc, $dni), 404);
+        $targetDoc = (string) ($request->route('numdoc') ?? $request->route('dni') ?? $numdoc);
+        abort_unless(hash_equals((string) $ccdCliente->numdoc, $targetDoc), 404);
 
         $archivoId = $ccdCliente->getAttribute('ccd_archivo_id');
 

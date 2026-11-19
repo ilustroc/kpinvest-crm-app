@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KP INVEST — Reversión Específica de Migración CCD V6 (AQP4 / AQP5)
+# KP INVEST — Reversión Específica de Migración CCD V6.2 (AQP4 / AQP5)
 # ==============================================================================
 # Reversión explícita y segura de las dos migraciones CCD sin restaurar
 # ciegamente tablas completas ni afectar datos concurrentes de producción.
@@ -13,7 +13,7 @@ set -euo pipefail
 umask 077
 
 echo "=============================================================================="
-echo "  KP INVEST — REVERSIÓN ESPECÍFICA CCD AQP V6"
+echo "  KP INVEST — REVERSIÓN ESPECÍFICA CCD AQP V6.2"
 echo "=============================================================================="
 
 PROD_DIR="${PROD_DIR:-/home/u480021566/domains/impulse-go.com/public_html/plataforma-crm}"
@@ -49,30 +49,11 @@ if [ "$CONFIRM_FLAG" = false ]; then
   fi
 fi
 
-PROD_ENV="${PROD_DIR}/.env"
-if [ ! -f "$PROD_ENV" ]; then
-  echo "ERROR: Archivo .env de producción no encontrado: $PROD_ENV" >&2
-  exit 1
-fi
-
-get_env_var() {
-  local env_file="$1"
-  local var_name="$2"
-  local default_val="${3:-}"
-  grep -E "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2- | tr -d '"\r' || echo "$default_val"
-}
-
-TGT_DB_HOST="${PROD_DB_HOST:-$(get_env_var "$PROD_ENV" "DB_HOST" "127.0.0.1")}"
-TGT_DB_PORT="${PROD_DB_PORT:-$(get_env_var "$PROD_ENV" "DB_PORT" "3306")}"
-TGT_DB_NAME="${PROD_DB_DATABASE:-$(get_env_var "$PROD_ENV" "DB_DATABASE" "u480021566_kpinvest_bd")}"
-TGT_DB_USER="${PROD_DB_USERNAME:-$(get_env_var "$PROD_ENV" "DB_USERNAME")}"
-TGT_DB_PASS="${PROD_DB_PASSWORD:-$(get_env_var "$PROD_ENV" "DB_PASSWORD")}"
-
-# Credenciales seguras mediante serializador nativo PHP
+# Credenciales seguras mediante configuración efectiva de Laravel
 CRED_DIR="${HOME}/private/.ccd_credentials"
 mkdir -p "$CRED_DIR"
 chmod 700 "$CRED_DIR"
-CRED_FILE="${CRED_DIR}/ccd_v6_rev_${$}_$(date +%s).json"
+CRED_FILE="${CRED_DIR}/ccd_v62_rev_${$}_$(date +%s).json"
 
 cleanup_credentials() {
   if [ -f "$CRED_FILE" ]; then
@@ -81,19 +62,49 @@ cleanup_credentials() {
 }
 trap cleanup_credentials EXIT INT TERM
 
-TGT_P="$TGT_DB_PASS" CRED_OUT="$CRED_FILE" php -r '
+php -r '
+  $prodDir = rtrim($argv[1], "/\\");
+  $credOut = $argv[2];
+
+  $autoload = $prodDir . "/vendor/autoload.php";
+  $bootstrap = $prodDir . "/bootstrap/app.php";
+  $cfg = [];
+
+  if (file_exists($autoload) && file_exists($bootstrap)) {
+      $code = "require \$argv[1].\"/vendor/autoload.php\"; \$app=require \$argv[1].\"/bootstrap/app.php\"; \$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap(); \$conn=config(\"database.default\",\"mysql\"); echo json_encode(config(\"database.connections.{\$conn}\", []));";
+      $descriptors = [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]];
+      $proc = @proc_open([PHP_BINARY ?: "php", "-r", $code, $prodDir], $descriptors, $pipes);
+      if (is_resource($proc)) {
+          fclose($pipes[0]);
+          $out = stream_get_contents($pipes[1]);
+          fclose($pipes[1]);
+          fclose($pipes[2]);
+          proc_close($proc);
+          $decoded = json_decode(trim($out), true);
+          if (is_array($decoded)) {
+              $cfg = $decoded;
+          }
+      }
+  }
+
+  $host = getenv("PROD_DB_HOST") ?: ($cfg["host"] ?? "127.0.0.1");
+  $port = (int) (getenv("PROD_DB_PORT") ?: ($cfg["port"] ?? 3306));
+  $db   = getenv("PROD_DB_DATABASE") ?: ($cfg["database"] ?? "u480021566_kpinvest_bd");
+  $user = getenv("PROD_DB_USERNAME") ?: ($cfg["username"] ?? "");
+  $pass = (string) (getenv("PROD_DB_PASSWORD") ?: ($cfg["password"] ?? ""));
+
   $data = [
     "target" => [
-      "host" => getenv("TGT_DB_HOST"),
-      "port" => (int) (getenv("TGT_DB_PORT") ?: 3306),
-      "database" => getenv("TGT_DB_NAME"),
-      "username" => getenv("TGT_DB_USER"),
-      "password" => (string) getenv("TGT_P"),
+      "host" => $host,
+      "port" => $port,
+      "database" => $db,
+      "username" => $user,
+      "password" => $pass,
     ],
   ];
-  file_put_contents(getenv("CRED_OUT"), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-'
-unset TGT_P CRED_OUT
+  file_put_contents($credOut, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+' "$PROD_DIR" "$CRED_FILE"
+
 chmod 600 "$CRED_FILE"
 
 # 1. Comprobación exhaustiva de seguridad antes de la reversión

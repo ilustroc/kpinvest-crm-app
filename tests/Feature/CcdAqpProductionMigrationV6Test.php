@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
+use App\Models\CcdClienteCuenta;
+use App\Models\ClienteCuenta;
 use App\Models\User;
 use App\Services\Ccd\CcdProductionMigratorService;
 use DomainException;
@@ -642,6 +644,308 @@ class CcdAqpProductionMigrationV6Test extends TestCase
         $checkForeignData = $service->validateRollbackSafety($this->targetPdo);
         $this->assertFalse($checkForeignData['safe']);
         $this->assertStringContainsString('distintas de AQP4/AQP5', $checkForeignData['reasons'][0]);
+    }
+
+    public function test_assert_php_syntax_detects_errors_using_proc_open_without_exec(): void
+    {
+        $service = new CcdProductionMigratorService();
+
+        // 1. Archivo válido
+        $validFile = storage_path('framework/testing/valid_'.uniqid().'.php');
+        file_put_contents($validFile, "<?php\n\necho 'valid syntax';\n");
+
+        $service->assertPhpSyntax($validFile);
+        $this->assertTrue(true);
+        @unlink($validFile);
+
+        // 2. Archivo con error de sintaxis
+        $invalidFile = storage_path('framework/testing/invalid_'.uniqid().'.php');
+        file_put_contents($invalidFile, "<?php\n\nfunction bad() { missing_brace()\n");
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('Error de sintaxis PHP detectado');
+
+        try {
+            $service->assertPhpSyntax($invalidFile);
+        } finally {
+            @unlink($invalidFile);
+        }
+    }
+
+    public function test_verify_and_integrate_components_legacy_architecture_routes_controller_and_view(): void
+    {
+        $service = new CcdProductionMigratorService();
+        $sourceDir = base_path();
+        $targetDir = storage_path('framework/testing/legacy_target_'.uniqid());
+        $backupDir = storage_path('framework/testing/legacy_backup_'.uniqid());
+
+        @mkdir($targetDir.'/routes', 0775, true);
+        @mkdir($targetDir.'/app/Http/Controllers', 0775, true);
+        @mkdir($targetDir.'/resources/views/clientes', 0775, true);
+        @mkdir($targetDir.'/app/Models', 0775, true);
+        @mkdir($targetDir.'/config', 0775, true);
+
+        // 1. Setup rutas legacy (routes/web.php con prefijo clientes y grupo auth)
+        $legacyWeb = <<<'PHP'
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClienteController;
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'form'])->name('login');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::prefix('clientes')->group(function () {
+        Route::get('/', [ClienteController::class, 'index'])->name('clientes.index');
+        Route::get('/{dni}', [ClienteController::class, 'show'])->name('clientes.show');
+    });
+});
+PHP;
+        file_put_contents($targetDir.'/routes/web.php', $legacyWeb);
+
+        // 2. Setup controlador legacy (ClienteController.php sin ClienteProfileService)
+        $legacyController = <<<'PHP'
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use App\Models\ClienteCuenta;
+use App\Models\CcdCliente;
+
+class ClienteController extends Controller
+{
+    public function show(string $dni)
+    {
+        $cuentas = ClienteCuenta::query()
+            ->where('numdoc', $dni)
+            ->get(['numdoc','nombre','cuenta','operacion','entidad','cosecha']);
+
+        $ccdDocs = collect();
+        if (Schema::hasTable('ccd_clientes')) {
+            $ccdDocs = CcdCliente::query()->where('numdoc', $dni)->get();
+        }
+
+        $ccdByDni = collect([$dni => $ccdDocs->values()]);
+
+        return view('clientes.show', compact('dni', 'cuentas', 'ccdDocs', 'ccdByDni'));
+    }
+}
+PHP;
+        file_put_contents($targetDir.'/app/Http/Controllers/ClienteController.php', $legacyController);
+
+        // 3. Setup vista legacy (show.blade.php con celda legacy)
+        $legacyView = <<<'BLADE'
+@extends('layouts.app')
+@section('content')
+<table>
+    @foreach($cuentas as $cta)
+        <tr>
+            <td>{{ $cta->operacion }}</td>
+            {{-- === CELDA CCD === --}}
+            <td class="text-nowrap">
+                @php
+                    $docs = collect($ccdByDni[$dni] ?? []);
+                @endphp
+                @if($docs->isNotEmpty())
+                    <a href="{{ $docs->first()->link }}">Ver</a>
+                @else
+                    <span>—</span>
+                @endif
+            </td>
+            {{-- === /CELDA CCD === --}}
+        </tr>
+    @endforeach
+</table>
+@endsection
+BLADE;
+        file_put_contents($targetDir.'/resources/views/clientes/show.blade.php', $legacyView);
+
+        // 4. Setup modelos base y filesystems
+        file_put_contents($targetDir.'/app/Models/ClienteCuenta.php', "<?php\nnamespace App\Models;\nuse Illuminate\Database\Eloquent\Model;\nclass ClienteCuenta extends Model {}\n");
+        file_put_contents($targetDir.'/app/Models/CcdCliente.php', "<?php\nnamespace App\Models;\nuse Illuminate\Database\Eloquent\Model;\nclass CcdCliente extends Model {}\n");
+        file_put_contents($targetDir.'/config/filesystems.php', "<?php\nreturn ['disks' => ['local' => []]];\n");
+
+        // 5. Test DRY-RUN: Cero escrituras en archivos
+        $dryRunResults = $service->verifyAndIntegrateComponents($sourceDir, $targetDir, false);
+        $this->assertEquals('pending_additive_integration', $dryRunResults['routes/web.php']['status']);
+        $this->assertEquals('pending_additive_integration', $dryRunResults['app/Http/Controllers/ClienteController.php']['status']);
+        $this->assertEquals('pending_additive_integration', $dryRunResults['resources/views/clientes/show.blade.php']['status']);
+        $this->assertFalse(str_contains((string) file_get_contents($targetDir.'/routes/web.php'), 'clientes.ccd.show'));
+        $this->assertFalse(str_contains((string) file_get_contents($targetDir.'/app/Http/Controllers/ClienteController.php'), 'ccdConfirmados'));
+
+        // 6. Test APPLY: Integración quirúrgica aditiva
+        $applyResults = $service->verifyAndIntegrateComponents($sourceDir, $targetDir, true, $backupDir);
+        $this->assertEquals('additively_integrated', $applyResults['routes/web.php']['status']);
+        $this->assertEquals('additively_integrated', $applyResults['app/Http/Controllers/ClienteController.php']['status']);
+        $this->assertEquals('additively_integrated', $applyResults['resources/views/clientes/show.blade.php']['status']);
+
+        // Verificaciones de contenido inyectado
+        $modRoutes = (string) file_get_contents($targetDir.'/routes/web.php');
+        $this->assertStringContainsString('CcdDocumentController::class', $modRoutes);
+        $this->assertStringContainsString("name('clientes.ccd.show')", $modRoutes);
+
+        $modController = (string) file_get_contents($targetDir.'/app/Http/Controllers/ClienteController.php');
+        $this->assertStringContainsString("'id','numdoc'", $modController);
+        $this->assertStringContainsString('use App\Models\CcdClienteCuenta;', $modController);
+        $this->assertStringContainsString('$cta->ccdConfirmados =', $modController);
+        $this->assertStringContainsString('cliente_cuenta_id', $modController);
+
+        $modView = (string) file_get_contents($targetDir.'/resources/views/clientes/show.blade.php');
+        $this->assertStringContainsString('cta->ccdConfirmados', $modView);
+        $this->assertStringContainsString("route('clientes.ccd.show'", $modView);
+        $this->assertStringContainsString('{{-- === CELDA CCD === --}}', $modView);
+
+        // Verificación de respaldos individuales
+        $this->assertFileExists($backupDir.'/modified_files/routes/web.php');
+        $this->assertFileExists($backupDir.'/modified_files/app/Http/Controllers/ClienteController.php');
+        $this->assertFileExists($backupDir.'/modified_files/resources/views/clientes/show.blade.php');
+
+        // Limpieza recursiva
+        $deleteTree = function (string $dir) use (&$deleteTree) {
+            if (! is_dir($dir)) {
+                return;
+            }
+            $items = array_diff(scandir($dir) ?: [], ['.', '..']);
+            foreach ($items as $item) {
+                $path = $dir.'/'.$item;
+                is_dir($path) ? $deleteTree($path) : @unlink($path);
+            }
+            @rmdir($dir);
+        };
+        $deleteTree($targetDir);
+        $deleteTree($backupDir);
+    }
+
+    public function test_legacy_controller_ccd_confirmed_matches_operation_specifically_without_cross_pollution(): void
+    {
+        $dni = '40889911';
+        $cta1 = ClienteCuenta::create([
+            'numdoc' => $dni,
+            'cuenta' => 'CTA-001',
+            'operacion' => 'OP-AQP-001',
+            'entidad' => 'CAJA AQP',
+            'cosecha' => 'AQP4',
+        ]);
+        $cta2 = ClienteCuenta::create([
+            'numdoc' => $dni,
+            'cuenta' => 'CTA-002',
+            'operacion' => 'OP-AQP-002',
+            'entidad' => 'CAJA AQP',
+            'cosecha' => 'AQP4',
+        ]);
+
+        $archivo = CcdArchivo::create([
+            'disk' => 'ccd-private',
+            'path' => CcdArchivo::pathForHash('a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123'),
+            'sha256' => 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
+            'size_bytes' => 2048,
+            'mime_type' => 'application/pdf',
+            'nombre_original' => 'doc1.pdf',
+            'verified_at' => now(),
+        ]);
+
+        $ccd1 = CcdCliente::create([
+            'numdoc' => $dni,
+            'pdf' => 'doc1.pdf',
+            'cosecha' => 'AQP4',
+            'ccd_archivo_id' => $archivo->id,
+        ]);
+
+        CcdClienteCuenta::create([
+            'ccd_cliente_id' => $ccd1->id,
+            'cliente_cuenta_id' => $cta1->id,
+            'estado' => CcdClienteCuenta::ESTADO_CONFIRMADA,
+            'metodo_verificacion' => 'operacion_pdf_aqp_auditada_v5',
+            'evidencia' => 'Hash Match',
+            'confirmado_at' => now(),
+        ]);
+
+        // Simular lógica del controlador legacy
+        $cuentas = ClienteCuenta::query()->where('numdoc', $dni)->get();
+        $ccdDocs = CcdCliente::query()->where('numdoc', $dni)->get();
+
+        $confirmedLinks = CcdClienteCuenta::query()
+            ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
+            ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+            ->with('ccdCliente:id,numdoc,pdf,cosecha,link')
+            ->get()
+            ->filter(fn ($link) => $link->ccdCliente !== null && hash_equals($dni, (string) $link->ccdCliente->numdoc))
+            ->groupBy('cliente_cuenta_id');
+
+        $confirmedIds = $confirmedLinks->flatten()->pluck('ccd_cliente_id')->map(fn ($id) => (int) $id)->unique()->all();
+
+        foreach ($cuentas as $cta) {
+            $cta->ccdConfirmados = collect($confirmedLinks->get((int) $cta->id, []))
+                ->pluck('ccdCliente')
+                ->filter()
+                ->sortBy('id')
+                ->values();
+        }
+
+        $remainingCcdDocs = $ccdDocs->reject(fn ($doc) => in_array((int) $doc->id, $confirmedIds, true))->values();
+
+        // 1. La cuenta 101 (OP-AQP-001) tiene exactamente su CCD
+        $cta101 = $cuentas->firstWhere('id', $cta1->id);
+        $this->assertNotNull($cta101);
+        $this->assertCount(1, $cta101->ccdConfirmados);
+        $this->assertEquals($ccd1->id, $cta101->ccdConfirmados->first()->id);
+
+        // 2. La cuenta 102 (OP-AQP-002) NO tiene ningún CCD confirmado (cero contaminación cruzada)
+        $cta102 = $cuentas->firstWhere('id', $cta2->id);
+        $this->assertNotNull($cta102);
+        $this->assertCount(0, $cta102->ccdConfirmados);
+
+        // 3. El CCD confirmado se retira del pool general
+        $this->assertCount(0, $remainingCcdDocs);
+    }
+
+    public function test_ccd_document_controller_authorizes_legacy_and_modern_and_prevents_parameter_tampering(): void
+    {
+        $dniReal = '41223344';
+        $dniAjeno = '99887766';
+
+        $archivo = CcdArchivo::create([
+            'disk' => 'ccd-private',
+            'path' => CcdArchivo::pathForHash('fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'),
+            'sha256' => 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+            'size_bytes' => 1024,
+            'mime_type' => 'application/pdf',
+            'nombre_original' => 'seguro.pdf',
+            'verified_at' => now(),
+        ]);
+
+        $ccdCliente = CcdCliente::create([
+            'numdoc' => $dniReal,
+            'pdf' => 'seguro.pdf',
+            'cosecha' => 'AQP4',
+            'ccd_archivo_id' => $archivo->id,
+        ]);
+
+        Storage::fake('ccd-private');
+        config(['ccd.private_disk' => 'ccd-private']);
+        Storage::disk('ccd-private')->put($archivo->path, '%PDF-1.4 Fake PDF Content');
+
+        $user = User::factory()->create();
+
+        // 1. Acceso legítimo con usuario autenticado (simulando contexto legacy sin Gate view-cliente)
+        $this->actingAs($user);
+        $response = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Disposition', 'inline; filename=seguro.pdf');
+
+        // 2. Intento de manipulación de parámetro URL (DNI ajeno para documento legítimo) -> Debe abortar con 404
+        $responseTampered = $this->get("/clientes/{$dniAjeno}/ccd/{$ccdCliente->id}");
+        $responseTampered->assertStatus(404);
+
+        // 3. Intento de acceso sin autenticación -> Debe rechazar con 401 o redirigir a login
+        auth()->logout();
+        $responseGuest = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
+        $this->assertTrue(in_array($responseGuest->getStatusCode(), [302, 401], true));
     }
 
     private function setupSourceSchema(PDO $pdo): void

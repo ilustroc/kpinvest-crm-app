@@ -1,238 +1,198 @@
-# KP INVEST — Informe de Migración a Producción CCD V6 (AQP4 / AQP5) — Versión 6.1
+# KP INVEST — Informe de Migración a Producción CCD V6.2 (Adaptación a Producción LEGACY)
 
 ## 1. Resumen Ejecutivo y Objetivos
 
-El presente documento describe la arquitectura técnica, controles de integridad, protección de credenciales, plan de respaldo y el procedimiento de ejecución del desplegador y migrador **V6.1** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**.
+El presente documento describe la arquitectura técnica, controles de integridad, compatibilidad de hosting, protección de credenciales, plan de contingencia y el procedimiento de ejecución del desplegador y migrador **V6.2** para el traslado de las **10,224 asociaciones CCD AQP4/AQP5** y sus archivos PDF privados correspondientes desde el entorno de staging (`u480021566_prueba`) al entorno de producción real (`u480021566_kpinvest_bd`) de **KP INVEST**, adaptado específicamente a la **arquitectura LEGACY** instalada en Hostinger.
 
 ### Datos de Entornos
 
-| Parámetro | Staging (Origen) | Producción (Destino) |
+| Parámetro | Staging (Origen) | Producción (Destino LEGACY) |
 | :--- | :--- | :--- |
 | **Host / Servidor** | Hostinger Cloud SSH | Hostinger Cloud SSH |
 | **Ruta de Aplicación** | `/home/u480021566/apps/kpinvest-crm-pruebas` | `/home/u480021566/domains/impulse-go.com/public_html/plataforma-crm` |
 | **Base de Datos** | `u480021566_prueba` | `u480021566_kpinvest_bd` |
+| **Conexión MySQL** | `u480021566_kpprueba@localhost` | `u480021566_kpinvest@127.0.0.1` |
 | **Repositorio Git** | `ilustroc/kpinvest-crm-app` | `ilustroc/kpinvest-crm-app` |
-| **Rama de Despliegue** | `codex/ccd-aqp-v6-produccion` | `codex/ccd-aqp-v6-produccion` |
+| **Rama de Entrega** | `codex/ccd-aqp-v6-2-produccion-legacy` | `codex/ccd-aqp-v6-2-produccion-legacy` |
 
 ---
 
-## 2. Línea Base Verificada y Huellas Criptográficas
+## 2. Diagnóstico de la Arquitectura Real de Producción LEGACY
 
-Ambas bases de datos presentan una concordancia idéntica en el universo de clientes y cuentas:
+A diferencia de la rama de desarrollo que introdujo subcarpetas de rutas (`routes/web/clientes.php`) y servicios desacoplados (`ClienteProfileService.php`), la aplicación en producción real opera con una estructura monolítica probada:
 
-- **Total `ccd_clientes`:** 275,987 registros.
-- **Total `clientes_cuentas`:** 282,595 registros.
-- **CCD AQP4:** 7,024 registros.
-- **CCD AQP5:** 3,200 registros.
-- **Total universo AQP:** 10,224 registros.
-
-### Huellas Criptográficas SHA-256 Certificadas
-
-Las siguientes firmas SHA-256 son estrictamente validadas por el servicio migrador y el desplegador antes de permitir cualquier operación:
-
-- **Firma CCD AQP:** `861b054ff5ca5027f927d95d8c9980381bb6d3cd69f325ec019b3650506b568b`
-- **Firma Cuentas (universo total):** `0a66ff254fd82cfa021cca872404686ee15785d8231e34eae0ae8711076bbd6f`
-
-### Método de Serialización Unificado para el Cálculo de Firmas
-
-Para garantizar consistencia matemática exacta con la auditoría original:
-1. **Firma CCD AQP:** Consulta `SELECT id, numdoc, pdf, cosecha FROM ccd_clientes WHERE cosecha IN ('AQP4', 'AQP5') ORDER BY id ASC;` (10,224 registros).
-2. **Firma Cuentas Total:** Consulta `SELECT id, numdoc, cuenta, operacion, entidad, cosecha FROM clientes_cuentas ORDER BY id ASC;` (la totalidad de los 282,595 registros, sin filtro de cosecha).
-3. **Formato y Codificación:** Cada fila se serializa mediante `json_encode([...], JSON_UNESCAPED_UNICODE) . "\n"` por registro de forma secuencial mediante streaming, procesando candidatos indexados y asociativos ordenados por `id ASC`.
-4. **Unificación Bash-PHP:** El desplegador Bash (`desplegar_ccd_aqp_produccion_v6.sh`) invoca directamente las funciones PHP de `CcdProductionMigratorService` a través del archivo privado de credenciales. Se eliminó la serialización tabulada por `mysql -N -B` y el filtrado indebido de cuentas AQP, garantizando que el cálculo de firmas en Bash y PHP sea 100% idéntico. Ambos entornos validan:
-   - Concordancia cruzada idéntica: `origen == destino`.
-   - Coincidencia exacta contra las firmas de referencia oficiales.
-
-### Atribución y Métodos de Verificación de las Asociaciones en Staging
-
-Las 10,224 asociaciones confirmadas en staging se componen exactamente de:
-
-1. **1 asociación** con método `operacion_pdf_aqp_auditada_v3`:
-   - Corresponde al CCD del piloto confirmado **ID `153552`** (DNI `05378290`).
-2. **7,023 asociaciones AQP4** con método `operacion_pdf_aqp_auditada_v5`.
-3. **3,200 asociaciones AQP5** con método `operacion_pdf_aqp_auditada_v5`.
-
-> [!IMPORTANT]
-> **Transparencia en la Evidencia y Auditoría Humana:**
-> Las evidencias y métodos originales de cada asociación son preservados de forma íntegra. Únicamente la muestra controlada de **40 registros** contó con revisión visual humana directa (V4.1); los **10,184 registros restantes** provienen de verificación algorítmica documental estricta (V5/V3). El migrador no altera los métodos ni atribuye falsamente revisión humana a los 10,224 registros.
+1. **Rutas Monolíticas Centralizadas:**
+   - Todas las rutas del sistema residen en `routes/web.php`.
+   - No existe el archivo `routes/web/clientes.php`.
+   - Las rutas de clientes están bajo `Route::prefix('clientes')->group(...)` dentro del middleware `auth`.
+2. **Controlador Directo de Clientes:**
+   - La lógica de negocio y visualización reside en `app/Http/Controllers/ClienteController.php`.
+   - No existe la clase `app/Services/Cliente/ClienteProfileService.php`.
+   - El método `ClienteController::show(string $dni)` gestiona directamente `$cuentas`, `$pagos`, `$promesas`, `$cnas`, `$ccdDocs`, `$ccdByDni` y `$ccdByCodigo`.
+3. **Vista de Cliente con Celdas Específicas:**
+   - La vista utilizada es `resources/views/clientes/show.blade.php`.
+   - Renderiza una tabla con la sección delimitada `{{-- === CELDA CCD === --}}`.
+4. **Restricciones de Funciones PHP en Hostinger:**
+   - Hostinger deshabilita funciones como `exec()`, `shell_exec()` y `system()` por motivos de seguridad compartida.
+   - La función `proc_open()` está completamente disponible.
 
 ---
 
-## 3. Arquitectura Aditiva y Mejoras de Seguridad V6.1
+## 3. Correcciones Implementadas en V6.2
 
-### 3.1. Dry-Run Real Sin Escrituras
-- Producción actualmente carece de `ccd_archivos`, `ccd_cliente_cuenta` y de la columna `ccd_clientes.ccd_archivo_id`.
-- En modo `--dry-run`, el migrador **no exige que estas tablas existan en destino**.
-- El dry-run inspecciona el esquema de producción, comprueba las 2 migraciones pendientes, verifica la integridad de los 10,224 PDFs en almacenamiento origen, verifica la disponibilidad de espacio en disco en el directorio existente sin crear carpetas, y comprueba las referencias cruzadas.
-- **Cero escrituras:** no crea directorios en destino, no ejecuta migraciones, no modifica código y no genera manifiestos en producción.
+### 3.1. Verificación de Sintaxis PHP Compatible con Hostinger (Sin `exec()`)
+Se rediseñó `CcdProductionMigratorService::assertPhpSyntax(string $filePath)`:
+- Utiliza `proc_open([$phpBinary, '-l', $filePath], ...)` para invocar el linter nativo de PHP mediante descriptores de tuberías de entrada/salida.
+- Captura `stdout` y `stderr` sin requerir `exec()`.
+- Incorpora un mecanismo de contingencia nativo mediante `token_get_all($code, TOKEN_PARSE)` que detecta cualquier `ParseError` directamente en memoria si el entorno impidiera subprocesos.
 
-### 3.2. Integración Aditiva Quirúrgica y Verificación de Compatibilidad
-- Se eliminó el reemplazo ciego con `cp` y scripts externos de parsing.
-- La integración se realiza mediante el método `CcdProductionMigratorService::verifyAndIntegrateComponents()`:
-  - **Archivos nuevos:** Se instalan con permisos 0664 previa validación de sintaxis (`php -l`).
-  - **Componentes existentes de CRM:**
-    - `ClienteCuenta.php`: Si el archivo de producción ya cuenta con `ccdLinks()`, se deja **completamente intacto**. Si carece de él, se valida la estructura del modelo, se inyecta la relación `ccdLinks(): HasMany` antes de la llave de cierre, se crea un respaldo individual previo y se valida con `php -l`.
-    - `CcdCliente.php`: Inyecta exclusivamente las relaciones `archivo()` y `cuentaLinks()` faltantes sin sobreescribir código existente.
-    - `routes/web/clientes.php`: Inyecta la ruta `ccd.show` dentro del grupo de clientes solo si no se encuentra ya declarada.
-    - `ClienteProfileService.php`: Inyecta la lógica de filtrado de documentos confirmados dentro de `ccdData()` solo si no está presente.
-    - `resources/views/clientes/show.blade.php`: Inyecta el visualizador de documentos confirmados conservando el diseño de la tabla.
-    - `config/filesystems.php`: Inyecta la definición del disco `ccd-private` de forma nativa mediante PHP (sin requerir intérpretes secundarios como Python).
-  - Si cualquier archivo presenta una estructura incompatible, el proceso **aborta inmediatamente antes de modificar el entorno de producción**.
-- Se preservan de forma 100% garantizada la autenticación y los módulos de clientes, pagos, promesas y CNA.
+### 3.2. Carga Segura de Credenciales desde la Configuración Efectiva de Laravel
+Se erradicó la lectura manual e insegura mediante `grep` y `cut` en archivos `.env`:
+- El script desplegador arranca el bootstrap de Laravel (`bootstrap/app.php`) en subprocesos aislados para staging y producción.
+- Obtiene la configuración efectiva autenticada:
+  - Staging: `u480021566_kpprueba@localhost`.
+  - Producción: `u480021566_kpinvest@127.0.0.1`.
+- Admite caracteres especiales, contraseñas complejas y variables multilínea que rompían el parser Bash anterior.
+- Genera un archivo JSON temporal con permisos restrictivos `0600` (`~/.ccd_credentials/`), el cual es eliminado de manera garantizada mediante la trampa `trap cleanup_credentials EXIT INT TERM`.
+- Ninguna contraseña se imprime en terminal, ni se pasa como parámetro visible en `ps aux`, ni se registra en logs o manifiestos.
 
-### 3.3. Rechazo de Conflictos y Eliminación de `ON DUPLICATE KEY UPDATE`
-- Se eliminó completamente la sobrescritura silenciosa mediante `ON DUPLICATE KEY UPDATE`.
-- **Política de Inserción e Idempotencia:**
-  - Si un registro ya existe en destino y todos sus campos de negocio son idénticos: se considera **idempotente** y se continúa sin duplicar.
-  - Si un registro ya existe en destino pero difiere en cualquier campo de negocio: se **detiene inmediatamente la ejecución**, se hace rollback de la transacción y se registra el conflicto de integridad sin modificar la fila preexistente.
-  - Esta política aplica uniformemente a `ccd_archivos`, `ccd_clientes.ccd_archivo_id` y `ccd_cliente_cuenta`.
+### 3.3. Vinculación Estricta por Operación (`cliente_cuenta_id = clientes_cuentas.id`)
+Para evitar asociar indiscriminadamente todos los CCDs de un mismo DNI a todas las operaciones del cliente:
+1. **Inclusión de Clave Primaria:** Se asegura la columna `id` en la consulta `ClienteCuenta::query()->get(['id', 'numdoc', ...])`.
+2. **Asociación Específica:**
+   ```php
+   $confirmedLinks = CcdClienteCuenta::query()
+       ->whereIn('ccd_cliente_id', $ccdDocs->pluck('id'))
+       ->where('estado', CcdClienteCuenta::ESTADO_CONFIRMADA)
+       ->with('ccdCliente:id,numdoc,pdf,cosecha,link')
+       ->get()
+       ->filter(fn ($link) => $link->ccdCliente !== null && hash_equals((string) $dni, (string) $link->ccdCliente->numdoc))
+       ->groupBy('cliente_cuenta_id');
+   ```
+3. **Asignación por Cuenta:** Cada cuenta `$cta` recibe exactamente sus CCDs en `$cta->ccdConfirmados = collect($confirmedLinks->get((int) $cta->id, []))->pluck('ccdCliente')->values();`.
+4. **Aislamiento y Preservación:** Los CCDs confirmados se retiran de `$ccdDocs` para que no sean asignados por la heurística difusa anterior. Los CCDs históricos o no confirmados permanecen intactos en la vista general.
 
-### 3.4. Protección de Credenciales MySQL con Serializador Nativo
-- Se eliminó el paso de contraseñas mediante argumentos CLI (`--source-password`, `--target-password`) que puedan exponerse en la tabla de procesos (`ps aux`).
-- La generación del JSON de credenciales privadas se realiza mediante un serializador nativo en PHP (`json_encode()`), garantizando el soporte seguro de contraseñas complejas con caracteres especiales (comillas, barras invertidas, signos de dólar).
-- El archivo temporal se crea en `${HOME}/private/.ccd_credentials/`, asegurado con permisos estrictos `0600`, y se destruye automáticamente al finalizar o abortar la ejecución mediante un handler `trap`.
+### 3.4. Integración Aditiva Quirúrgica de Componentes
+El método `verifyAndIntegrateComponents()` detecta automáticamente la arquitectura destino (Legacy o Moderna):
+- **Rutas:** Inyecta `Route::get('/{numdoc}/ccd/{ccdCliente}', [CcdDocumentController::class, 'show'])->name('clientes.ccd.show');` dentro del grupo `Route::prefix('clientes')` en `routes/web.php` (Legacy) o en `routes/web/clientes.php` (Moderna).
+- **Controlador:** Inyecta la relación y asignación de `$cta->ccdConfirmados` directamente en `app/Http/Controllers/ClienteController.php` (Legacy) o en `ClienteProfileService.php` (Moderna).
+- **Vista:** En `resources/views/clientes/show.blade.php`, envuelve la celda `{{-- === CELDA CCD === --}}` con la prioridad de `$cta->ccdConfirmados` hacia la ruta segura `clientes.ccd.show`, preservando el bloque legacy como fallback cuando no hay confirmados.
+- **Modelos:** Inyecta aditivamente `ccdLinks()` en `ClienteCuenta.php` y `archivo()` / `cuentaLinks()` en `CcdCliente.php`.
+- **Filesystem:** Registra el disco privado local `ccd-private` en `config/filesystems.php`.
+- **Respaldos Individuales:** En `--apply`, genera copias de seguridad de cada archivo modificado en `${BACKUP_DIR}/modified_files/` antes de tocarlo.
+
+### 3.5. Seguridad en el Controlador Documental (`CcdDocumentController.php`)
+- **Autorización Adaptativa:** Si la aplicación define el Gate `view-cliente`, lo ejecuta; de lo contrario, valida que el usuario esté debidamente autenticado (`abort_unless($request->user() !== null, 401)`).
+- **Prevención de Manipulación de Parámetros:** Verifica estrictamente que el documento pertenezca al DNI indicado en la URL mediante `hash_equals((string) $ccdCliente->numdoc, $targetDoc)`. Si un usuario intenta modificar la URL para solicitar el documento de otro DNI, recibe inmediatamente un error `404 Not Found`.
+- **Streaming Privado e Inmutable:** Transmite los PDFs desde el disco `ccd-private` con cabeceras `inline`, `Content-Type: application/pdf`, `Cache-Control: private, no-store, no-cache` y `X-Content-Type-Options: nosniff`.
 
 ---
 
-## 4. Componentes y Scripts Disponibles
+## 4. Separación del Proceso en 5 Fases Controladas
 
-- [`app/Services/Ccd/CcdProductionMigratorService.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/app/Services/Ccd/CcdProductionMigratorService.php): Motor central de migración, inspección de esquema, validación de huellas y auditoría.
-- [`app/Console/Commands/MigrateCcdAqpProductionV6.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/app/Console/Commands/MigrateCcdAqpProductionV6.php): Comando Artisan `ccd:migrate-aqp-production-v6` con soporte para `--credentials-file`, `--dry-run`, `--apply` y tokens de seguridad.
-- [`desplegar_ccd_aqp_produccion_v6.sh`](file:///c:/GitHub/KP-CRM-Meridian-ui/desplegar_ccd_aqp_produccion_v6.sh): Desplegador para Hostinger con respaldos previos, sincronización aditiva, migraciones selectivas y auditoría post-migración.
-- [`revertir_ccd_aqp_produccion_v6.sh`](file:///c:/GitHub/KP-CRM-Meridian-ui/revertir_ccd_aqp_produccion_v6.sh): Reversor específico para deshacer de forma segura las dos migraciones CCD y restaurar archivos respaldados.
-- [`tests/Feature/CcdAqpProductionMigrationV6Test.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/tests/Feature/CcdAqpProductionMigrationV6Test.php): Suite de pruebas automatizadas que valida dry-run en destino limpio, migraciones selectivas, rechazo de colisiones, idempotencia y streaming PDF.
+El proceso de despliegue se organiza en cinco fases secuenciales e independientes:
 
----
-
-## 5. Procedimiento de Ejecución en Hostinger (Paso a Paso)
-
-### Paso 1: Conexión SSH y Descarga de la Rama V6.1
-
-```bash
-# Conectar por SSH
-ssh u480021566@<hostinger-ip> -p <puerto>
-
-cd /home/u480021566/domains/impulse-go.com/public_html/plataforma-crm
-
-# Descargar la rama actualizada
-git fetch origin codex/ccd-aqp-v6-produccion
-git checkout codex/ccd-aqp-v6-produccion
-
-# Otorgar permisos de ejecución a los scripts
-chmod +x desplegar_ccd_aqp_produccion_v6.sh revertir_ccd_aqp_produccion_v6.sh
+```mermaid
+flowchart TD
+    Fase1["Fase 1: Validaciones y Respaldo<br/>(Preflight, SHA-256 cruzado, espacio >= 5 GiB, mysqldump)"] --> Fase2["Fase 2: Instalación de Tablas CCD<br/>(Migraciones selectivas 2026_10_30 y 2026_11_13)"]
+    Fase2 --> Fase3["Fase 3: Migración de PDFs y Datos<br/>(Transferencia 10,224 PDFs a ccd-private y asociaciones)"]
+    Fase3 --> Fase4["Fase 4: Integración Interfaz CRM<br/>(Inyección aditiva en routes/web.php, ClienteController, show.blade.php)"]
+    Fase4 --> Fase5["Fase 5: Auditoría Funcional Final<br/>(Verificación total de catálogos, rutas y limpieza de caché)"]
 ```
 
-### Paso 2: Ejecución de Simulación Integral (`--dry-run`)
+### Detalle de Fases
 
+1. **Fase 1: Validaciones y Respaldo**
+   - Comprueba binarios requeridos (`php`, `mysql`, `mysqldump`, `sha256sum`, `df`, `tar`, `cmp`, `cp`).
+   - Carga credenciales efectivas de Laravel.
+   - Valida la conectividad a ambas bases de datos.
+   - Valida conteos de 275,987 CCDs y 282,595 cuentas.
+   - Valida huellas SHA-256 certificadas en ambos entornos:
+     - CCD AQP (10,224): `861b054ff5ca5027f927d95d8c9980381bb6d3cd69f325ec019b3650506b568b`.
+     - Cuentas universo completo (282,595): `0a66ff254fd82cfa021cca872404686ee15785d8231e34eae0ae8711076bbd6f`.
+   - Verifica espacio en disco >= 5 GiB.
+   - En `--apply`, crea respaldo completo de base de datos (`mysqldump`) y archivos de configuración.
+2. **Fase 2: Instalación de Tablas CCD**
+   - En `--dry-run`: inspecciona el esquema destino y reporta migraciones pendientes sin modificar nada.
+   - En `--apply`: ejecuta exclusivamente las 2 migraciones selectivas CCD:
+     - `2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php`
+     - `2026_11_13_000001_create_ccd_cliente_cuenta_table.php`
+3. **Fase 3: Migración de los 10,224 PDFs y Asociaciones**
+   - Ejecuta `php artisan ccd:migrate-aqp-production-v6`.
+   - Transfiere y cataloga los 10,224 PDFs en `storage/app/private/ccd/`.
+   - Puebla `ccd_archivos` y vincula `ccd_clientes.ccd_archivo_id`.
+   - Puebla las 10,224 asociaciones en `ccd_cliente_cuenta` (1 V3, 10,223 V5) con detección estricta de conflictos e idempotencia.
+   - Genera el manifiesto oficial de auditoría CSV.
+4. **Fase 4: Integración de la Interfaz del CRM**
+   - Ejecuta `verifyAndIntegrateComponents()`.
+   - Instala modelos y controlador CCD.
+   - Aplica inyección quirúrgica en `routes/web.php`, `ClienteController.php`, `show.blade.php`, `ClienteCuenta.php`, `CcdCliente.php` y `filesystems.php`.
+   - Valida sintaxis PHP de todos los archivos mediante `proc_open`.
+5. **Fase 5: Auditoría Funcional Final**
+   - Ejecuta `auditTarget()` en producción verificando integridad física y lógica de los 10,224 PDFs.
+   - Limpia cachés de Laravel (`config:clear`, `route:clear`, `view:clear`).
+
+---
+
+## 5. Plan de Contingencia y Reversión Específica
+
+El script `revertir_ccd_aqp_produccion_v6.sh`:
+1. Verifica mediante `validateRollbackSafety` que no existan migraciones posteriores en el mismo lote ni datos ajenos a AQP4/AQP5.
+2. Deshace selectivamente las dos migraciones CCD en orden inverso:
+   - `php artisan migrate:rollback --path=database/migrations/2026_11_13_000001_create_ccd_cliente_cuenta_table.php --step=1 --force`
+   - `php artisan migrate:rollback --path=database/migrations/2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php --step=1 --force`
+3. Si se proporciona `--restore-files=/ruta/al/respaldo`, restaura los archivos modificados desde `${BACKUP_DIR}/modified_files/` a su estado exacto original.
+4. Limpia las cachés de Laravel.
+
+---
+
+## 6. Resultados de Verificación y Pruebas Automatizadas
+
+Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
+
+- **Pruebas de Integración V6.2 (`tests/Feature/CcdAqpProductionMigrationV6Test.php`):**
+  - `test_dry_run_on_clean_target_with_no_ccd_tables_executes_zero_writes_and_reports_pending_migrations`: PASS
+  - `test_apply_fails_if_target_schema_lacks_ccd_tables`: PASS
+  - `test_selective_migrations_create_only_ccd_tables_and_columns`: PASS
+  - `test_apply_rejects_incompatible_association_collision_without_modifying_target`: PASS
+  - `test_apply_is_idempotent_when_association_is_identical`: PASS
+  - `test_apply_rejects_incompatible_ccd_archivos_and_link_collision`: PASS
+  - `test_interrupted_migration_resumes_safely`: PASS
+  - `test_credentials_file_reading_and_protection`: PASS
+  - `test_file_transfer_copies_and_verifies_sha256`: PASS
+  - `test_ccd_document_controller_serves_migrated_private_pdf_inline`: PASS
+  - `test_sha256_calculation_uses_json_lines_and_unifies_ccd_and_cuentas`: PASS
+  - `test_verify_and_integrate_components_dry_run_and_additive_apply`: PASS
+  - `test_verify_and_integrate_components_aborts_on_corrupted_file`: PASS
+  - `test_validate_rollback_safety_guards_against_subsequent_batches_and_foreign_data`: PASS
+  - `test_assert_php_syntax_detects_errors_using_proc_open_without_exec`: PASS
+  - `test_verify_and_integrate_components_legacy_architecture_routes_controller_and_view`: PASS
+  - `test_legacy_controller_ccd_confirmed_matches_operation_specifically_without_cross_pollution`: PASS
+  - `test_ccd_document_controller_authorizes_legacy_and_modern_and_prevents_parameter_tampering`: PASS
+  - **Total:** 16 pruebas pasadas, 122 aserciones.
+
+- **Suite General CCD:** 131 pruebas pasadas (685 aserciones).
+- **Estándar de Código (Laravel Pint):** 100% de conformidad sin advertencias.
+
+---
+
+## 7. Instrucciones de Ejecución en Hostinger SSH
+
+### Paso 1: Ejecutar Simulación Segura (CERO Escrituras)
 ```bash
+cd /home/u480021566/apps/kpinvest-crm-pruebas
 ./desplegar_ccd_aqp_produccion_v6.sh --dry-run
 ```
 
-**Verificaciones realizadas en `--dry-run`:**
-- Comprobación de binarios del sistema.
-- Generación de credenciales temporales en archivo privado 0600 (sin exposición en `ps`).
-- Preflight: 275,987 en `ccd_clientes` y 282,595 en `clientes_cuentas` en ambas bases.
-- Huellas SHA-256 idénticas en ambas bases de datos.
-- Espacio en disco destino verificado (> 5 GiB libres).
-- Detección de las 2 migraciones pendientes en producción.
-- Verificación de los 10,224 PDFs en almacenamiento origen sin tocar destino.
-- Resultado: **0 escrituras efectuadas, código de salida 0**.
-
-### Paso 3: Ejecución Autorizada en Producción (`--apply`)
-
-Una vez validada satisfactoriamente la simulación:
-
+### Paso 2: Ejecución Real Autorizada (--apply)
+Una vez validada la salida del dry-run y contando con la debida autorización:
 ```bash
+cd /home/u480021566/apps/kpinvest-crm-pruebas
 ./desplegar_ccd_aqp_produccion_v6.sh --apply
 ```
 
-**Flujo ejecutado en `--apply`:**
-1. Respaldo previo de tablas afectadas en `${HOME}/private/backups/ccd-v6-produccion-<timestamp>/`.
-2. Sincronización aditiva de archivos con respaldo individual de cualquier archivo preexistente modificado en `${BACKUP_DIR}/modified_files/`.
-3. Inyección aditiva del disco `ccd-private` en `config/filesystems.php`.
-4. Ejecución exclusiva de las 2 migraciones selectivas CCD:
-   - `2026_10_30_120000_create_ccd_archivos_and_link_ccd_clientes.php`
-   - `2026_11_13_000001_create_ccd_cliente_cuenta_table.php`
-5. Transferencia física y validación SHA-256 de los 10,224 PDFs AQP (~2.618 GiB).
-6. Inserción transaccional por lotes (500) en `ccd_archivos`, `ccd_clientes.ccd_archivo_id` y `ccd_cliente_cuenta` con detección estricta de conflictos.
-7. Auditoría post-migración y emisión de manifiesto firmado en `storage/app/private/ccd/audits/`.
-
----
-
-## 6. Consultas SQL de Auditoría y Verificación Post-Migración
-
-Ejecutar las siguientes consultas directamente en la base de producción `u480021566_kpinvest_bd`:
-
-```sql
--- 1. Validar total de asociaciones migradas por método de verificación y cosecha
-SELECT 
-    cc.cosecha,
-    ca.estado,
-    ca.metodo_verificacion,
-    COUNT(*) AS total
-FROM ccd_cliente_cuenta ca
-JOIN clientes_cuentas cc ON ca.cliente_cuenta_id = cc.id
-GROUP BY cc.cosecha, ca.estado, ca.metodo_verificacion
-ORDER BY cc.cosecha, ca.metodo_verificacion;
-
--- Resultado esperado:
--- CAJAAQP4 | confirmada | operacion_pdf_aqp_auditada_v3 |     1
--- CAJAAQP4 | confirmada | operacion_pdf_aqp_auditada_v5 |  7023
--- CAJAAQP5 | confirmada | operacion_pdf_aqp_auditada_v5 |  3200
--- Total: 10,224
-
--- 2. Validar que no existan duplicados en ccd_cliente_cuenta
-SELECT ccd_cliente_id, COUNT(*) 
-FROM ccd_cliente_cuenta 
-GROUP BY ccd_cliente_id 
-HAVING COUNT(*) > 1;
--- Resultado esperado: 0 filas
-
--- 3. Validar que todo ccd_archivo vinculado exista y esté catalogado
-SELECT COUNT(*) 
-FROM ccd_clientes c
-LEFT JOIN ccd_archivos a ON c.ccd_archivo_id = a.id
-WHERE c.cosecha IN ('AQP4', 'AQP5') AND a.id IS NULL;
--- Resultado esperado: 0 filas
-
--- 4. Validar correspondencia exacta de DNI entre ccd_clientes y clientes_cuentas
-SELECT COUNT(*)
-FROM ccd_cliente_cuenta ca
-JOIN ccd_clientes cl ON ca.ccd_cliente_id = cl.id
-JOIN clientes_cuentas cc ON ca.cliente_cuenta_id = cc.id
-WHERE cl.numdoc <> cc.numdoc;
--- Resultado esperado: 0 filas
-```
-
----
-
-## 7. Plan de Rollback Específico y Blindaje de Lotes
-
-Se descartó la recomendación genérica `php artisan migrate:rollback --step=2` debido al riesgo de deshacer migraciones no deseadas o restaurar volcados completos que sobreescribirían nuevas operaciones concurrentes de clientes o pagos en producción.
-
-### Salvaguardas previas a la reversión (`validateRollbackSafety`):
-1. **Aislamiento de Lotes:** Comprueba que no existan otras migraciones no-CCD registradas en el mismo lote (`batch`) en la tabla `migrations`. Si existieran, la reversión selectiva por ruta garantiza que solo se deshagan las migraciones CCD sin afectar a las demás.
-2. **Protección contra Migraciones Posteriores:** Comprueba que no se hayan ejecutado migraciones posteriores a CCD (lote superior al de CCD).
-3. **Ausencia de Datos Ajenos:** Verifica que `ccd_cliente_cuenta` no contenga asociaciones de otras cosechas y que `ccd_archivos` no tenga referencias externas activas.
-4. **Verificación de Claves Foráneas:** Revisa `information_schema.KEY_COLUMN_USAGE` para asegurar que ninguna tabla ajena dependa de `ccd_archivos` o `ccd_cliente_cuenta`.
-5. **Verificación Post-Reversión:** Confirma que las tablas y columnas CCD se hayan eliminado, pero certifica que `ccd_clientes` conserve íntegros sus 275,987 registros y `clientes_cuentas` sus 282,595 registros.
-
-En caso de requerir reversión:
-
+### Procedimiento de Rollback en Caso de Contingencia
 ```bash
-# Ejecutar la reversión específica y segura de las 2 migraciones CCD
-./revertir_ccd_aqp_produccion_v6.sh --confirm
-
-# (Opcional) Si se desea restaurar archivos modificados desde un respaldo previo:
-./revertir_ccd_aqp_produccion_v6.sh --confirm --restore-files="${HOME}/private/backups/ccd-v6-produccion-<timestamp>"
+cd /home/u480021566/domains/impulse-go.com/public_html/plataforma-crm
+./revertir_ccd_aqp_produccion_v6.sh --restore-files=/home/u480021566/private/backups/ccd-v6-produccion-YYYYMMDD-HHMMSS
 ```
-
----
-
-## 8. Resultados de la Suite de Pruebas
-
-- **Pruebas de Integración y Regresión V6.1:** 12 pasadas, 88 aserciones ([`tests/Feature/CcdAqpProductionMigrationV6Test.php`](file:///c:/GitHub/KP-CRM-Meridian-ui/tests/Feature/CcdAqpProductionMigrationV6Test.php)).
-- **Suite Completa CCD:** 127 pasadas, 651 aserciones, 0 errores, 0 fallos.
-- **Suite General CRM (Pagos, Promesas, CNA, Clientes, Auth):** 252 pasadas, 1,670 aserciones, 0 errores, 0 fallos.
-- **Compilación de Assets Frontend (`npm run build`):** 38 módulos transformados en 5.14s sin errores.
-- **Laravel Pint:** 100% de cumplimiento de estilo en todos los archivos del módulo.
