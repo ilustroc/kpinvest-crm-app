@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\CcdDocumentController;
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
 use App\Models\CcdClienteCuenta;
@@ -988,6 +989,105 @@ BLADE;
         $this->actingAs($blockedUser);
         $responseBlocked = $this->get("/clientes/{$dniReal}/ccd/{$ccdCliente->id}");
         $responseBlocked->assertStatus(403);
+    }
+
+    public function test_ccd_document_controller_legacy_production_with_no_roles_class_and_no_view_cliente_gate(): void
+    {
+        $dniReal = '41223344';
+        $dniAjeno = '99887766';
+
+        $archivo = CcdArchivo::create([
+            'disk' => 'ccd-private',
+            'path' => CcdArchivo::pathForHash('abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'),
+            'sha256' => 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+            'size_bytes' => 2048,
+            'mime_type' => 'application/pdf',
+            'nombre_original' => 'contrato_aqp4.pdf',
+            'verified_at' => now(),
+        ]);
+
+        $ccdCliente = CcdCliente::create([
+            'numdoc' => $dniReal,
+            'pdf' => 'contrato_aqp4.pdf',
+            'cosecha' => 'AQP4',
+            'ccd_archivo_id' => $archivo->id,
+        ]);
+
+        Storage::fake('ccd-private');
+        config(['ccd.private_disk' => 'ccd-private']);
+        Storage::disk('ccd-private')->put($archivo->path, '%PDF-1.4 Legacy PDF Content');
+
+        // Simular exactamente el entorno de producción Hostinger: ROLES_CLASS=NO y GATE_VIEW_CLIENTE=NO
+        CcdDocumentController::$simulateRolesClassMissing = true;
+        CcdDocumentController::$simulateGateMissing = true;
+
+        try {
+            // 1. Roles legítimos autorizados en producción legacy: asesor, supervisor, administrador, soporte
+            foreach (['asesor', 'supervisor', 'administrador', 'soporte'] as $role) {
+                $user = User::factory()->create([
+                    'role' => $role,
+                    'active' => true,
+                ]);
+
+                $this->actingAs($user);
+                $response = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+                $response->assertStatus(200);
+                $response->assertHeader('Content-Disposition', 'inline; filename=contrato_aqp4.pdf');
+            }
+
+            // 2. Rol no autorizado en producción legacy: usuario común o rol arbitrario -> 403
+            $unauthorizedUser = User::factory()->create(['role' => 'asesor', 'active' => true]);
+            $unauthorizedUser->role = 'usuario_no_autorizado';
+            $this->actingAs($unauthorizedUser);
+            $responseUnauthorized = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+            $responseUnauthorized->assertStatus(403);
+
+            // 3. Usuario inactivo en producción legacy -> Debe ser rechazado (302 o 403)
+            $inactiveUser = User::factory()->create(['role' => 'asesor', 'active' => false]);
+            $this->actingAs($inactiveUser);
+            $responseInactive = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+            $this->assertTrue(in_array($responseInactive->getStatusCode(), [302, 403], true));
+
+            // 4. Usuario no autenticado (invitado) -> Debe ser rechazado (302 o 401)
+            auth()->logout();
+            $responseGuest = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+            $this->assertTrue(in_array($responseGuest->getStatusCode(), [302, 401], true));
+
+            // 5. Intento de manipulación de DNI en URL contra DNI del CCD -> 404
+            $asesor = User::factory()->create(['role' => 'asesor', 'active' => true]);
+            $this->actingAs($asesor);
+            $responseTampered = $this->get("/clientes/{$dniAjeno}/ccd/{$ccdCliente->id}");
+            $responseTampered->assertStatus(404);
+
+            // 6. Asesor con bloqueo específico en cliente_bloqueos -> Debe recibir 403
+            if (! \Illuminate\Support\Facades\Schema::hasTable('cliente_bloqueos')) {
+                \Illuminate\Support\Facades\Schema::create('cliente_bloqueos', function ($table) {
+                    $table->id();
+                    $table->unsignedBigInteger('user_id');
+                    $table->string('numdoc');
+                });
+            }
+            \Illuminate\Support\Facades\DB::table('cliente_bloqueos')->insert([
+                'user_id' => $asesor->id,
+                'numdoc' => $dniReal,
+            ]);
+            $responseBlocked = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+            $responseBlocked->assertStatus(403);
+
+            // 7. Administrador con registro en cliente_bloqueos -> Bypassa el bloqueo y recibe 200
+            $admin = User::factory()->create(['role' => 'administrador', 'active' => true]);
+            \Illuminate\Support\Facades\DB::table('cliente_bloqueos')->insert([
+                'user_id' => $admin->id,
+                'numdoc' => $dniReal,
+            ]);
+            $this->actingAs($admin);
+            $responseAdmin = $this->get(route('clientes.ccd.show', ['numdoc' => $dniReal, 'ccdCliente' => $ccdCliente->id]));
+            $responseAdmin->assertStatus(200);
+
+        } finally {
+            CcdDocumentController::$simulateRolesClassMissing = false;
+            CcdDocumentController::$simulateGateMissing = false;
+        }
     }
 
     public function test_inspect_target_schema_unifies_column_keys_and_detects_discrepancies(): void

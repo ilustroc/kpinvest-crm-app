@@ -130,6 +130,29 @@ El método `verifyAndIntegrateComponents()` detecta automáticamente la arquitec
    - **Permisos Equivalentes a `clientes.show`:** Valida la autorización mediante el Gate `view-cliente` o el conjunto de roles autorizados (`Roles::FINAL_ROLES`), rechazando cualquier acceso si no se cumplen las condiciones (`403`), erradicando fallbacks que reduzcan la seguridad existente.
    - **Bloqueo Específico y DNI:** Integra la verificación de bloqueo (`cliente_bloqueos` -> `403`) y mantiene la concordancia estricta de DNI en URL contra el registro del documento (`404` ante discrepancias).
 
+### 3.8. Adaptación de Autorización para Arquitectura LEGACY en Producción Real (`ROLES_CLASS=NO`, `GATE_VIEW_CLIENTE=NO`)
+
+1. **Diagnóstico en Entorno Real de Hostinger:**
+   - Durante el DRY-RUN en Hostinger, se validaron exitosamente 10,224 PDFs, 10,224 asociaciones y 21 lotes con 0 escrituras.
+   - Sin embargo, las verificaciones del entorno detectaron que en producción:
+     - `ROLES_CLASS=NO` (la clase `App\Support\Authorization\Roles` no existe en la arquitectura legacy).
+     - `GATE_VIEW_CLIENTE=NO` (el Gate `'view-cliente'` no está registrado en el `AuthServiceProvider` de producción).
+   - En consecuencia, la implementación inicial devolvía `403 Forbidden` a todos los usuarios legítimos (asesores, supervisores y administradores), bloqueando la visualización de los CCD.
+
+2. **Resolución Autofinanciada y Robusta en `CcdDocumentController.php`:**
+   - **Eliminación de Acoplamiento Fuerte:** Se eliminó la importación estática de `use App\Support\Authorization\Roles;`, permitiendo que el archivo compile y opere sin dependencias inexistentes en producción legacy.
+   - **Definición Canónica de Roles Autorizados:** Se formalizó la constante `CcdDocumentController::AUTHORIZED_ROLES = ['administrador', 'admin', 'supervisor', 'asesor', 'soporte']`, reflejando exactamente el conjunto de roles autorizados para acceder a las fichas de clientes en `ClienteController::show`.
+   - **Resolución Condicional sin Reducción de Seguridad:**
+     - Si el Gate `'view-cliente'` existe, se ejecuta (`Gate::forUser($user)->authorize('view-cliente')`).
+     - Si la clase `App\Support\Authorization\Roles` existe, normaliza y valida contra `Roles::FINAL_ROLES`.
+     - Si ambos están ausentes (caso exacto de Producción Legacy en Hostinger), valida que `$user->role` pertenezca a `AUTHORIZED_ROLES` o que el usuario posea privilegios administrativos (`isAdmin`). En caso contrario, aborta con `403`.
+   - **Controles de Seguridad Inalterados:**
+     - Control de autenticación (`401` si no hay sesión).
+     - Control de usuario activo (`403` si `active === false` o `activo === false`).
+     - Verificación estricta de DNI en URL contra el registro documental (`hash_equals` -> `404`).
+     - Control de bloqueo de clientes (`cliente_bloqueos` -> `403`), con bypass autorizado únicamente para administradores.
+   - **Flags de Simulación y Pruebas Automatizadas:** Se introdujeron `$simulateRolesClassMissing` y `$simulateGateMissing` junto con una prueba de regresión exhaustiva (`test_ccd_document_controller_legacy_production_with_no_roles_class_and_no_view_cliente_gate`), cubriendo accesos legítimos de cada rol, rechazo de roles inválidos, usuarios inactivos, invitados, manipulación de URL y bloqueos.
+
 ---
 
 ## 4. Separación del Proceso en 5 Fases Controladas
@@ -217,6 +240,7 @@ Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
   - `test_verify_and_integrate_components_legacy_architecture_routes_controller_and_view`: PASS
   - `test_legacy_controller_ccd_confirmed_matches_operation_specifically_without_cross_pollution`: PASS
   - `test_ccd_document_controller_authorizes_legacy_and_modern_and_prevents_parameter_tampering`: PASS
+  - `test_ccd_document_controller_legacy_production_with_no_roles_class_and_no_view_cliente_gate`: PASS
   - `test_inspect_target_schema_unifies_column_keys_and_detects_discrepancies`: PASS
   - `test_install_migration_files_copies_and_validates_syntax_before_migration`: PASS
   - `test_audit_target_contract_and_anomaly_abort`: PASS
@@ -227,9 +251,9 @@ Se ejecutó la suite completa de pruebas obteniendo 100% de éxito:
   - `test_migrate_renews_connections_and_executes_batch_validation_end_to_end`: PASS
   - `test_audit_target_materializes_rows_closes_cursor_and_renews_connections_exceeding_timeout_for_manifest`: PASS
   - `test_interrupted_migration_between_phases_recovers_completely`: PASS
-  - **Total:** 26 pruebas pasadas, 270 aserciones.
+  - **Total:** 27 pruebas pasadas, 288 aserciones (2 anotaciones deprecated inherentes a PHP 8.5 en el entorno de pruebas).
 
-- **Suite General CCD:** 141 pruebas pasadas (833 aserciones).
+- **Suite General CCD:** 142 pruebas pasadas (851 aserciones).
 - **Estándar de Código (Laravel Pint):** 100% de conformidad sin advertencias.
 - **Validación de Sintaxis Bash (`bash -n`):** 100% de conformidad sin errores.
 

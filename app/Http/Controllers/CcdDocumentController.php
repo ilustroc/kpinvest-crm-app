@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\CcdArchivo;
 use App\Models\CcdCliente;
-use App\Support\Authorization\Roles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -13,6 +12,25 @@ use Illuminate\Support\Facades\Storage;
 
 class CcdDocumentController extends Controller
 {
+    /**
+     * Roles autorizados para consultar información de clientes en KP INVEST CRM.
+     * Compatible con arquitectura LEGACY de producción donde Roles::class no existe.
+     */
+    public const AUTHORIZED_ROLES = [
+        'administrador',
+        'admin',
+        'supervisor',
+        'asesor',
+        'soporte',
+    ];
+
+    /**
+     * Flags de simulación para pruebas automatizadas en entornos mixtos (Legacy vs Modern).
+     */
+    public static bool $simulateRolesClassMissing = false;
+
+    public static bool $simulateGateMissing = false;
+
     public function show(Request $request, string $numdoc, CcdCliente $ccdCliente)
     {
         $user = $request->user();
@@ -23,25 +41,44 @@ class CcdDocumentController extends Controller
             abort(403, 'Tu cuenta ha sido desactivada.');
         }
 
-        // 2. Control de permisos equivalente a clientes.show (sin fallbacks que reduzcan permisos)
-        if (Gate::has('view-cliente')) {
+        // 2. Control de permisos equivalente a clientes.show (compatible con Producción Legacy y Modern)
+        $hasGate = ! self::$simulateGateMissing && Gate::has('view-cliente');
+        $hasRolesClass = ! self::$simulateRolesClassMissing && class_exists('App\Support\Authorization\Roles');
+
+        $isAuthorized = false;
+
+        if ($hasGate) {
             Gate::forUser($user)->authorize('view-cliente');
-        } elseif (class_exists(Roles::class) && isset($user->role)) {
-            abort_unless(
-                in_array(Roles::normalize($user->role), Roles::FINAL_ROLES, true),
-                403,
-                'No autorizado para consultar información de clientes.'
-            );
+            $isAuthorized = true;
+        } elseif ($hasRolesClass) {
+            /** @var class-string $rolesClass */
+            $rolesClass = 'App\Support\Authorization\Roles';
+            $role = $rolesClass::normalize($user->role ?? '');
+            $isAuthorized = in_array($role, $rolesClass::FINAL_ROLES, true);
         } else {
-            abort(403, 'No autorizado para consultar información de clientes.');
+            // Producción LEGACY (ROLES_CLASS=NO y GATE_VIEW_CLIENTE=NO):
+            // Reutiliza exactamente los roles legítimos de clientes.show
+            $role = strtolower(trim((string) ($user->role ?? '')));
+            $isAdmin = in_array($role, ['administrador', 'admin'], true)
+                || (! empty($user->is_admin))
+                || (! empty($user->es_admin));
+
+            $isAuthorized = in_array($role, self::AUTHORIZED_ROLES, true) || $isAdmin;
         }
+
+        abort_unless($isAuthorized, 403, 'No autorizado para consultar información de clientes.');
 
         // 3. Verificación estricta de DNI en URL contra DNI del registro documental
         $targetDoc = (string) ($request->route('numdoc') ?? $request->route('dni') ?? $numdoc);
         abort_unless(hash_equals((string) $ccdCliente->numdoc, $targetDoc), 404);
 
         // 4. Control de bloqueo de cliente (mismo criterio que BlockClienteAccess)
-        if ($user && (! isset($user->role) || $user->role !== 'administrador') && Schema::hasTable('cliente_bloqueos')) {
+        $userRole = strtolower(trim((string) ($user->role ?? '')));
+        $isAdminRole = in_array($userRole, ['administrador', 'admin'], true)
+            || (! empty($user->is_admin))
+            || (! empty($user->es_admin));
+
+        if ($user && ! $isAdminRole && Schema::hasTable('cliente_bloqueos')) {
             $col = Schema::hasColumn('cliente_bloqueos', 'numdoc') ? 'numdoc' : 'dni';
             $blocked = DB::table('cliente_bloqueos')
                 ->where('user_id', $user->id)
