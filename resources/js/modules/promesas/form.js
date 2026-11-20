@@ -2,6 +2,15 @@ import { $, $$ } from '../../core/dom';
 import { formatMoney } from '../../core/money';
 import { notify } from '../../core/toast';
 
+function getTodayLimaString() {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Lima',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+}
+
 function numberValue(value) {
     const parsed = parseFloat(String(value ?? '').replace(/[^\d,.-]/g, '').replaceAll(',', ''));
 
@@ -64,6 +73,40 @@ export function setupPromesaForm(root) {
     const proposalButton = $('#btnPropuesta', root);
     const selectionCount = $('#selCount', root);
     const operationsHidden = $('#opsHidden', root);
+    const phoneInput = $('#telefonoPropuesta', root);
+    const cancelDateInput = $('#fechaPagoCancel', root);
+    const todayLima = getTodayLimaString();
+
+    if (phoneInput) {
+        phoneInput.setAttribute('maxlength', '9');
+        phoneInput.setAttribute('minlength', '9');
+        phoneInput.setAttribute('pattern', '^9[0-9]{8}$');
+        phoneInput.setAttribute('inputmode', 'numeric');
+        phoneInput.setAttribute('title', 'El teléfono debe tener exactamente 9 dígitos y comenzar con 9');
+        phoneInput.addEventListener('input', () => {
+            phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 9);
+        });
+    }
+
+    if (startDate) {
+        startDate.setAttribute('min', todayLima);
+        startDate.addEventListener('change', () => {
+            if (startDate.value && startDate.value < getTodayLimaString()) {
+                notify('La fecha inicial no puede ser anterior a la fecha actual.', 'warning');
+                startDate.value = getTodayLimaString();
+            }
+        });
+    }
+
+    if (cancelDateInput) {
+        cancelDateInput.setAttribute('min', todayLima);
+        cancelDateInput.addEventListener('change', () => {
+            if (cancelDateInput.value && cancelDateInput.value < getTodayLimaString()) {
+                notify('La fecha límite de pago no puede ser anterior a la fecha actual.', 'warning');
+                cancelDateInput.value = getTodayLimaString();
+            }
+        });
+    }
 
     const selectedOperations = () => operationChecks
         .filter((input) => input.checked && !input.disabled)
@@ -198,6 +241,7 @@ export function setupPromesaForm(root) {
 
         const rows = Math.max(1, parseInt(count || '1', 10));
         const previous = preserve ? rowStates() : [];
+        const currentToday = getTodayLimaString();
 
         tableBody.innerHTML = '';
 
@@ -208,7 +252,7 @@ export function setupPromesaForm(root) {
             row.innerHTML = `
                 <td class="whitespace-nowrap border-t border-kp-border px-3 py-2 text-center text-[12px] font-medium tabular-nums text-slate-500">${String(index).padStart(2, '0')}</td>
                 <td class="whitespace-nowrap border-t border-kp-border px-3 py-2">
-                    <input type="date" class="cr-fecha h-8 w-full min-w-[150px] rounded-md border border-kp-border bg-white px-2.5 text-[12px] text-kp-ink shadow-[0_1px_1px_rgba(16,24,40,0.02)] transition hover:border-slate-300 kp-focus">
+                    <input type="date" min="${currentToday}" class="cr-fecha h-8 w-full min-w-[150px] rounded-md border border-kp-border bg-white px-2.5 text-[12px] text-kp-ink shadow-[0_1px_1px_rgba(16,24,40,0.02)] transition hover:border-slate-300 kp-focus">
                 </td>
                 <td class="whitespace-nowrap border-t border-kp-border px-3 py-2">
                     <div class="relative min-w-[110px]">
@@ -269,6 +313,12 @@ export function setupPromesaForm(root) {
     function generateSchedule() {
         if (!tableBody) return;
 
+        const currentToday = getTodayLimaString();
+        if (startDate?.value && startDate.value < currentToday) {
+            notify('La fecha inicial no puede ser anterior a la fecha actual.', 'warning');
+            startDate.value = currentToday;
+        }
+
         const rowsCount = Math.max(1, parseInt(quotaCount?.value || '1', 10));
 
         renderRows(rowsCount, true);
@@ -283,7 +333,12 @@ export function setupPromesaForm(root) {
             const amount = row.querySelector('.cr-monto');
 
             if (start && date) {
-                date.valueAsDate = addMonthsNoOverflow(start, index);
+                const targetDate = addMonthsNoOverflow(start, index);
+                const ty = targetDate.getFullYear();
+                const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const td = String(targetDate.getDate()).padStart(2, '0');
+                const dateStr = `${ty}-${tm}-${td}`;
+                date.value = dateStr < currentToday ? currentToday : dateStr;
             }
 
             if (amount) {
@@ -332,25 +387,71 @@ export function setupPromesaForm(root) {
     typeSelect?.addEventListener('change', applyTypeUi);
     generate?.addEventListener('click', generateSchedule);
     quotaCount?.addEventListener('change', () => renderRows(quotaCount.value, true));
+    table?.addEventListener('change', (event) => {
+        if (event.target.matches('.cr-fecha')) {
+            const currentToday = getTodayLimaString();
+            if (event.target.value && event.target.value < currentToday) {
+                notify('Las fechas del cronograma no pueden ser anteriores a la fecha actual.', 'warning');
+                event.target.value = currentToday;
+                recalc();
+            }
+        }
+    });
     table?.addEventListener('input', (event) => {
         if (event.target.matches('.cr-monto, .cr-fecha')) recalc();
     });
     total?.addEventListener('input', recalc);
     form?.addEventListener('submit', (event) => {
+        const currentToday = getTodayLimaString();
         const type = String(typeSelect?.value || '').toLowerCase();
         const convention = type === 'convenio' || type === 'convenio_balon';
 
-        if (balloonInput) {
-            const rows = tableBody?.querySelectorAll('tr').length || 0;
-            balloonInput.value = type === 'convenio_balon' && rows ? String(rows) : '';
+        // 1. Validación estricta de teléfono: ^9[0-9]{8}$
+        const phone = phoneInput?.value?.trim() || '';
+        if (!/^9[0-9]{8}$/.test(phone)) {
+            event.preventDefault();
+            event.stopPropagation();
+            notify('El teléfono debe tener exactamente 9 dígitos y comenzar con 9.', 'warning');
+            phoneInput?.focus();
+            return;
         }
 
-        if (!convention) return;
+        // 2. Validación de fechas para cancelación
+        if (!convention) {
+            const cancelDate = cancelDateInput?.value;
+            if (cancelDate && cancelDate < currentToday) {
+                event.preventDefault();
+                event.stopPropagation();
+                notify('La fecha límite de pago no puede ser anterior a la fecha actual.', 'warning');
+                cancelDateInput?.focus();
+                return;
+            }
+            return;
+        }
+
+        // 3. Validación de fechas para convenios (todas las cuotas, incluida cuota balón)
+        const rows = tableBody ? Array.from(tableBody.querySelectorAll('tr')) : [];
+        const pastDateRow = rows.find((row) => {
+            const d = row.querySelector('.cr-fecha')?.value;
+            return d && d < currentToday;
+        });
+
+        if (pastDateRow) {
+            event.preventDefault();
+            event.stopPropagation();
+            notify('Las fechas del cronograma no pueden ser anteriores a la fecha actual.', 'warning');
+            pastDateRow.querySelector('.cr-fecha')?.focus();
+            return;
+        }
+
+        if (balloonInput) {
+            const rowCount = rows.length || 0;
+            balloonInput.value = type === 'convenio_balon' && rowCount ? String(rowCount) : '';
+        }
 
         recalc();
 
         const conventionTotal = numberValue(total?.value);
-        const rows = tableBody ? Array.from(tableBody.querySelectorAll('tr')) : [];
         const sum = rows.reduce((carry, row) => carry + numberValue(row.querySelector('.cr-monto')?.value), 0);
 
         if (Math.abs(sum - conventionTotal) > 0.01) {

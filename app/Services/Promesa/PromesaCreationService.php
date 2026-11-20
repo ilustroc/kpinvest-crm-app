@@ -14,9 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class PromesaCreationService
 {
-    public function __construct(private readonly PromesaScheduleService $schedule)
-    {
-    }
+    public function __construct(private readonly PromesaScheduleService $schedule) {}
 
     /**
      * Crea la promesa y retorna [PromesaPago $promesa, string $mensaje].
@@ -38,7 +36,7 @@ class PromesaCreationService
             ->all();
 
         $missing = array_diff($operations, $accountRows);
-        if (!empty($missing)) {
+        if (! empty($missing)) {
             throw new \DomainException('Las operaciones seleccionadas no corresponden al cliente.');
         }
 
@@ -107,10 +105,10 @@ class PromesaCreationService
     private function conventionData(StorePromesaRequest $request, array $dates, array $amounts, array $base): array
     {
         $quotaCount = max(1, (int) $request->input('nro_cuotas'));
-        $firstDate = Carbon::parse($dates[0] ?? now());
+        $firstDate = Carbon::parse($dates[0] ?? now('America/Lima'));
 
         return array_merge($base, [
-            'fecha_promesa' => now()->toDateString(),
+            'fecha_promesa' => now('America/Lima')->toDateString(),
             'fecha_pago' => $firstDate->toDateString(),
             'cuota_dia' => (int) $firstDate->day,
             'nro_cuotas' => $quotaCount,
@@ -124,7 +122,7 @@ class PromesaCreationService
         $date = Carbon::parse($request->input('fecha_pago'));
 
         return array_merge($base, [
-            'fecha_promesa' => $date->toDateString(),
+            'fecha_promesa' => now('America/Lima')->toDateString(),
             'fecha_pago' => $date->toDateString(),
             'monto' => (float) $request->input('monto_cancel'),
         ]);

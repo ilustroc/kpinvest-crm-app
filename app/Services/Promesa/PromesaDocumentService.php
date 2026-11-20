@@ -4,17 +4,57 @@ namespace App\Services\Promesa;
 
 use App\Models\PromesaPago;
 use Carbon\Carbon;
-use Ilovepdf\Ilovepdf;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Ilovepdf\Ilovepdf;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 use ZipArchive;
 
 class PromesaDocumentService
 {
+    /**
+     * Fake PDF converter closure for tests (avoids consuming real iLovePDF credits).
+     */
+    public static ?\Closure $fakePdfConverter = null;
+
+    /**
+     * Localiza la ruta absoluta de la plantilla oficial Word del acuerdo de pago.
+     * Revisa en orden de prioridad: config, almacenamiento privado de plantillas y recursos.
+     */
+    public function resolveTemplatePath(): string
+    {
+        $candidates = array_values(array_filter([
+            config('promesas.template_path'),
+            storage_path('app/templates/Acuerdo_de_Pago_DNI_{dni}.docx'),
+            resource_path('templates/Acuerdo_de_Pago_DNI_{dni}.docx'),
+            storage_path('app/templates/Acuerdo_de_Pago.docx'),
+            resource_path('templates/Acuerdo_de_Pago.docx'),
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                $storageDefault = storage_path('app/templates/Acuerdo_de_Pago_DNI_{dni}.docx');
+                if ($candidate !== $storageDefault && ! is_file($storageDefault)) {
+                    $storageDir = dirname($storageDefault);
+                    if (! is_dir($storageDir)) {
+                        @mkdir($storageDir, 0770, true);
+                    }
+                    if (is_dir($storageDir) && is_writable($storageDir)) {
+                        @copy($candidate, $storageDefault);
+                    }
+                }
+
+                return $candidate;
+            }
+        }
+
+        throw new \RuntimeException('No se encontró la plantilla oficial del acuerdo de pago en las ubicaciones autorizadas.');
+    }
+
     public function agreementResponse(PromesaPago $promesa): Response|BinaryFileResponse
     {
         $workflow = strtolower(trim((string) ($promesa->workflow_estado ?: $promesa->estado)));
@@ -31,19 +71,29 @@ class PromesaDocumentService
             @mkdir($docxPrivateDir, 0770, true);
         }
 
-        $docNum = (string) ($promesa->numdoc ?? $promesa->dni);
+        $docNum = (string) ($promesa->numdoc ?: $promesa->dni);
+        $dniRaw = (string) ($promesa->dni ?: $promesa->numdoc);
         $pdfPrivateFile = "{$pdfPrivateDir}/Acuerdo_{$promesa->id}_{$docNum}.pdf";
         $docxPrivateFile = "{$docxPrivateDir}/Acuerdo_{$promesa->id}_{$docNum}.docx";
 
-        // Si el PDF oficial ya existe en almacenamiento privado, servirlo directamente sin reprocesar.
-        if (is_file($pdfPrivateFile) && filesize($pdfPrivateFile) > 0) {
-            return response()->file($pdfPrivateFile, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$docNum.'.pdf"',
-                'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
-                'Pragma' => 'no-cache',
-                'X-Content-Type-Options' => 'nosniff',
-            ]);
+        // 8. Reutilizar un PDF previamente generado cuando exista y sea válido, evitando consumir créditos innecesariamente.
+        $candidatePdfs = array_unique([
+            $pdfPrivateFile,
+            "{$pdfPrivateDir}/Acuerdo_{$promesa->id}_{$dniRaw}.pdf",
+            "{$pdfPrivateDir}/Conv_{$docNum}.pdf",
+            "{$pdfPrivateDir}/Conv_{$dniRaw}.pdf",
+        ]);
+
+        foreach ($candidatePdfs as $candidatePdf) {
+            if (is_file($candidatePdf) && filesize($candidatePdf) > 0) {
+                return response()->file($candidatePdf, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$docNum.'.pdf"',
+                    'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+            }
         }
 
         $requestId = now()->format('YmdHis').'_'.bin2hex(random_bytes(3));
@@ -52,9 +102,23 @@ class PromesaDocumentService
         $pdfOut = null;
 
         try {
-            $template = storage_path('app/templates/Acuerdo_de_Pago_DNI_{dni}.docx');
-            if (! is_file($template)) {
-                abort(404, 'No se encontro la plantilla: '.$template);
+            try {
+                $template = $this->resolveTemplatePath();
+            } catch (Throwable $e) {
+                Log::error('Error localizando plantilla oficial de acuerdo', [
+                    'req_id' => $requestId,
+                    'promesa_id' => $promesa->id,
+                    'dni' => $docNum,
+                    'searched_paths' => [
+                        storage_path('app/templates/Acuerdo_de_Pago_DNI_{dni}.docx'),
+                        resource_path('templates/Acuerdo_de_Pago_DNI_{dni}.docx'),
+                        storage_path('app/templates/Acuerdo_de_Pago.docx'),
+                        resource_path('templates/Acuerdo_de_Pago.docx'),
+                    ],
+                    'msg' => $e->getMessage(),
+                ]);
+
+                abort(404, 'La plantilla oficial del acuerdo de pago no se encuentra disponible. Contacte al administrador.');
             }
 
             if (! is_dir($isolatedTmpDir)) {
@@ -71,14 +135,14 @@ class PromesaDocumentService
             $document = new TemplateProcessor($template);
             $this->fillDocument($document, $promesa, $client, $operationRows, $scheduleRows);
 
-            $docxOut = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$promesa->dni}.docx";
+            $docxOut = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$docNum}.docx";
             $document->saveAs($docxOut);
             @copy($docxOut, $docxPrivateFile);
 
             Log::info('PROMESA_DOCX_INSPECT', [
                 'req_id' => $requestId,
                 'promesa_id' => $promesa->id,
-                'dni' => $promesa->dni,
+                'dni' => $docNum,
                 'tpl' => $template,
                 'ops_count' => count($operations),
                 'cuotas_count' => $promesa->relationLoaded('cuotas') ? $promesa->cuotas->count() : null,
@@ -94,7 +158,7 @@ class PromesaDocumentService
 
                 return response()->file($pdfPrivateFile, [
                     'Content-Type' => 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$promesa->dni.'.pdf"',
+                    'Content-Disposition' => 'inline; filename="Acuerdo_'.$promesa->id.'_'.$docNum.'.pdf"',
                     'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
                     'Pragma' => 'no-cache',
                     'X-Content-Type-Options' => 'nosniff',
@@ -103,7 +167,7 @@ class PromesaDocumentService
                 Log::warning('iLovePDF fallo, entregando DOCX', [
                     'req_id' => $requestId,
                     'promesa_id' => $promesa->id,
-                    'dni' => $promesa->dni,
+                    'dni' => $docNum,
                     'msg' => $e->getMessage(),
                     'exception' => get_class($e),
                 ]);
@@ -118,7 +182,7 @@ class PromesaDocumentService
                     @rmdir($isolatedTmpDir);
                 }
 
-                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$promesa->dni}.docx", [
+                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$docNum}.docx", [
                     'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
                     'Pragma' => 'no-cache',
@@ -126,16 +190,20 @@ class PromesaDocumentService
                 ]);
             }
         } catch (Throwable $e) {
+            if ($e instanceof HttpExceptionInterface) {
+                throw $e;
+            }
+
             Log::error('Error generando Conv PDF', [
                 'req_id' => $requestId,
                 'promesa_id' => $promesa->id ?? null,
-                'dni' => $promesa->dni ?? null,
+                'dni' => $docNum ?? null,
                 'msg' => $e->getMessage(),
                 'exception' => get_class($e),
             ]);
 
             if (is_file($docxPrivateFile)) {
-                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$promesa->dni}.docx", [
+                return response()->download($docxPrivateFile, "Acuerdo_{$promesa->id}_{$docNum}.docx", [
                     'Cache-Control' => 'private, no-store, no-cache, must-revalidate, max-age=0',
                     'Pragma' => 'no-cache',
                     'X-Content-Type-Options' => 'nosniff',
@@ -342,6 +410,22 @@ class PromesaDocumentService
 
     private function convertToPdf(string $docxOut, string $isolatedTmpDir, PromesaPago $promesa): string
     {
+        $docNum = (string) ($promesa->numdoc ?: $promesa->dni);
+
+        // 8. Conversión a PDF simulada en pruebas automatizadas, sin consumir créditos reales.
+        if (self::$fakePdfConverter !== null) {
+            $converter = self::$fakePdfConverter;
+
+            return $converter($docxOut, $isolatedTmpDir, $promesa);
+        }
+
+        if (app()->environment('testing') && (! config('services.ilovepdf.public') || ! config('services.ilovepdf.secret'))) {
+            $simulatedPdf = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$docNum}.pdf";
+            file_put_contents($simulatedPdf, "%PDF-1.4 Simulated Agreement for Promesa #{$promesa->id}\n%%EOF");
+
+            return $simulatedPdf;
+        }
+
         $public = config('services.ilovepdf.public');
         $secret = config('services.ilovepdf.secret');
 
@@ -351,12 +435,12 @@ class PromesaDocumentService
 
         $ilovepdf = new Ilovepdf($public, $secret);
         $task = $ilovepdf->newTask('officepdf');
-        $task->setOutputFilename("Acuerdo_{$promesa->id}_{$promesa->dni}");
+        $task->setOutputFilename("Acuerdo_{$promesa->id}_{$docNum}");
         $task->addFile($docxOut);
         $task->execute();
         $task->download($isolatedTmpDir);
 
-        $expectedPdf = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$promesa->dni}.pdf";
+        $expectedPdf = $isolatedTmpDir."/Acuerdo_{$promesa->id}_{$docNum}.pdf";
         if (is_file($expectedPdf)) {
             return $expectedPdf;
         }
@@ -426,14 +510,16 @@ class PromesaDocumentService
 
         if (! is_file($docxAbs)) {
             $out['xml_error'] = ['reason' => 'file_not_found'];
+
             return $out;
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $open = $zip->open($docxAbs);
 
         if ($open !== true) {
             $out['xml_error'] = ['reason' => 'zip_open_failed', 'code' => $open];
+
             return $out;
         }
 
@@ -445,7 +531,7 @@ class PromesaDocumentService
         $previous = libxml_use_internal_errors(true);
         libxml_clear_errors();
 
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
 
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $name = $zip->getNameIndex($i);

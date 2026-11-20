@@ -32,11 +32,15 @@ database/backup/
 
 # Sensitive or generated attachments, documents and exports
 *.docx
+!resources/templates/*.docx
+!storage/app/templates/*.docx
 *.pdf
 *.xlsx
 *.csv
 storage/app/*
 !storage/app/.gitignore
+!storage/app/templates
+!storage/app/templates/*
 storage/logs/*
 !storage/logs/.gitignore
 storage/framework/cache/*

@@ -20,11 +20,12 @@
                 label="Teléfono de contacto *"
                 name="telefono"
                 id="telefonoPropuesta"
-                maxlength="30"
-                inputmode="tel"
-                pattern="^\+?\d[\d\s\-]{5,}$"
-                title="Ingresa un teléfono válido"
-                placeholder="+51 9XXXXXXXX"
+                maxlength="9"
+                minlength="9"
+                inputmode="numeric"
+                pattern="^9[0-9]{8}$"
+                title="El teléfono debe tener exactamente 9 dígitos y comenzar con 9"
+                placeholder="9XXXXXXXX"
                 required
             />
             <x-forms.error name="telefono" />
@@ -105,7 +106,7 @@
 
         <div class="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
-                <x-ui.date label="Fecha inicial" id="cvFechaIni" />
+                <x-ui.date label="Fecha inicial" id="cvFechaIni" min="{{ now('America/Lima')->toDateString() }}" />
             </div>
             <x-ui.button type="button" id="cvGen" variant="secondary" class="w-full sm:w-auto">
                 <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
@@ -177,7 +178,7 @@
             </div>
 
             <div>
-                <x-ui.date label="Fecha límite de pago *" name="fecha_pago_cancel" id="fechaPagoCancel" />
+                <x-ui.date label="Fecha límite de pago *" name="fecha_pago_cancel" id="fechaPagoCancel" min="{{ now('America/Lima')->toDateString() }}" />
                 <x-forms.error name="fecha_pago_cancel" />
             </div>
         </div>
